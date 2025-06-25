@@ -1,0 +1,76 @@
+﻿<Project Sdk="Dalamud.NET.Sdk/12.0.2">
+  <PropertyGroup>
+    <Authors>eqbot, ViviAshe, astrodoobs</Authors>
+    <Company></Company>
+    <Version>0.2.1.7</Version>
+    <Description>Snappy</Description>
+    <Copyright></Copyright>
+    <PackageProjectUrl>https://github.com/astrodoobs/XIVSnapper</PackageProjectUrl>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net9.0-windows7.0</TargetFramework>
+    <Platforms>x64</Platforms>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <ProduceReferenceAssembly>false</ProduceReferenceAssembly>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <CopyLocalLockfileAssemblies>true</CopyLocalLockfileAssemblies>
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <DalamudLibPath>$(appdata)\XIVLauncher\addon\Hooks\dev\</DalamudLibPath>
+  </PropertyGroup>
+  
+   <PropertyGroup Condition="'$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::Linux)))'">
+    <DalamudLibPath>$(DALAMUD_HOME)/</DalamudLibPath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ECommons\ECommons\ECommons.csproj" />
+    <ProjectReference Include="..\Glamourer.Api\Glamourer.Api.csproj" />
+    <ProjectReference Include="..\Penumbra\Penumbra.GameData\Penumbra.GameData.csproj" />
+    <ProjectReference Include="..\Penumbra\Penumbra\Penumbra.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+        <PackageReference Include="Lumina" Version="5.6.1" />
+        <PackageReference Include="Lumina.Excel" Version="7.2.1" />
+        <PackageReference Include="lz4net" Version="1.0.15.93" />
+        <PackageReference Include="Microsoft.Extensions.Logging" Version="9.0.3" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <Reference Include="FFXIVClientStructs">
+            <HintPath>$(DalamudLibPath)FFXIVClientStructs.dll</HintPath>
+            <Private>false</Private>
+        </Reference>
+        <Reference Include="Newtonsoft.Json">
+            <HintPath>$(DalamudLibPath)Newtonsoft.Json.dll</HintPath>
+            <Private>false</Private>
+        </Reference>
+        <Reference Include="Dalamud">
+            <HintPath>$(DalamudLibPath)Dalamud.dll</HintPath>
+            <Private>false</Private>
+        </Reference>
+        <Reference Include="ImGui.NET">
+            <HintPath>$(DalamudLibPath)ImGui.NET.dll</HintPath>
+            <Private>false</Private>
+        </Reference>
+        <Reference Include="ImGuiScene">
+            <HintPath>$(DalamudLibPath)ImGuiScene.dll</HintPath>
+            <Private>false</Private>
+        </Reference>
+        <Reference Include="Lumina">
+            <HintPath>$(DalamudLibPath)Lumina.dll</HintPath>
+            <Private>false</Private>
+        </Reference>
+        <Reference Include="Lumina.Excel">
+            <HintPath>$(DalamudLibPath)Lumina.Excel.dll</HintPath>
+            <Private>false</Private>
+        </Reference>
+    </ItemGroup>
+
+</Project>
