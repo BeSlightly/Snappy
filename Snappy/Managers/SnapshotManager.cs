@@ -284,7 +284,7 @@ namespace Snappy.Managers
             }
         }
 
-        private string CreateCustomizePlusTemplate(string profileJson, string characterName)
+        internal string CreateCustomizePlusTemplate(string profileJson, string characterName)
         {
             const byte templateVersionByte = 4;
 
