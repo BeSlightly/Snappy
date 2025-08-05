@@ -14,6 +14,12 @@
         "resolved": "1.2.25",
         "contentHash": "xCXiw7BCxHJ8pF6wPepRUddlh2dlQlbr81gXA72hdk4FLHkKXas7EH/n+fk5UCA/YfMqG1Z6XaPiUjDbUNBUzg=="
       },
+      "ECommons": {
+        "type": "Direct",
+        "requested": "[3.0.0.8, )",
+        "resolved": "3.0.0.8",
+        "contentHash": "wvB3MTBTYQh8a7gAf5pLVS1wqyvihn4Q0RpHAgf/i+vMPVMMi/X2fegWE6JEY13syR4kl8WlGCkQmemxCZhe6Q=="
+      },
       "Lumina": {
         "type": "Direct",
         "requested": "[5.6.1, )",
@@ -51,6 +57,14 @@
           "Microsoft.Extensions.DependencyInjection": "9.0.3",
           "Microsoft.Extensions.Logging.Abstractions": "9.0.3",
           "Microsoft.Extensions.Options": "9.0.3"
+        }
+      },
+      "EmbedIO": {
+        "type": "Transitive",
+        "resolved": "3.5.2",
+        "contentHash": "YU4j+3XvuO8/VPkNf7KWOF1TpMhnyVhXnPsG1mvnDhTJ9D5BZOFXVDvCpE/SkQ1AJ0Aa+dXOVSW3ntgmLL7aJg==",
+        "dependencies": {
+          "Unosquare.Swan.Lite": "3.1.0"
         }
       },
       "JetBrains.Annotations": {
@@ -177,6 +191,20 @@
           "System.Xml.XDocument": "4.3.0"
         }
       },
+      "PeNet": {
+        "type": "Transitive",
+        "resolved": "5.1.0",
+        "contentHash": "XSd1PUwWo5uI8iqVHk7Mm02RT1bjndtAYsaRwLmdYZoHOAmb4ohkvRcZiqxJ7iLfBfdiwm+PHKQIMqDmOavBtw==",
+        "dependencies": {
+          "PeNet.Asn1": "2.0.1",
+          "System.Security.Cryptography.Pkcs": "8.0.1"
+        }
+      },
+      "PeNet.Asn1": {
+        "type": "Transitive",
+        "resolved": "2.0.1",
+        "contentHash": "YR2O2YokSAYB+7CXkCDN3bd6/p0K3/AicCPkOJHKUz500v1D/hulCuVlggguqNc3M0LgSfOZKGvVYg2ud1GA9A=="
+      },
       "runtime.debian.8-x64.runtime.native.System.Security.Cryptography.OpenSsl": {
         "type": "Transitive",
         "resolved": "4.3.0",
@@ -284,18 +312,40 @@
         "resolved": "4.3.0",
         "contentHash": "VB5cn/7OzUfzdnC8tqAIMQciVLiq2epm2NrAm1E9OjNRyG4lVhfR61SMcLizejzQP8R8Uf/0l5qOIbUEi+RdEg=="
       },
-      "SharpGen.Runtime": {
+      "SharpCompress": {
         "type": "Transitive",
-        "resolved": "2.1.2-beta",
-        "contentHash": "nqZAjfEG1jX1ivvdZLsi6Pkt0DiOJyuOgRgldNFsmjXFPhxUbXQibofLSwuDZidL2kkmtTF8qLoRIeqeVdXgYw=="
-      },
-      "SharpGen.Runtime.COM": {
-        "type": "Transitive",
-        "resolved": "2.1.2-beta",
-        "contentHash": "HBCrb6HfnUWx9v5/GjJeBr5DuodZLnHlFQQYXPrQs1Hbe1c6Wd0uCXf+SJp4hW8fQNxjXEu0FgiyHGlA/SRzRw==",
+        "resolved": "0.40.0",
+        "contentHash": "yP/aFX1jqGikVF7u2f05VEaWN4aCaKNLxSas82UgA2GGVECxq/BcqZx3STHCJ78qilo1azEOk1XpBglIuGMb7w==",
         "dependencies": {
-          "SharpGen.Runtime": "2.1.2-beta"
+          "System.Buffers": "4.6.0",
+          "ZstdSharp.Port": "0.8.5"
         }
+      },
+      "SharpGLTF.Core": {
+        "type": "Transitive",
+        "resolved": "1.0.5",
+        "contentHash": "HNHKPqaHXm7R1nlXZ764K5UI02IeDOQ5DQKLjwYUVNTsSW27jJpw+wLGQx6ZFoiFYqUlyZjmsu+WfEak2GmJAg=="
+      },
+      "SharpGLTF.Runtime": {
+        "type": "Transitive",
+        "resolved": "1.0.5",
+        "contentHash": "EVP32k4LqERxSVICiupT8xQvhHSHJCiXajBjNpqdfdajtREHayuVhH0Jmk6uSjTLX8/IIH9XfT34sw3TwvCziw==",
+        "dependencies": {
+          "SharpGLTF.Core": "1.0.5"
+        }
+      },
+      "SharpGLTF.Toolkit": {
+        "type": "Transitive",
+        "resolved": "1.0.5",
+        "contentHash": "piQKk7PH2pSWQSQmCSd8cYPaDtAy/ppAD+Mrh2RUhhHI8awl81HqqLyAauwQhJwea3LNaiJ6f4ehZuOGk89TlA==",
+        "dependencies": {
+          "SharpGLTF.Runtime": "1.0.5"
+        }
+      },
+      "SixLabors.ImageSharp": {
+        "type": "Transitive",
+        "resolved": "3.1.11",
+        "contentHash": "JfPLyigLthuE50yi6tMt7Amrenr/fA31t2CvJyhy/kQmfulIBAqo5T/YFUSRHtuYPXRSaUHygFeh6Qd933EoSw=="
       },
       "System.AppContext": {
         "type": "Transitive",
@@ -307,15 +357,8 @@
       },
       "System.Buffers": {
         "type": "Transitive",
-        "resolved": "4.3.0",
-        "contentHash": "ratu44uTIHgeBeI0dE8DWvmXVBSo4u7ozRZZHOMmK/JPpYyo0dAfgSiHlpiObMQ5lEtEyIXA40sKRYg5J6A8uQ==",
-        "dependencies": {
-          "System.Diagnostics.Debug": "4.3.0",
-          "System.Diagnostics.Tracing": "4.3.0",
-          "System.Resources.ResourceManager": "4.3.0",
-          "System.Runtime": "4.3.0",
-          "System.Threading": "4.3.0"
-        }
+        "resolved": "4.6.0",
+        "contentHash": "lN6tZi7Q46zFzAbRYXTIvfXcyvQQgxnY7Xm6C6xQ9784dEL1amjM6S6Iw4ZpsvesAKnRVsM4scrDQaDqSClkjA=="
       },
       "System.Collections": {
         "type": "Transitive",
@@ -862,6 +905,11 @@
           "runtime.native.System.Security.Cryptography.OpenSsl": "4.3.0"
         }
       },
+      "System.Security.Cryptography.Pkcs": {
+        "type": "Transitive",
+        "resolved": "8.0.1",
+        "contentHash": "CoCRHFym33aUSf/NtWSVSZa99dkd0Hm7OCZUxORBjRB16LNhIEOf8THPqzIYlvKM0nNDAPTRBa1FxEECrgaxxA=="
+      },
       "System.Security.Cryptography.Primitives": {
         "type": "Transitive",
         "resolved": "4.3.0",
@@ -976,6 +1024,11 @@
           "System.Runtime": "4.3.0"
         }
       },
+      "System.ValueTuple": {
+        "type": "Transitive",
+        "resolved": "4.5.0",
+        "contentHash": "okurQJO6NRE/apDIP23ajJ0hpiNmJ+f0BwOlB/cSqTLQlw5upkf+5+96+iG2Jw40G1fCVCyPz/FhIABUjMR+RQ=="
+      },
       "System.Xml.ReaderWriter": {
         "type": "Transitive",
         "resolved": "4.3.0",
@@ -1017,50 +1070,18 @@
           "System.Xml.ReaderWriter": "4.3.0"
         }
       },
-      "Vortice.Direct3D11": {
+      "Unosquare.Swan.Lite": {
         "type": "Transitive",
-        "resolved": "3.4.2-beta",
-        "contentHash": "CWVMTF7ebylzzXbQXVp5C9UpBB/L+EpX2OxSdb2wlzcsdEmrev/Ith8wVs0WjZ6DbA0WiiybnYAWqB5v0nOO/A==",
+        "resolved": "3.1.0",
+        "contentHash": "X3s5QE/KMj3WAPFqFve7St+Ds10BB50u8kW8PmKIn7FVkn7yEXe9Yxr2htt1WV85DRqfFR0MN/BUNHkGHtL4OQ==",
         "dependencies": {
-          "SharpGen.Runtime": "2.1.2-beta",
-          "Vortice.DXGI": "3.4.2-beta"
+          "System.ValueTuple": "4.5.0"
         }
       },
-      "Vortice.DirectX": {
+      "ZstdSharp.Port": {
         "type": "Transitive",
-        "resolved": "3.4.2-beta",
-        "contentHash": "EwDbemXkmEiDGZVDem25uiEcZBYOMb+wzePuta+M/k2LXrQVGPknZhZUK56+QlHhI+Ducf/d+J75wgBzEjKi2g==",
-        "dependencies": {
-          "SharpGen.Runtime": "2.1.2-beta",
-          "SharpGen.Runtime.COM": "2.1.2-beta",
-          "Vortice.Mathematics": "1.7.6"
-        }
-      },
-      "Vortice.DXGI": {
-        "type": "Transitive",
-        "resolved": "3.4.2-beta",
-        "contentHash": "T4S3pp6l/SGJ6SH3ebCbodN/bimGOkIBiIYKeBpVEis7+/ac1XIjyzgSTJ5XsH3o3hSH7DqSbP6Yo6mL9nyFQA==",
-        "dependencies": {
-          "SharpGen.Runtime": "2.1.2-beta",
-          "Vortice.DirectX": "3.4.2-beta"
-        }
-      },
-      "Vortice.Mathematics": {
-        "type": "Transitive",
-        "resolved": "1.7.6",
-        "contentHash": "W8FNv850lPGxmHphwLyi1qnUlQHZBxh/62EenFJTaY6acPP29Fk0xMQJI60G+YNlsVJb3fSoriuW+ong5sM5UQ=="
-      },
-      "glamourer": {
-        "type": "Project",
-        "dependencies": {
-          "DalamudPackager": "[12.0.0, )",
-          "Glamourer.Api": "[2.4.1, )",
-          "OtterGui": "[1.0.0, )",
-          "Penumbra.Api": "[5.6.1, )",
-          "Penumbra.GameData": "[1.0.0, )",
-          "Penumbra.String": "[1.0.6, )",
-          "Vortice.Direct3D11": "[3.4.2-beta, )"
-        }
+        "resolved": "0.8.5",
+        "contentHash": "TR4j17WeVSEb3ncgL2NqlXEqcy04I+Kk9CaebNDplUeL8XOgjkZ7fP4Wg4grBdPLIqsV86p2QaXTkZoRMVOsew=="
       },
       "glamourer.api": {
         "type": "Project"
@@ -1072,14 +1093,33 @@
           "Microsoft.Extensions.DependencyInjection": "[9.0.2, )"
         }
       },
+      "penumbra": {
+        "type": "Project",
+        "dependencies": {
+          "EmbedIO": "[3.5.2, )",
+          "OtterGui": "[1.0.0, )",
+          "PeNet": "[5.1.0, )",
+          "Penumbra.Api": "[5.10.0, )",
+          "Penumbra.CrashHandler": "[1.0.0, )",
+          "Penumbra.GameData": "[1.0.0, )",
+          "Penumbra.String": "[1.0.6, )",
+          "SharpCompress": "[0.40.0, )",
+          "SharpGLTF.Core": "[1.0.5, )",
+          "SharpGLTF.Toolkit": "[1.0.5, )",
+          "SixLabors.ImageSharp": "[3.1.11, )"
+        }
+      },
       "penumbra.api": {
+        "type": "Project"
+      },
+      "penumbra.crashhandler": {
         "type": "Project"
       },
       "penumbra.gamedata": {
         "type": "Project",
         "dependencies": {
           "OtterGui": "[1.0.0, )",
-          "Penumbra.Api": "[5.6.1, )",
+          "Penumbra.Api": "[5.10.0, )",
           "Penumbra.String": "[1.0.6, )"
         }
       },

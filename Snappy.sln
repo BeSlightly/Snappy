@@ -7,8 +7,6 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Snappy", "Snappy\Snappy.csp
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Glamourer.Api", "Glamourer.Api\Glamourer.Api.csproj", "{8C7FE3F5-06BE-8D99-EA44-47B7A8097CF8}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ECommons", "ECommons\ECommons\ECommons.csproj", "{0B1F2C54-98D7-DBB6-6CDF-C71EE0173954}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Penumbra", "Penumbra\Penumbra\Penumbra.csproj", "{41B46E26-43A2-90B4-2D5F-F2C8ED34C378}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Penumbra.GameData", "Penumbra\Penumbra.GameData\Penumbra.GameData.csproj", "{109B6D82-1D91-2186-D916-39E0DBD6C08D}"
@@ -45,14 +43,6 @@ Global
 		{8C7FE3F5-06BE-8D99-EA44-47B7A8097CF8}.Release|Any CPU.Build.0 = Release|x64
 		{8C7FE3F5-06BE-8D99-EA44-47B7A8097CF8}.Release|x64.ActiveCfg = Release|x64
 		{8C7FE3F5-06BE-8D99-EA44-47B7A8097CF8}.Release|x64.Build.0 = Release|x64
-		{0B1F2C54-98D7-DBB6-6CDF-C71EE0173954}.Debug|Any CPU.ActiveCfg = Debug|x64
-		{0B1F2C54-98D7-DBB6-6CDF-C71EE0173954}.Debug|Any CPU.Build.0 = Debug|x64
-		{0B1F2C54-98D7-DBB6-6CDF-C71EE0173954}.Debug|x64.ActiveCfg = Debug|x64
-		{0B1F2C54-98D7-DBB6-6CDF-C71EE0173954}.Debug|x64.Build.0 = Debug|x64
-		{0B1F2C54-98D7-DBB6-6CDF-C71EE0173954}.Release|Any CPU.ActiveCfg = Release|x64
-		{0B1F2C54-98D7-DBB6-6CDF-C71EE0173954}.Release|Any CPU.Build.0 = Release|x64
-		{0B1F2C54-98D7-DBB6-6CDF-C71EE0173954}.Release|x64.ActiveCfg = Release|x64
-		{0B1F2C54-98D7-DBB6-6CDF-C71EE0173954}.Release|x64.Build.0 = Release|x64
 		{41B46E26-43A2-90B4-2D5F-F2C8ED34C378}.Debug|Any CPU.ActiveCfg = Debug|x64
 		{41B46E26-43A2-90B4-2D5F-F2C8ED34C378}.Debug|Any CPU.Build.0 = Debug|x64
 		{41B46E26-43A2-90B4-2D5F-F2C8ED34C378}.Debug|x64.ActiveCfg = Debug|x64

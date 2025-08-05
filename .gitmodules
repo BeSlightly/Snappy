@@ -1,9 +1,6 @@
-[submodule "ECommons"]
-	path = ECommons
-	url = https://github.com/NightmareXIV/ECommons.git
 [submodule "Glamourer.Api"]
 	path = Glamourer.Api
-	url = https://github.com/Ottermandias/Glamourer.Api.git
+	url = https://github.com/Ottermandias/Glamourer.api
 [submodule "Penumbra"]
 	path = Penumbra
 	url = https://github.com/xivdev/Penumbra
