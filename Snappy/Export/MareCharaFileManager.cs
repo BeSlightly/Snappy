@@ -12,10 +12,12 @@ namespace MareSynchronos.Export;
 public class MareCharaFileManager
 {
     private readonly Configuration _configuration;
+    private readonly Plugin _plugin;
     public MareCharaFileHeader? LoadedCharaFile { get; private set; }
 
     public MareCharaFileManager(Plugin plugin)
     {
+        _plugin = plugin;
         _configuration = plugin.Configuration;
     }
 
@@ -105,6 +107,28 @@ public class MareCharaFileManager
                 else
                 {
                     snapInfo.FileReplacements.Add(record.Value, new List<string>() { record.Key });
+                }
+            }
+
+            if (!string.IsNullOrEmpty(snapInfo.CustomizeData))
+            {
+                try
+                {
+                    // The data in the MCDF is the Base64 of the raw JSON profile. Decode it.
+                    var cPlusJson = System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(snapInfo.CustomizeData));
+
+                    // The 'path' variable is already defined earlier in the method.
+                    var templateString = _plugin.SnapshotManager.CreateCustomizePlusTemplate(cPlusJson, LoadedCharaFile.CharaFileData.Description);
+
+                    if (!string.IsNullOrEmpty(templateString))
+                    {
+                        File.WriteAllText(Path.Combine(path, "customizePlus.json"), templateString);
+                        Logger.Debug("Successfully created customizePlus.json from imported MCDF data.");
+                    }
+                }
+                catch (Exception e)
+                {
+                    Logger.Error("Failed to create customizePlus.json from imported MCDF data.", e);
                 }
             }
 

@@ -1,5 +1,4 @@
-﻿// CustomizeIpc.Defs.cs
-namespace Snappy.Managers.Customize;
+﻿namespace Snappy.Managers.Customize;
 
 public partial class CustomizeIpc
 {

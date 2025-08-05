@@ -12,28 +12,23 @@ namespace Snappy.Managers.Customize;
 public partial class CustomizeIpc : IDisposable
 {
     private readonly DalamudUtil _dalamudUtil;
-    private readonly ConcurrentQueue<Action> _queue;
 
-    private readonly ICallGateSubscriber<string> _apiVersion;
-    private readonly ICallGateSubscriber<string> _branch;
-    private readonly ICallGateSubscriber<string, string> _getTemp;
-    private readonly ICallGateSubscriber<ICharacter?, string> _getFromChar;
-    private readonly ICallGateSubscriber<string, ICharacter?, object> _setToChar;
-    private readonly ICallGateSubscriber<ICharacter?, object> _revert;
-    private readonly ICallGateSubscriber<string?, object> _onScaleUpdate;
+    private readonly ICallGateSubscriber<(int, int)> _getApiVersion;
+    private readonly ICallGateSubscriber<ushort, (int, Guid?)> _getActiveProfileId;
+    private readonly ICallGateSubscriber<Guid, (int, string?)> _getProfileById;
+    private readonly ICallGateSubscriber<ushort, string, (int, Guid?)> _setTempProfile;
+    private readonly ICallGateSubscriber<Guid, int> _deleteTempProfileById;
 
-    public CustomizeIpc(IDalamudPluginInterface pi, DalamudUtil dalamudUtil, ConcurrentQueue<Action> queue)
+    public CustomizeIpc(IDalamudPluginInterface pi, DalamudUtil dalamudUtil)
     {
         _dalamudUtil = dalamudUtil;
-        _queue = queue;
 
-        _apiVersion = pi.GetIpcSubscriber<string>("CustomizePlus.GetApiVersion");
-        _branch = pi.GetIpcSubscriber<string>("CustomizePlus.GetBranch");
-        _getTemp = pi.GetIpcSubscriber<string, string>("CustomizePlus.GetTemporaryScale");
-        _getFromChar = pi.GetIpcSubscriber<ICharacter?, string>("CustomizePlus.GetBodyScaleFromCharacter");
-        _setToChar = pi.GetIpcSubscriber<string, ICharacter?, object>("CustomizePlus.SetBodyScaleToCharacter");
-        _revert = pi.GetIpcSubscriber<ICharacter?, object>("CustomizePlus.RevertCharacter");
-        _onScaleUpdate = pi.GetIpcSubscriber<string?, object>("CustomizePlus.OnScaleUpdate");
+        // Modern IPC definitions based on C+ API v6
+        _getApiVersion = pi.GetIpcSubscriber<(int, int)>("CustomizePlus.General.GetApiVersion");
+        _getActiveProfileId = pi.GetIpcSubscriber<ushort, (int, Guid?)>("CustomizePlus.Profile.GetActiveProfileIdOnCharacter");
+        _getProfileById = pi.GetIpcSubscriber<Guid, (int, string?)>("CustomizePlus.Profile.GetByUniqueId");
+        _setTempProfile = pi.GetIpcSubscriber<ushort, string, (int, Guid?)>("CustomizePlus.Profile.SetTemporaryProfileOnCharacter");
+        _deleteTempProfileById = pi.GetIpcSubscriber<Guid, int>("CustomizePlus.Profile.DeleteTemporaryProfileByUniqueId");
     }
 
     public void Dispose() { }
@@ -42,10 +37,20 @@ public partial class CustomizeIpc : IDisposable
     {
         try
         {
-            return _apiVersion.InvokeFunc() == "1.0" && _branch.InvokeFunc() == "eqbot";
+            var version = _getApiVersion.InvokeFunc();
+            // We need API version 6 or higher.
+            if (version.Item1 >= 6)
+            {
+                // Let's not spam the log every time. A debug message is fine.
+                Logger.Verbose($"Customize+ API v{version.Item1}.{version.Item2} found.");
+                return true;
+            }
+            Logger.Warn($"Customize+ API v{version.Item1}.{version.Item2} is not compatible. Snappy requires v6 or higher.");
+            return false;
         }
         catch
         {
+            Logger.Warn("Could not check Customize+ API version. Is it installed and running?");
             return false;
         }
     }
@@ -53,35 +58,71 @@ public partial class CustomizeIpc : IDisposable
     public string GetScaleFromCharacter(ICharacter c)
     {
         if (!CheckApi()) return string.Empty;
-        var scale = _getFromChar.InvokeFunc(c);
-        return string.IsNullOrEmpty(scale) ? string.Empty : Convert.ToBase64String(Encoding.UTF8.GetBytes(scale));
+
+        try
+        {
+            // Step 1: Get the active profile ID for the character.
+            var (profileIdCode, profileId) = _getActiveProfileId.InvokeFunc(c.ObjectIndex);
+            if (profileIdCode != 0 || profileId == null || profileId == Guid.Empty)
+            {
+                Logger.Debug($"C+: No active profile found for {c.Name} (Code: {profileIdCode}).");
+                return string.Empty;
+            }
+            Logger.Debug($"C+: Found active profile {profileId} for {c.Name}");
+
+            // Step 2: Get the profile data (as JSON) using the ID.
+            var (profileDataCode, profileJson) = _getProfileById.InvokeFunc(profileId.Value);
+            if (profileDataCode != 0 || string.IsNullOrEmpty(profileJson))
+            {
+                Logger.Warn($"C+: Could not retrieve profile data for {profileId} (Code: {profileDataCode}).");
+                return string.Empty;
+            }
+
+            // The result is the raw JSON, no Base64 encoding needed.
+            return profileJson;
+        }
+        catch (Exception ex)
+        {
+            Logger.Error("Exception during C+ GetScaleFromCharacter IPC.", ex);
+            return string.Empty;
+        }
     }
 
-    public void SetScale(IntPtr address, string scale)
+    public Guid? SetScale(IntPtr address, string scale)
     {
-        if (!CheckApi() || string.IsNullOrEmpty(scale)) return;
-        _queue.Enqueue(() =>
+        if (!CheckApi() || string.IsNullOrEmpty(scale)) return null;
+
+        var gameObj = _dalamudUtil.CreateGameObject(address);
+        if (gameObj is ICharacter c)
         {
-            var gameObj = _dalamudUtil.CreateGameObject(address);
-            if (gameObj is ICharacter c)
+            try
             {
-                Logger.Verbose("C+ apply for: " + c.Address.ToString("X"));
-                _setToChar.InvokeAction(scale, c);
+                Logger.Info($"C+ applying temporary profile to: {c.Name} ({c.Address:X})");
+                var (code, guid) = _setTempProfile.InvokeFunc(c.ObjectIndex, scale);
+                Logger.Debug($"C+ SetTemporaryProfileOnCharacter result: Code={code}, Guid={guid}");
+                return guid;
             }
-        });
+            catch (Exception ex)
+            {
+                Logger.Error("Exception during C+ SetScale IPC.", ex);
+            }
+        }
+        return null;
     }
 
-    public void Revert(IntPtr address)
+    public void Revert(Guid profileId)
     {
-        if (!CheckApi()) return;
-        _queue.Enqueue(() =>
+        if (!CheckApi() || profileId == Guid.Empty) return;
+
+        try
         {
-            var gameObj = _dalamudUtil.CreateGameObject(address);
-            if (gameObj is ICharacter c)
-            {
-                Logger.Verbose("C+ revert for: " + c.Address.ToString("X"));
-                _revert.InvokeAction(c);
-            }
-        });
+            Logger.Info($"C+ reverting temporary profile for Guid: {profileId}");
+            var code = _deleteTempProfileById.InvokeFunc(profileId);
+            Logger.Debug($"C+ DeleteTemporaryProfileByUniqueId result: Code={code}");
+        }
+        catch (Exception ex)
+        {
+            Logger.Error("Exception during C+ Revert IPC.", ex);
+        }
     }
 }

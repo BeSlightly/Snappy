@@ -1,0 +1,75 @@
+# .github/workflows/build-and-release.yml
+
+name: Build and Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "The tag to create and release (e.g., v0.3.0-alpha)"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Setup .NET SDK 9
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "9.0.x"
+
+      - name: Download Dalamud Stubs
+        run: Invoke-WebRequest -Uri https://goatcorp.github.io/dalamud-distrib/stg/latest.zip -OutFile latest.zip; Expand-Archive -Force latest.zip "$env:AppData\XIVLauncher\addon\Hooks\dev"
+        shell: pwsh
+
+      - name: Build Plugin and Package
+        run: dotnet build Snappy/Snappy.csproj -c Release --nologo
+        shell: pwsh
+
+      - name: Update repo.json
+        id: prep
+        run: |
+          $releaseTag = "${{ github.event.inputs.tag }}"
+          echo "Processing release for tag: $releaseTag"
+          $version = (Select-Xml -Path Snappy/Snappy.csproj -XPath "/Project/PropertyGroup/Version").Node.InnerText
+          echo "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          $repoJsonPath = "./repo.json"
+          $repoJson = Get-Content -Path $repoJsonPath -Raw | ConvertFrom-Json
+          if ($repoJson -isnot [System.Array]) { $repoJson = @($repoJson) }
+          $repoJson[0].AssemblyVersion = $version
+          $repoJson[0].LastUpdate = [int64](([datetimeoffset](Get-Date)).ToUnixTimeSeconds())
+          $repoJson[0].DownloadLinkInstall = "https://github.com/${{ github.repository }}/releases/download/$releaseTag/latest.zip"
+          $repoJson[0].DownloadLinkTesting = $repoJson[0].DownloadLinkInstall
+          $repoJson[0].DownloadLinkUpdate = $repoJson[0].DownloadLinkInstall
+          $jsonOutput = ConvertTo-Json $repoJson -Depth 5 -Compress:$false
+          $jsonOutput | Set-Content -Path $repoJsonPath -Encoding UTF8
+        shell: pwsh
+
+      - name: Create GitHub Pre-Release and Tag
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag }}
+          name: Release ${{ github.event.inputs.tag }}
+          body: "${{ steps.prep.outputs.version }}"
+          generate_release_notes: true
+          files: Snappy/bin/Release/Snappy/latest.zip
+
+      - name: Commit and Push Updated repo.json
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add repo.json
+          git diff --staged --quiet || git commit -m "Update repo.json for ${{ github.event.inputs.tag }}"
+          git push
+        shell: bash

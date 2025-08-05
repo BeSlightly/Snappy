@@ -14,14 +14,14 @@ public partial class PenumbraIpc : IDisposable
     private readonly DalamudUtil _dalamudUtil;
     private readonly ConcurrentQueue<Action> _queue;
     private readonly IDalamudPluginInterface _pi;
-    private readonly Dictionary<string, Guid> _tempCollectionGuids = new();
+    private readonly Dictionary<int, Guid> _tempCollectionGuids = new();
 
     private readonly GetMetaManipulations _getMeta;
     private readonly RedrawObject _redraw;
-    //private readonly Penumbra.Api.IpcSubscribers.Legacy.RedrawObject _redrawLegacy;
     private readonly RemoveTemporaryMod _removeTempMod;
     private readonly AddTemporaryMod _addTempMod;
     private readonly CreateTemporaryCollection _createTempCollection;
+    private readonly global::Penumbra.Api.IpcSubscribers.DeleteTemporaryCollection _deleteTempCollection;
     private readonly AssignTemporaryCollection _assignTempCollection;
     private readonly GetEnabledState _enabled;
 
@@ -38,10 +38,10 @@ public partial class PenumbraIpc : IDisposable
 
         _getMeta = new GetMetaManipulations(pi);
         _redraw = new RedrawObject(pi);
-        //_redrawLegacy = new Penumbra.Api.IpcSubscribers.Legacy.RedrawObject(pi);
         _removeTempMod = new RemoveTemporaryMod(pi);
         _addTempMod = new AddTemporaryMod(pi);
         _createTempCollection = new CreateTemporaryCollection(pi);
+        _deleteTempCollection = new global::Penumbra.Api.IpcSubscribers.DeleteTemporaryCollection(pi);
         _assignTempCollection = new AssignTemporaryCollection(pi);
         _enabled = new GetEnabledState(pi);
 
@@ -53,24 +53,21 @@ public partial class PenumbraIpc : IDisposable
 
     public void Dispose() { }
 
-    public void RemoveTemporaryCollection(string characterName)
+    public void RemoveTemporaryCollection(int objIdx)
     {
         if (!Check()) return;
 
-        _queue.Enqueue(() =>
+        if (!_tempCollectionGuids.TryGetValue(objIdx, out var guid))
         {
-            if (!_tempCollectionGuids.TryGetValue(characterName, out var guid))
-            {
-                Logger.Warn($"No collection Guid found for character '{characterName}'");
-                return;
-            }
+            Logger.Warn($"[Penumbra] No temporary collection GUID found for object index '{objIdx}' to remove.");
+            return;
+        }
 
-            Logger.Verbose($"Removing temp collection for {characterName} (Guid: {guid})");
-            var ret = _removeTempMod.Invoke("Snap", guid, 0);
-            Logger.Verbose("RemoveTemporaryMod: " + ret);
+        Logger.Info($"[Penumbra] Deleting temporary collection for object index {objIdx} (Guid: {guid})");
+        var ret = _deleteTempCollection.Invoke(guid);
+        Logger.Debug("[Penumbra] DeleteTemporaryCollection returned: " + ret);
 
-            _tempCollectionGuids.Remove(characterName);
-        });
+        _tempCollectionGuids.Remove(objIdx);
     }
 
     public void Redraw(int objIdx)
@@ -88,7 +85,6 @@ public partial class PenumbraIpc : IDisposable
             if (gameObj != null)
             {
                 Logger.Verbose("Redrawing " + gameObj);
-                //_redrawLegacy.Invoke(gameObj, RedrawType.Redraw);
             }
         });
     }
@@ -102,11 +98,11 @@ public partial class PenumbraIpc : IDisposable
     public void SetTemporaryMods(ICharacter character, int? idx, Dictionary<string, string> mods, string manips)
     {
         if (!Check() || idx == null) return;
-        var name = "Snap_" + character.Name.TextValue;
+        var name = "Snap_" + character.Name.TextValue + "_" + idx.Value;
         var collection = _createTempCollection.Invoke(name);
         Logger.Verbose("Created temp collection: " + collection);
 
-        _tempCollectionGuids[character.Name.TextValue] = collection;
+        _tempCollectionGuids[idx.Value] = collection;
 
         var assign = _assignTempCollection.Invoke(collection, idx.Value, true);
         Logger.Verbose("Assigned temp collection: " + assign);

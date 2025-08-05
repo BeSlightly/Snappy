@@ -2,7 +2,7 @@
   <PropertyGroup>
     <Authors>eqbot, ViviAshe, astrodoobs</Authors>
     <Company></Company>
-    <Version>0.1.1</Version>
+    <Version>0.2.1.8</Version>
     <Description>Snappy</Description>
     <Copyright></Copyright>
     <PackageProjectUrl>https://github.com/astrodoobs/XIVSnapper</PackageProjectUrl>
@@ -29,9 +29,10 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Penumbra.Api\Penumbra.Api.csproj" />
-    <ProjectReference Include="..\Penumbra.String\Penumbra.String.csproj" />
+    <ProjectReference Include="..\ECommons\ECommons\ECommons.csproj" />
     <ProjectReference Include="..\Glamourer.Api\Glamourer.Api.csproj" />
+    <ProjectReference Include="..\Penumbra\Penumbra.GameData\Penumbra.GameData.csproj" />
+    <ProjectReference Include="..\Penumbra\Penumbra\Penumbra.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -70,7 +71,6 @@
             <HintPath>$(DalamudLibPath)Lumina.Excel.dll</HintPath>
             <Private>false</Private>
         </Reference>
-      <Reference Include="System.Windows.Forms" />
     </ItemGroup>
 
 </Project>

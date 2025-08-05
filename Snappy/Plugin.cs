@@ -4,6 +4,7 @@ using Dalamud.Interface.Windowing;
 using Dalamud.IoC;
 using Dalamud.Plugin;
 using Dalamud.Plugin.Services;
+using ECommons;
 using MareSynchronos.Export;
 using Snappy.Managers;
 using Snappy.PMP;
@@ -38,29 +39,27 @@ namespace Snappy
         [PluginService] public static ICommandManager CommandManager { get; private set; } = null!;
         [PluginService] public static IDalamudPluginInterface PluginInterface { get; private set; } = null!;
         [PluginService] public static IDataManager DataManager { get; private set; } = null!;
-
-        //[PluginService] public static Configuration Configuration { get; private set; } = null!;
-
-        //public IPluginLog PluginLog { get; private set; } = null!;
-        //public static object Log { get; internal set; }
+        [PluginService] public static IGameInteropProvider GameInteropProvider { get; private set; } = null!;
 
         public Plugin(
             IFramework framework,
             IObjectTable objectTable,
             IClientState clientState,
             ICondition condition,
-            IChatGui chatGui)
+            IChatGui chatGui,
+            IGameInteropProvider gameInteropProvider)
         {
-            this.Objects = objectTable;
+            ECommonsMain.Init(PluginInterface, this, ECommons.Module.DalamudReflector);
 
-            this.DalamudUtil = new DalamudUtil(clientState, objectTable, framework, condition, chatGui);
-            this.IpcManager = new IpcManager(PluginInterface, this.DalamudUtil);
+            this.Objects = objectTable;
 
             Configuration = PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
             Configuration.Initialize(PluginInterface);
 
+            this.DalamudUtil = new DalamudUtil(clientState, objectTable, framework, condition, chatGui);
+            this.IpcManager = new IpcManager(PluginInterface, this.DalamudUtil);
 
-            this.SnapshotManager = new SnapshotManager(this);
+            this.SnapshotManager = new SnapshotManager(this, gameInteropProvider);
             this.MCDFManager = new MareCharaFileManager(this);
             this.PMPExportManager = new PMPExportManager(this);
 
@@ -85,7 +84,9 @@ namespace Snappy
         {
             this.WindowSystem.RemoveAllWindows();
             CommandManager.RemoveHandler(CommandName);
-            this.SnapshotManager.RevertAllSnapshots();
+            this.SnapshotManager.Dispose();
+            this.IpcManager.Dispose();
+            ECommonsMain.Dispose();
         }
 
         private void OnCommand(string command, string args)

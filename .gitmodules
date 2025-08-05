@@ -3,13 +3,7 @@
 	url = https://github.com/NightmareXIV/ECommons.git
 [submodule "Glamourer.Api"]
 	path = Glamourer.Api
-	url = https://github.com/Limiana/Glamourer.Api.git
-[submodule "Penumbra.Api"]
-	path = Penumbra.Api
-	url = https://github.com/Limiana/Penumbra.Api.git
-[submodule "Penumbra.String"]
-	path = Penumbra.String
-	url = https://github.com/Ottermandias/Penumbra.String
-[submodule "Glamourer"]
-	path = Glamourer
-	url = https://github.com/Ottermandias/Glamourer
+	url = https://github.com/Ottermandias/Glamourer.Api.git
+[submodule "Penumbra"]
+	path = Penumbra
+	url = https://github.com/xivdev/Penumbra

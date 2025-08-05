@@ -2,7 +2,8 @@ using Dalamud.Game.ClientState.Objects.Types;
 using Dalamud.Utility;
 using FFXIVClientStructs.FFXIV.Client.Graphics.Scene;
 using FFXIVClientStructs.FFXIV.Client.System.Resource;
-using ImGuiNET;
+using Dalamud.Bindings.ImGui;
+using Newtonsoft.Json;
 using Penumbra.String;
 using Snappy.Interop;
 using Snappy.Models;
@@ -10,134 +11,161 @@ using Snappy.Utils;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.IO.Compression;
 using System.Linq;
+using System.Numerics;
+using System.Text;
 using System.Text.Encodings.Web;
-using System.Text.Json;
 using System.Threading;
+using JsonSerializer = System.Text.Json.JsonSerializer;
+using Dalamud.Hooking;
+using FFXIVClientStructs.FFXIV.Client.UI;
+using FFXIVClientStructs.FFXIV.Client.System.Framework;
+using Dalamud.Plugin.Services;
+using System.Text.RegularExpressions;
 
 namespace Snappy.Managers
 {
-    public class SnapshotManager
+    public class SnapshotManager : IDisposable
     {
+        private record ActiveSnapshot(ICharacter Character, Guid? CustomizePlusProfileId);
+        private readonly List<ActiveSnapshot> _activeSnapshots = new();
         private Plugin Plugin;
-        private List<ICharacter> tempCollections = new();
 
-        public SnapshotManager(Plugin plugin)
+        private unsafe delegate void ExitGPoseDelegate(UIModule* uiModule);
+        private readonly Hook<ExitGPoseDelegate>? _exitGPoseHook;
+
+        public unsafe SnapshotManager(Plugin plugin, IGameInteropProvider gameInteropProvider)
         {
             this.Plugin = plugin;
+
+            // Hook ExitGPose to revert snapshots before actors are destroyed.
+            var uiModule = Framework.Instance()->UIModule;
+            var exitGPoseAddress = (IntPtr)uiModule->VirtualTable->ExitGPose;
+            _exitGPoseHook = gameInteropProvider.HookFromAddress<ExitGPoseDelegate>(exitGPoseAddress, ExitGPoseDetour);
+            _exitGPoseHook.Enable();
+        }
+
+        public void Dispose()
+        {
+            _exitGPoseHook?.Dispose();
+            // Revert any remaining snapshots on plugin disposal as a safeguard.
+            this.RevertAllSnapshots();
+        }
+
+        private unsafe void ExitGPoseDetour(UIModule* uiModule)
+        {
+            Logger.Info("Exiting GPose, reverting all active snapshots via hook.");
+            RevertAllSnapshots();
+            _exitGPoseHook!.Original(uiModule);
         }
 
         public void RevertAllSnapshots()
         {
-            foreach (var character in tempCollections)
+            if (!_activeSnapshots.Any()) return;
+
+            Logger.Info($"Reverting {_activeSnapshots.Count} active snapshots.");
+            foreach (var snapshot in _activeSnapshots)
             {
-                Plugin.IpcManager.PenumbraRemoveTemporaryCollection(character.Name.TextValue);
-                Plugin.IpcManager.RevertGlamourerState(character);
-                Plugin.IpcManager.RevertCustomizePlusScale(character.Address);
+                // Use the object index for Penumbra and Glamourer reverts.
+                Plugin.IpcManager.PenumbraRemoveTemporaryCollection(snapshot.Character.ObjectIndex);
+                Plugin.IpcManager.RevertGlamourerState(snapshot.Character);
+                if (snapshot.CustomizePlusProfileId.HasValue)
+                {
+                    Plugin.IpcManager.RevertCustomizePlusScale(snapshot.CustomizePlusProfileId.Value);
+                }
             }
-            tempCollections.Clear();
+            _activeSnapshots.Clear();
         }
         public bool AppendSnapshot(ICharacter character)
         {
             var charaName = character.Name.TextValue;
             var path = Path.Combine(Plugin.Configuration.WorkingDirectory, charaName);
-            string infoJson = File.ReadAllText(Path.Combine(path, "snapshot.json"));
-            if (infoJson == null)
+
+            if (!File.Exists(Path.Combine(path, "snapshot.json")))
             {
-                Logger.Warn("No snapshot json found, aborting");
-                return false;
+                Logger.Warn("Append called, but snapshot.json missing. Falling back to SaveSnapshot.");
+                return this.SaveSnapshot(character);
             }
+
+            string infoJson = File.ReadAllText(Path.Combine(path, "snapshot.json"));
             SnapshotInfo? snapshotInfo = JsonSerializer.Deserialize<SnapshotInfo>(infoJson);
             if (snapshotInfo == null)
             {
-                Logger.Warn("Failed to deserialize snapshot json, aborting");
+                Logger.Warn("Failed to deserialize snapshot json, aborting append");
                 return false;
             }
 
-            if (!Directory.Exists(path))
+            List<FileReplacement> currentReplacements = GetFileReplacementsForCharacter(character);
+            Logger.Debug($"Got {currentReplacements.Count} replacements for merge.");
+
+            foreach (var replacement in currentReplacements)
             {
-                //no existing snapshot for character, just use save mode
-                this.SaveSnapshot(character);
-            }
+                var conflictingEntries = snapshotInfo.FileReplacements
+                    .Where(kvp => kvp.Value.Any(pathInSnapshot => replacement.GamePaths.Contains(pathInSnapshot, StringComparer.OrdinalIgnoreCase)))
+                    .ToList();
 
-            //Merge file replacements
-            List<FileReplacement> replacements = GetFileReplacementsForCharacter(character);
-
-            Logger.Debug($"Got {replacements.Count} replacements");
-
-            foreach (var replacement in replacements)
-            {
-                FileInfo replacementFile = new FileInfo(replacement.ResolvedPath);
-                FileInfo fileToCreate = new FileInfo(Path.Combine(path, replacement.GamePaths[0]));
-                if (!fileToCreate.Exists)
+                if (conflictingEntries.Any())
                 {
-                    //totally new file
-                    fileToCreate.Directory.Create();
-                    replacementFile.CopyTo(fileToCreate.FullName);
-                    foreach (var gamePath in replacement.GamePaths)
+                    Logger.Debug($"Found {conflictingEntries.Count} conflicting entries for new replacement of {replacement.GamePaths.First()}. Removing old entries before adding new one.");
+                    foreach (var oldEntry in conflictingEntries)
                     {
-                        var collisions = snapshotInfo.FileReplacements.Where(src => src.Value.Any(path => path == gamePath));
-                        //gamepath already exists in snapshot, overwrite with new file
-                        foreach (var collision in collisions)
+                        snapshotInfo.FileReplacements.Remove(oldEntry.Key);
+                        var oldFilePath = Path.Combine(path, oldEntry.Key);
+                        if (File.Exists(oldFilePath))
                         {
-                            collision.Value.Remove(gamePath);
-                            if (collision.Value.Count == 0)
-                            {
-                                //delete file if it no longer has any references
-                                snapshotInfo.FileReplacements.Remove(collision.Key);
-                                File.Delete(Path.Combine(path, collision.Key));
-                            }
+                            File.Delete(oldFilePath);
+                            Logger.Verbose($"Deleted conflicting snapshot file: {oldFilePath}");
                         }
                     }
-                    snapshotInfo.FileReplacements.Add(replacement.GamePaths[0], replacement.GamePaths);
                 }
+
+                var sourceGamePath = replacement.GamePaths.First();
+                var resolvedDiskPath = Plugin.IpcManager.PenumbraResolvePathObject(sourceGamePath, character.ObjectIndex);
+
+                if (string.IsNullOrEmpty(resolvedDiskPath)
+                    || string.Equals(resolvedDiskPath, sourceGamePath, StringComparison.OrdinalIgnoreCase)
+                    || !File.Exists(resolvedDiskPath))
+                {
+                    continue;
+                }
+
+                FileInfo replacementFile = new FileInfo(resolvedDiskPath);
+                var snapshotFileName = replacement.GamePaths[0];
+                FileInfo fileToCreate = new FileInfo(Path.Combine(path, snapshotFileName));
+
+                Logger.Debug($"Adding/overwriting file in snapshot: {snapshotFileName}");
+
+                fileToCreate.Directory?.Create();
+                replacementFile.CopyTo(fileToCreate.FullName, true);
+
+                snapshotInfo.FileReplacements[snapshotFileName] = replacement.GamePaths;
             }
 
-            //Merge meta manips
-            //Meta manipulations seem to be sent containing every mod a character has enabled, regardless of whether it's actively being used.
-            //This may end up shooting me in the foot, but a newer snapshot should contain the info of an older one.
             snapshotInfo.ManipulationString = Plugin.IpcManager.GetMetaManipulations(character.ObjectIndex);
 
-            // Save the glamourer string to a new file
-            var glamourerString = Plugin.IpcManager.GetGlamourerState(character);
-            if (!string.IsNullOrEmpty(glamourerString))
+            if (Plugin.IpcManager.IsCustomizePlusAvailable())
             {
-                int fileIndex = 1;
-                string glamourerFilePath;
-                do
-                {
-                    glamourerFilePath = Path.Combine(path, $"glamourer-{fileIndex}.json");
-                    fileIndex++;
-                } while (File.Exists(glamourerFilePath));
-
-                File.WriteAllText(glamourerFilePath, JsonSerializer.Serialize(glamourerString, new JsonSerializerOptions
-                {
-                    Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
-                }));
+                HandleCustomizePlusData(character, snapshotInfo, path);
             }
 
-            var options = new JsonSerializerOptions
+            var glamourerString = Plugin.IpcManager.GetGlamourerStateFromMare(character);
+            if (string.IsNullOrEmpty(glamourerString))
             {
-                Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
-            };
+                glamourerString = Plugin.IpcManager.GetGlamourerState(character);
+            }
+
+            if (!string.IsNullOrEmpty(glamourerString))
+            {
+                snapshotInfo.GlamourerString = glamourerString;
+            }
+
+            var options = new System.Text.Json.JsonSerializerOptions { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping, WriteIndented = true };
             string infoJsonWrite = JsonSerializer.Serialize(snapshotInfo, options);
             File.WriteAllText(Path.Combine(path, "snapshot.json"), infoJsonWrite);
 
+            Logger.Info($"Successfully merged snapshot for {charaName}.");
             return true;
-        }
-
-        public void CopyGlamourerStringToClipboard(ICharacter character)
-        {
-            var glamourerString = Plugin.IpcManager.GlamourerIpc.GetClipboardGlamourerString(character);
-
-            if (string.IsNullOrEmpty(glamourerString))
-            {
-                Logger.Warn("Failed to get Glamourer string for clipboard.");
-                return;
-            }
-
-            ImGui.SetClipboardText(glamourerString);
-            Logger.Info($"Copied Glamourer string for {character.Name.TextValue} to clipboard.");
         }
 
         public bool SaveSnapshot(ICharacter character)
@@ -148,26 +176,34 @@ namespace Snappy.Managers
 
             if (Directory.Exists(path))
             {
-                Logger.Warn("Snapshot already existed. Running in append mode.");
-                return AppendSnapshot(character);
+                Logger.Warn("Snapshot already existed. Running in overwrite mode.");
+                Directory.Delete(path, true);
             }
             Directory.CreateDirectory(path);
 
-            snapshotInfo.GlamourerString = Plugin.IpcManager.GetGlamourerState(character);
-            Logger.Debug($"Got glamourer string {snapshotInfo.GlamourerString}");
+            var glamourerString = Plugin.IpcManager.GetGlamourerStateFromMare(character);
+            if (string.IsNullOrEmpty(glamourerString))
+            {
+                glamourerString = Plugin.IpcManager.GetGlamourerState(character);
+            }
+            snapshotInfo.GlamourerString = glamourerString;
 
             List<FileReplacement> replacements = GetFileReplacementsForCharacter(character);
+            Logger.Debug($"Got {replacements.Count} replacements for save.");
 
             foreach (var replacement in replacements)
             {
-                Logger.Debug(replacement.GamePaths[0]);
-            }
+                var sourceGamePath = replacement.GamePaths.First();
+                var resolvedDiskPath = Plugin.IpcManager.PenumbraResolvePathObject(sourceGamePath, character.ObjectIndex);
 
-            Logger.Debug($"Got {replacements.Count} replacements");
+                if (string.IsNullOrEmpty(resolvedDiskPath)
+                    || string.Equals(resolvedDiskPath, sourceGamePath, StringComparison.OrdinalIgnoreCase)
+                    || !File.Exists(resolvedDiskPath))
+                {
+                    continue;
+                }
 
-            foreach (var replacement in replacements)
-            {
-                FileInfo replacementFile = new FileInfo(replacement.ResolvedPath);
+                FileInfo replacementFile = new FileInfo(resolvedDiskPath);
                 FileInfo fileToCreate = new FileInfo(Path.Combine(path, replacement.GamePaths[0]));
                 fileToCreate.Directory.Create();
                 replacementFile.CopyTo(fileToCreate.FullName);
@@ -178,22 +214,149 @@ namespace Snappy.Managers
 
             if (Plugin.IpcManager.IsCustomizePlusAvailable())
             {
-                Logger.Debug("C+ api loaded");
-                var data = Plugin.IpcManager.GetCustomizePlusScale(character);
-                if (!data.IsNullOrEmpty())
-                {
-                    File.WriteAllText(Path.Combine(path, "customizePlus.json"), data);
-                }
+                HandleCustomizePlusData(character, snapshotInfo, path);
             }
 
-            var options = new JsonSerializerOptions
-            {
-                Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
-            };
+            var options = new System.Text.Json.JsonSerializerOptions { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping, WriteIndented = true };
             string infoJson = JsonSerializer.Serialize(snapshotInfo, options);
             File.WriteAllText(Path.Combine(path, "snapshot.json"), infoJson);
 
             return true;
+        }
+
+
+        private void HandleCustomizePlusData(ICharacter character, SnapshotInfo snapshotInfo, string snapshotPath)
+        {
+            string? cPlusDataJson = null;
+            string? cPlusDataB64 = null;
+
+            // Prioritize Mare data
+            var mareData = Plugin.IpcManager.GetCustomizePlusScaleFromMare(character);
+            if (!mareData.IsNullOrEmpty())
+            {
+                Logger.Info("Successfully used C+ data from Mare Synchronos.");
+                cPlusDataB64 = mareData;
+                try
+                {
+                    cPlusDataJson = Encoding.UTF8.GetString(Convert.FromBase64String(cPlusDataB64));
+                }
+                catch (Exception e)
+                {
+                    Logger.Error("Failed to decode C+ data from Mare", e);
+                }
+            }
+            else
+            {
+                // Fallback to IPC data
+                Logger.Debug("C+ data from Mare Synchronos is empty, attempting to get from IPC.");
+                var ipcData = Plugin.IpcManager.GetCustomizePlusScale(character);
+                if (!ipcData.IsNullOrEmpty())
+                {
+                    Logger.Info("Successfully used C+ data from IPC.");
+                    cPlusDataJson = ipcData;
+                    try
+                    {
+                        cPlusDataB64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(cPlusDataJson));
+                    }
+                    catch (Exception e)
+                    {
+                        Logger.Error("Failed to encode C+ data from IPC", e);
+                    }
+                }
+                else
+                {
+                    Logger.Warn("C+ data from IPC is also empty. C+ data will not be saved.");
+                }
+            }
+
+            // If we successfully got data from either source, process it.
+            if (!string.IsNullOrEmpty(cPlusDataB64) && !string.IsNullOrEmpty(cPlusDataJson))
+            {
+                // Save the Base64 version to the snapshot.
+                snapshotInfo.CustomizeData = cPlusDataB64;
+
+                // Create and save the importable template file from the JSON version.
+                var templateString = CreateCustomizePlusTemplate(cPlusDataJson, character.Name.TextValue);
+                if (!string.IsNullOrEmpty(templateString))
+                {
+                    File.WriteAllText(Path.Combine(snapshotPath, "customizePlus.json"), templateString);
+                }
+            }
+        }
+
+        internal string CreateCustomizePlusTemplate(string profileJson, string characterName)
+        {
+            const byte templateVersionByte = 4;
+
+            try
+            {
+                // Step 1: Deserialize the raw profile data into a structure that can handle missing fields.
+                var sanitizedProfile = JsonConvert.DeserializeObject<ProfileSanitizer>(profileJson);
+                if (sanitizedProfile?.Bones == null)
+                {
+                    Logger.Warn($"Could not deserialize C+ profile or it has no bones. JSON: {profileJson}");
+                    return string.Empty;
+                }
+
+                // Step 2: Rebuild the bone dictionary with complete data, providing defaults.
+                var finalBones = new Dictionary<string, object>();
+                foreach (var bone in sanitizedProfile.Bones)
+                {
+                    var completeTransform = new
+                    {
+                        Translation = bone.Value.Translation ?? Vector3.Zero,
+                        Rotation = bone.Value.Rotation ?? Vector3.Zero,
+                        Scaling = bone.Value.Scaling ?? Vector3.One
+                    };
+                    finalBones[bone.Key] = completeTransform;
+                }
+
+                // Step 3: Construct the final template object in the format C+ expects.
+                var finalTemplate = new
+                {
+                    Version = templateVersionByte,
+                    Bones = finalBones,
+                    IsWriteProtected = false
+                };
+
+                // Step 4: Serialize this final template object.
+                var templateJson = JsonConvert.SerializeObject(finalTemplate, Formatting.None);
+                var templateBytes = Encoding.UTF8.GetBytes(templateJson);
+
+                // Step 5: Compress and encode as per C+ template format.
+                using var compressedStream = new MemoryStream();
+                using (var zipStream = new GZipStream(compressedStream, CompressionMode.Compress))
+                {
+                    // C+ template format prepends the version byte to the compressed JSON data.
+                    zipStream.WriteByte(templateVersionByte);
+                    zipStream.Write(templateBytes, 0, templateBytes.Length);
+                }
+
+                return Convert.ToBase64String(compressedStream.ToArray());
+            }
+            catch (JsonReaderException jex)
+            {
+                // Provide more context for JSON parsing errors.
+                Logger.Error($"Failed to create Customize+ template due to a JSON parsing error. The JSON that failed was: {profileJson}", jex);
+                return string.Empty;
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("Failed to create Customize+ template.", ex);
+                return string.Empty;
+            }
+        }
+
+        // Helper records for sanitizing the C+ JSON data
+        private record BoneTransformSanitizer
+        {
+            public Vector3? Translation { get; set; }
+            public Vector3? Rotation { get; set; }
+            public Vector3? Scaling { get; set; }
+        }
+        private record ProfileSanitizer
+        {
+            public Dictionary<string, BoneTransformSanitizer> Bones { get; set; } = new();
         }
 
         public bool LoadSnapshot(ICharacter characterApplyTo, int objIdx, string path)
@@ -223,20 +386,23 @@ namespace Snappy.Managers
             }
             Logger.Debug($"Applied {moddedPaths.Count} replacements");
 
-            Plugin.IpcManager.PenumbraRemoveTemporaryCollection(characterApplyTo.Name.TextValue);
+            Plugin.IpcManager.PenumbraRemoveTemporaryCollection(characterApplyTo.ObjectIndex);
             Plugin.IpcManager.PenumbraSetTempMods(characterApplyTo, objIdx, moddedPaths, snapshotInfo.ManipulationString);
-            if (!tempCollections.Contains(characterApplyTo))
-            {
-                tempCollections.Add(characterApplyTo);
-            }
+
+            // Remove any previous snapshot data for this character to avoid duplicates
+            _activeSnapshots.RemoveAll(s => s.Character.Address == characterApplyTo.Address);
+            Guid? cplusProfileId = null;
 
             //Apply Customize+ if it exists and C+ is installed
             if (Plugin.IpcManager.IsCustomizePlusAvailable())
             {
-                if (File.Exists(Path.Combine(path, "customizePlus.json")))
+                if (!string.IsNullOrEmpty(snapshotInfo.CustomizeData))
                 {
-                    string custPlusData = File.ReadAllText(Path.Combine(path, "customizePlus.json"));
-                    Plugin.IpcManager.SetCustomizePlusScale(characterApplyTo.Address, custPlusData);
+                    string sanitizedCustPlusData = SanitizeCustomizePlusJson(snapshotInfo.CustomizeData);
+                    if (!string.IsNullOrEmpty(sanitizedCustPlusData))
+                    {
+                        cplusProfileId = Plugin.IpcManager.SetCustomizePlusScale(characterApplyTo.Address, sanitizedCustPlusData);
+                    }
                 }
             }
 
@@ -246,8 +412,66 @@ namespace Snappy.Managers
             //Redraw
             Plugin.IpcManager.PenumbraRedraw(objIdx);
 
+            //Track the applied snapshot for reversion
+            _activeSnapshots.Add(new ActiveSnapshot(characterApplyTo, cplusProfileId));
+
             return true;
         }
+
+        private string SanitizeCustomizePlusJson(string originalData)
+        {
+            string jsonToProcess;
+
+            // Step 1: Handle potential Base64 encoding for backward compatibility.
+            try
+            {
+                var bytes = Convert.FromBase64String(originalData);
+                jsonToProcess = Encoding.UTF8.GetString(bytes);
+                Logger.Debug("Successfully decoded legacy C+ Base64 data.");
+            }
+            catch (FormatException)
+            {
+                // If it's not a valid Base64 string, assume it's already raw JSON.
+                jsonToProcess = originalData;
+                Logger.Debug("C+ data is not Base64, processing as raw JSON.");
+            }
+
+            try
+            {
+                // Step 2: Deserialize using Newtonsoft.Json, which is more forgiving.
+                var profile = JsonConvert.DeserializeObject<ProfileSanitizer>(jsonToProcess);
+
+                if (profile?.Bones == null)
+                {
+                    Logger.Warn($"C+ JSON Sanitizer: Could not deserialize or profile has no bones. JSON: {jsonToProcess}");
+                    return string.Empty;
+                }
+
+                // Step 3: Rebuild the object with complete data, providing defaults.
+                var finalBones = new Dictionary<string, object>();
+                foreach (var bone in profile.Bones)
+                {
+                    var cleanTransforms = new Dictionary<string, Vector3>
+                    {
+                        ["Translation"] = bone.Value.Translation ?? Vector3.Zero,
+                        ["Rotation"] = bone.Value.Rotation ?? Vector3.Zero,
+                        ["Scaling"] = bone.Value.Scaling ?? Vector3.One
+                    };
+                    finalBones[bone.Key] = cleanTransforms;
+                }
+
+                var finalProfile = new { Bones = finalBones };
+
+                // Step 4: Serialize back to a clean JSON string using Newtonsoft.
+                return JsonConvert.SerializeObject(finalProfile);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error($"Failed to sanitize Customize+ JSON. Original Data: {originalData}", ex);
+                return string.Empty;
+            }
+        }
+
 
         private int? GetObjIDXFromCharacter(ICharacter character)
         {
@@ -289,6 +513,13 @@ namespace Snappy.Managers
 
             var baseCharacter = (FFXIVClientStructs.FFXIV.Client.Game.Character.Character*)(void*)charaPointer;
             var human = (Human*)baseCharacter->GameObject.GetDrawObject();
+
+            if (human == null)
+            {
+                Logger.Error($"Could not get human/draw object for character '{charaName}'. The character is likely not fully rendered. Aborting file replacement scan to prevent a crash.");
+                return replacements;
+            }
+
             for (var mdlIdx = 0; mdlIdx < human->CharacterBase.SlotCount; ++mdlIdx)
             {
                 var mdl = (Snappy.Interop.RenderModel*)human->CharacterBase.Models[mdlIdx];
@@ -300,7 +531,7 @@ namespace Snappy.Managers
                 AddReplacementsFromRenderModel(mdl, replacements, objIdx.Value, 0);
             }
 
-            AddPlayerSpecificReplacements(replacements, charaPointer, human, objIdx.Value);
+            AddPlayerSpecificReplacements(replacements, human, objIdx.Value);
 
             return replacements;
         }
@@ -325,9 +556,36 @@ namespace Snappy.Managers
             Logger.Verbose("Checking File Replacement for Model " + mdlPath);
 
             FileReplacement mdlFileReplacement = CreateFileReplacement(mdlPath, objIdx);
-            //DebugPrint(mdlFileReplacement, objectKind, "Model", inheritanceLevel);
-
             AddFileReplacement(replacements, mdlFileReplacement);
+
+            var match = Regex.Match(mdlPath, @"chara/(?:equipment/e|accessory/a)(?<id>\d{4})/");
+            if (match.Success)
+            {
+                var equipId = ushort.Parse(match.Groups["id"].Value);
+                bool isAccessory = mdlPath.Contains("/accessory/");
+                Logger.Debug($"Identified gear ID {equipId} from model path. Checking for associated AVFX files.");
+
+                for (byte effectId = 0; effectId < 16; effectId++)
+                {
+                    string avfxPath;
+                    if (isAccessory)
+                    {
+                        avfxPath = $"chara/accessory/a{equipId:D4}/vfx/eff/va{effectId:D4}.avfx";
+                    }
+                    else
+                    {
+                        avfxPath = $"chara/equipment/e{equipId:D4}/vfx/eff/ve{effectId:D4}.avfx";
+                    }
+
+                    var avfxFileReplacement = CreateFileReplacement(avfxPath, objIdx, true);
+
+                    if (avfxFileReplacement.HasFileReplacement)
+                    {
+                        Logger.Info($"Found modded gear VFX: {avfxPath} -> {avfxFileReplacement.ResolvedPath}");
+                        AddReplacementsFromAvfx(avfxFileReplacement, replacements, objIdx);
+                    }
+                }
+            }
 
             for (var mtrlIdx = 0; mtrlIdx < mdl->MaterialCount; mtrlIdx++)
             {
@@ -336,6 +594,85 @@ namespace Snappy.Managers
 
                 AddReplacementsFromMaterial(mtrl, replacements, objIdx, inheritanceLevel + 1);
             }
+        }
+
+        private void AddReplacementsFromAvfx(FileReplacement avfxFile, List<FileReplacement> replacements, int objIdx)
+        {
+            AddFileReplacement(replacements, avfxFile);
+
+            try
+            {
+                var atexPaths = ParseAvfxForTexturePaths(avfxFile.ResolvedPath);
+
+                foreach (var atexPath in atexPaths)
+                {
+                    if (string.IsNullOrEmpty(atexPath)) continue;
+
+                    Logger.Verbose($"Found linked ATEX in {Path.GetFileName(avfxFile.ResolvedPath)}: {atexPath}");
+                    AddReplacementsFromTexture(atexPath, replacements, objIdx, doNotReverseResolve: true);
+                }
+            }
+            catch (Exception e)
+            {
+                Logger.Error($"Failed to parse AVFX file {avfxFile.ResolvedPath}", e);
+            }
+        }
+
+        private List<string> ParseAvfxForTexturePaths(string avfxDiskPath)
+        {
+            var texturePaths = new List<string>();
+            if (!File.Exists(avfxDiskPath))
+            {
+                Logger.Warn($"[AVFX Parser] File not found: {avfxDiskPath}");
+                return texturePaths;
+            }
+
+            try
+            {
+                var data = File.ReadAllBytes(avfxDiskPath);
+                using var stream = new MemoryStream(data);
+                using var r = new BinaryReader(stream);
+
+                var magic = r.ReadUInt32();
+                if (magic != 0x58465641)
+                {
+                    Logger.Warn($"[AVFX Parser] Invalid magic header for file: {avfxDiskPath}");
+                    return texturePaths;
+                }
+
+                var fileSize = r.ReadUInt32();
+
+                while (r.BaseStream.Position < fileSize)
+                {
+                    if (r.BaseStream.Position + 8 > r.BaseStream.Length) break;
+
+                    var blockName = r.ReadUInt32();
+                    var blockSize = r.ReadUInt32();
+                    long nextBlockPos = r.BaseStream.Position + (long)blockSize.AvfxRoundTo4();
+
+                    if (blockName == 0x00546578) // "Tex"
+                    {
+                        if (blockSize > 1 && r.BaseStream.Position + blockSize <= r.BaseStream.Length)
+                        {
+                            var pathBytes = r.ReadBytes((int)blockSize - 1);
+                            var path = Encoding.UTF8.GetString(pathBytes);
+                            if (!string.IsNullOrEmpty(path))
+                            {
+                                texturePaths.Add(path);
+                            }
+                        }
+                    }
+
+                    if (nextBlockPos > r.BaseStream.Length) break;
+                    r.BaseStream.Position = nextBlockPos;
+                }
+            }
+            catch (Exception e)
+            {
+                Logger.Error($"[AVFX Parser] Error parsing {avfxDiskPath}", e);
+            }
+
+            return texturePaths;
         }
 
         private unsafe void AddReplacementsFromMaterial(Material* mtrl, List<FileReplacement> replacements, int objIdx, int inheritanceLevel = 0)
@@ -371,7 +708,6 @@ namespace Snappy.Managers
             }
 
             var mtrlFileReplacement = CreateFileReplacement(mtrlPath, objIdx);
-            //DebugPrint(mtrlFileReplacement, objectKind, "Material", inheritanceLevel);
 
             AddFileReplacement(replacements, mtrlFileReplacement);
 
@@ -392,7 +728,7 @@ namespace Snappy.Managers
 
                 Logger.Verbose("Checking File Replacement for Texture " + texPath);
 
-                AddReplacementsFromTexture(texPath, replacements, objIdx, inheritanceLevel + 1);
+                AddReplacementsFromTexture(texPath, replacements, objIdx, inheritanceLevel + 1, doNotReverseResolve: true);
             }
 
             try
@@ -409,7 +745,7 @@ namespace Snappy.Managers
 
         private void AddReplacementsFromTexture(string texPath, List<FileReplacement> replacements, int objIdx, int inheritanceLevel = 0, bool doNotReverseResolve = true)
         {
-            if (string.IsNullOrEmpty(texPath) || texPath.Any(c => c < 32 || c > 126)) // Check for invalid characters
+            if (string.IsNullOrEmpty(texPath) || texPath.Any(c => c < 32 || c > 126))
             {
                 Logger.Warn($"Invalid texture path: {texPath}");
                 return;
@@ -442,11 +778,10 @@ namespace Snappy.Managers
             }
 
             var shpkFileReplacement = CreateFileReplacement(shpkPath, objIdx);
-            //DebugPrint(shpkFileReplacement, objectKind, "Shader", inheritanceLevel);
             AddFileReplacement(replacements, shpkFileReplacement);
         }
 
-        private unsafe void AddPlayerSpecificReplacements(List<FileReplacement> replacements, IntPtr charaPointer, Human* human, int objIdx)
+        private unsafe void AddPlayerSpecificReplacements(List<FileReplacement> replacements, Human* human, int objIdx)
         {
             var weaponObject = (Interop.Weapon*)((FFXIVClientStructs.FFXIV.Client.Graphics.Scene.Object*)human)->ChildObject;
 
@@ -456,64 +791,39 @@ namespace Snappy.Managers
 
                 AddReplacementsFromRenderModel(mainHandWeapon, replacements, objIdx, 0);
 
-                /*
-                foreach (var item in replacements)
-                {
-                    _transientResourceManager.RemoveTransientResource(charaPointer, item);
-                }
-                */
-                /*
-                foreach (var item in _transientResourceManager.GetTransientResources((IntPtr)weaponObject))
-                {
-                    Logger.Verbose("Found transient weapon resource: " + item);
-                    AddReplacement(item, objectKind, previousData, 1, true);
-                }
-                */
-
-
                 if (weaponObject->NextSibling != (IntPtr)weaponObject)
                 {
                     var offHandWeapon = ((Interop.Weapon*)weaponObject->NextSibling)->WeaponRenderModel->RenderModel;
 
                     AddReplacementsFromRenderModel(offHandWeapon, replacements, objIdx, 1);
-                    /*
-                    foreach (var item in replacements)
-                    {
-                        _transientResourceManager.RemoveTransientResource((IntPtr)offHandWeapon, item);
-                    }
-
-                    foreach (var item in _transientResourceManager.GetTransientResources((IntPtr)offHandWeapon))
-                    {
-                        Logger.Verbose("Found transient offhand weapon resource: " + item);
-                        AddReplacement(item, objectKind, previousData, 1, true);
-                    }
-                    */
                 }
             }
 
-            AddReplacementSkeleton(((Interop.HumanExt*)human)->Human.RaceSexId, objIdx, replacements);
-            try
+            AddReplacementSkeleton(human->RaceSexId, objIdx, replacements);
+
+            if (human->Decal != null)
             {
-                AddReplacementsFromTexture(new ByteString(((Interop.HumanExt*)human)->Decal->FileName()).ToString(), replacements, objIdx, 0, false);
+                try
+                {
+                    AddReplacementsFromTexture(new ByteString(((Interop.ResourceHandle*)human->Decal)->FileName()).ToString(), replacements, objIdx, 0, false);
+                }
+                catch
+                {
+                    Logger.Warn("Could not get Decal data (FileName was likely invalid).");
+                }
             }
-            catch
+
+            if (human->LegacyBodyDecal != null)
             {
-                Logger.Warn("Could not get Decal data");
+                try
+                {
+                    AddReplacementsFromTexture(new ByteString(((Interop.ResourceHandle*)human->LegacyBodyDecal)->FileName()).ToString(), replacements, objIdx, 0, false);
+                }
+                catch
+                {
+                    Logger.Warn("Could not get Legacy Body Decal Data (FileName was likely invalid).");
+                }
             }
-            try
-            {
-                AddReplacementsFromTexture(new ByteString(((Interop.HumanExt*)human)->LegacyBodyDecal->FileName()).ToString(), replacements, objIdx, 0, false);
-            }
-            catch
-            {
-                Logger.Warn("Could not get Legacy Body Decal Data");
-            }
-            /*
-            foreach (var item in previousData.FileReplacements[objectKind])
-            {
-                _transientResourceManager.RemoveTransientResource(charaPointer, item);
-            }
-            */
         }
 
         private void AddReplacementSkeleton(ushort raceSexId, int objIdx, List<FileReplacement> replacements)
@@ -524,8 +834,6 @@ namespace Snappy.Managers
 
             var replacement = CreateFileReplacement(skeletonPath, objIdx, true);
             AddFileReplacement(replacements, replacement);
-
-            //DebugPrint(replacement, objectKind, "SKLB", 0);
         }
 
         private void AddFileReplacement(List<FileReplacement> replacements, FileReplacement newReplacement)
@@ -568,6 +876,15 @@ namespace Snappy.Managers
 
             Logger.Debug($"Created file replacement for resolved path {fileReplacement.ResolvedPath}, hash {fileReplacement.Hash}, gamepath {fileReplacement.GamePaths[0]}");
             return fileReplacement;
+        }
+    }
+
+    internal static class AvfxParsingExtensions
+    {
+        internal static uint AvfxRoundTo4(this uint size)
+        {
+            var rest = size & 0b11u;
+            return rest > 0 ? (size & ~0b11u) + 4u : size;
         }
     }
 }

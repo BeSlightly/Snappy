@@ -1,6 +1,6 @@
 using Dalamud.Interface;
 using Dalamud.Interface.Colors;
-using ImGuiNET;
+using Dalamud.Bindings.ImGui;
 using System.IO;
 using System.Numerics;
 
@@ -21,39 +21,13 @@ namespace Snappy.Windows
 
         private void DrawPlayerPanel()
         {
-            ImGui.PushStyleColor(ImGuiCol.Text, ImGuiColors.ParsedOrange);
-            ImGui.Text("WARNING:");
-            ImGui.PopStyleColor();
-            ImGui.PushStyleColor(ImGuiCol.Text, ImGuiColors.DalamudYellow);
-            ImGui.Text("As of Glamourer v6, the API does not allow you to obtain designs automatically for Mare-synced users.");
-            ImGui.Text("A button has been added to this UI to attempt to manually capture Glamourer and Customize data, but this is not guaranteed.");
-            ImGui.PopStyleColor();
-
-            ImGui.Text("Capture Glamourer String for Selected Player");
-            ImGui.SameLine();
-            ImGui.PushFont(UiBuilder.IconFont);
-            try
-            {
-                string glamourerIcon = FontAwesomeIcon.Clipboard.ToIconString();
-                if (ImGui.Button(glamourerIcon))
-                {
-                    //save snapshot
-                    if (player != null)
-                        Plugin.SnapshotManager.CopyGlamourerStringToClipboard(player);
-                }
-            }
-            finally
-            {
-                ImGui.PopFont();
-            }
-
             ImGui.Text("Save snapshot of player ");
             ImGui.SameLine();
             ImGui.PushFont(UiBuilder.IconFont);
             try
             {
                 string saveIcon = FontAwesomeIcon.Save.ToIconString();
-                if (ImGui.Button(saveIcon))
+                if (ImGui.Button(saveIcon + "##SaveSnapshot"))
                 {
                     //save snapshot
                     if (player != null)
@@ -78,7 +52,7 @@ namespace Snappy.Windows
             try
             {
                 string addIcon = FontAwesomeIcon.Plus.ToIconString();
-                if (ImGui.Button(addIcon))
+                if (ImGui.Button(addIcon + "##AppendSnapshot"))
                 {
                     if (player != null)
                         Plugin.SnapshotManager.AppendSnapshot(player);
@@ -96,8 +70,8 @@ namespace Snappy.Windows
                 ImGui.PushFont(UiBuilder.IconFont);
                 try
                 {
-                    string loadIcon = FontAwesomeIcon.Clipboard.ToIconString();
-                    if (ImGui.Button(loadIcon))
+                    string loadIcon = FontAwesomeIcon.FolderOpen.ToIconString();
+                    if (ImGui.Button(loadIcon + "##LoadSnapshot"))
                     {
                         Plugin.FileDialogManager.OpenFolderDialog("Snapshot selection", (status, path) =>
                         {
@@ -121,7 +95,9 @@ namespace Snappy.Windows
             }
             else
             {
-                ImGui.Text("Loading snapshots can only be done on GPose actors");
+                ImGui.PushStyleColor(ImGuiCol.Text, ImGuiColors.DalamudRed);
+                ImGui.Text("Loading snapshots can only be done on GPose actors.");
+                ImGui.PopStyleColor();
             }
         }
 
