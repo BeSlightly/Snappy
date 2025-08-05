@@ -1,7 +1,7 @@
 # Snappy
 #### (Formerly XIVSnapper)
 
-### A forked and maintained mod originally based on work by @eqbot, and previously managed by @ViviAshe. 
+### A forked and maintained mod originally based on work by @eqbot, @ViviAshe and @astrodoobs.
 
 ### What is it?
 Ever had a friend ask you to share your character’s appearance because it looked especially sharp that day - only to realize you’d have to dig through your mod list or settle for the limited Mare Character Data Format (MCDF)? Snappy solves that problem.
@@ -11,7 +11,7 @@ Snappy is a plugin designed to save and load your character’s full appearance 
 ### Where to get it:
 Add this custom repo to Dalamud (check their documentation if you’re unfamiliar with that process):
 
-`https://raw.githubusercontent.com/brendoncintas/plugins/main/Plugins.json`
+`https://github.com/BeSlightly/Snappy/raw/refs/heads/master/repo.json`
 
 ### How to use it:
 1. **Set a working directory** in the settings menu.
