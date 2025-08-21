@@ -1,13 +1,12 @@
 # Snappy
 #### (Formerly XIVSnapper)
+### A forked and maintained mod originally based on work by @eqbot, @ViviAshe and @astrodoobs.
 
 RIP Mare.
 Snappy and old snapshots should still work as before, I will eventually remove Mare functionality from the plugin and, as originally intended, focus on this being an equivalent to what MCDF files were.
 
-On another note again, that apart from old code by eqbot, ViviAshe and astrodoobs changes are vibe-coded and therefor likely low quality code.
+On another note again, my changes changes to Snappy are vibe-coded and therefor, most likely bad quality code.
 
-
-### A forked and maintained mod originally based on work by @eqbot, @ViviAshe and @astrodoobs.
 
 ### What is it?
 Ever had a friend ask you to share your character’s appearance because it looked especially sharp that day - only to realize you’d have to dig through your mod list or settle for the limited Mare Character Data Format (MCDF)? Snappy solves that problem.
