@@ -1,6 +1,12 @@
 # Snappy
 #### (Formerly XIVSnapper)
 
+RIP Mare.
+Snappy and old snapshots should still work as before, I will eventually remove Mare functionality from the plugin and, as originally intended, focus on this being an equivalent to what MCDF files were.
+
+On another note again, that apart from old code by eqbot, ViviAshe and astrodoobs changes are vibe-coded and therefor likely low quality code.
+
+
 ### A forked and maintained mod originally based on work by @eqbot, @ViviAshe and @astrodoobs.
 
 ### What is it?
@@ -15,7 +21,7 @@ Add this custom repo to Dalamud (check their documentation if you’re unfamilia
 
 ### How to use it:
 1. **Set a working directory** in the settings menu.
-  - Optionally, also set a Glamourer Fallback string in case the plugin can't get your Glamourer string. 
+  - Optionally, also set a Glamourer Fallback string in case the plugin can't get your Glamourer string.
 2. **To save snapshots**: Press the save icon.
   - If you already have a Snapshot, you can append to the existing save. **Hitting the `save` icon while having a Snapshot appends for you.**
 3. **To load snapshots**:
