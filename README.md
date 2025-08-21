@@ -5,7 +5,7 @@
 RIP Mare.
 Snappy and old snapshots should still work as before, I will eventually remove Mare functionality from the plugin and, as originally intended, focus on this being an equivalent to what MCDF files were.
 
-On another note again, my changes changes to Snappy are vibe-coded and therefor, most likely bad quality code.
+On another note again, my changes to Snappy are vibe-coded and therefor, most likely bad quality code.
 
 
 ### What is it?
