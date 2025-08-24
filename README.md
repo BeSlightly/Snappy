@@ -1,11 +1,8 @@
-# Snappy
+# Snappy (Lightless Sync)
 #### (Formerly XIVSnapper)
 ### A forked and maintained mod originally based on work by @eqbot, @ViviAshe and @astrodoobs.
 
-RIP Mare. 
-
-Penumbra/Glamourer and Brio seem to be working on features similar to what we achieved using Snappy/XIVSnapper, so for now the project is archived.
-If another big Mare Server pops up, that is not Loporrit, I might get back to updating Snappy.
+This is now updated for use with [Lightless Sync](https://github.com/Light-Public-Syncshells/LightlessClient).
 
 
 ### What is it?

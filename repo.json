@@ -22,6 +22,7 @@
     "DownloadLinkUpdate": "https://github.com/BeSlightly/Snappy/releases/download/v0.2.1.11/latest.zip",
     "DownloadLinkTesting": "https://github.com/BeSlightly/Snappy/releases/download/v0.2.1.11/latest.zip",
     "IconUrl": "https://github.com/BeSlightly/Snappy/raw/refs/heads/0.2.0-dev/snappy.png",
-    "LastUpdate": 1754743696
+    "LastUpdate": 1754743696,
+    "Changelog": "Updated submodules, replace Mare with Lightless Sync."
   }
 ]

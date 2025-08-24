@@ -2,7 +2,7 @@
   <PropertyGroup>
     <Authors>eqbot, ViviAshe, astrodoobs</Authors>
     <Company></Company>
-    <Version>0.2.1.11</Version>
+    <Version>0.2.1.12</Version>
     <Description>Snappy</Description>
     <Copyright></Copyright>
     <PackageProjectUrl>https://github.com/astrodoobs/XIVSnapper</PackageProjectUrl>
@@ -41,28 +41,4 @@
         <PackageReference Include="lz4net" Version="1.0.15.93" />
         <PackageReference Include="Microsoft.Extensions.Logging" Version="9.0.8" />
     </ItemGroup>
-
-    <ItemGroup>
-        <Reference Include="FFXIVClientStructs">
-            <HintPath>$(DalamudLibPath)FFXIVClientStructs.dll</HintPath>
-            <Private>false</Private>
-        </Reference>
-        <Reference Include="Newtonsoft.Json">
-            <HintPath>$(DalamudLibPath)Newtonsoft.Json.dll</HintPath>
-            <Private>false</Private>
-        </Reference>
-        <Reference Include="Dalamud">
-            <HintPath>$(DalamudLibPath)Dalamud.dll</HintPath>
-            <Private>false</Private>
-        </Reference>
-        <Reference Include="Lumina">
-            <HintPath>$(DalamudLibPath)Lumina.dll</HintPath>
-            <Private>false</Private>
-        </Reference>
-        <Reference Include="Lumina.Excel">
-            <HintPath>$(DalamudLibPath)Lumina.Excel.dll</HintPath>
-            <Private>false</Private>
-        </Reference>
-    </ItemGroup>
-
 </Project>

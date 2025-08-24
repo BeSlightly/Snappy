@@ -87,10 +87,10 @@ public class IpcManager : IDisposable
     private string GetMareData(ICharacter character, string dataPropertyName, string friendlyName)
     {
         string resultData = string.Empty;
-        Logger.Debug($"Attempting to get {friendlyName} from Mare for {character.Name.TextValue}");
-        if (!DalamudReflector.TryGetDalamudPlugin("MareSynchronos", out var marePlugin, true))
+        Logger.Debug($"Attempting to get {friendlyName} from Lightless for {character.Name.TextValue}");
+        if (!DalamudReflector.TryGetDalamudPlugin("LightlessSync", out var marePlugin, true))
         {
-            Logger.Warn("Mare Synchronos plugin not found or not loaded. Cannot reflect for data.");
+            Logger.Warn("Lightless Sync plugin not found or not loaded. Cannot reflect for data.");
             return string.Empty;
         }
 
@@ -110,10 +110,10 @@ public class IpcManager : IDisposable
                 return string.Empty;
             }
 
-            var pairManagerType = marePlugin.GetType().Assembly.GetType("MareSynchronos.PlayerData.Pairs.PairManager");
+            var pairManagerType = marePlugin.GetType().Assembly.GetType("LightlessSync.PlayerData.Pairs.PairManager");
             if (pairManagerType == null)
             {
-                Logger.Warn("Reflection failed: Could not find type MareSynchronos.PlayerData.Pairs.PairManager.");
+                Logger.Warn("Reflection failed: Could not find type LightlessSync.PlayerData.Pairs.PairManager.");
                 return string.Empty;
             }
 
