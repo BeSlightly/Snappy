@@ -99,7 +99,14 @@ public partial class PenumbraIpc : IDisposable
     {
         if (!Check() || idx == null) return;
         var name = "Snap_" + character.Name.TextValue + "_" + idx.Value;
-        var collection = _createTempCollection.Invoke(name);
+        var result = _createTempCollection.Invoke("Snappy", name, out var collection);
+        
+        if (result != PenumbraApiEc.Success)
+        {
+            Logger.Error($"Failed to create temporary collection: {result}");
+            return;
+        }
+        
         Logger.Verbose("Created temp collection: " + collection);
 
         _tempCollectionGuids[idx.Value] = collection;
@@ -110,8 +117,8 @@ public partial class PenumbraIpc : IDisposable
         foreach (var m in mods)
             Logger.Verbose(m.Key + " => " + m.Value);
 
-        var result = _addTempMod.Invoke("Snap", collection, mods, manips, 0);
-        Logger.Verbose("Set temp mods result: " + result);
+        var addResult = _addTempMod.Invoke("Snap", collection, mods, manips, 0);
+        Logger.Verbose("Set temp mods result: " + addResult);
     }
 
     public string ResolvePath(string path)
