@@ -1,9 +1,10 @@
-# Snappy (Lightless Sync)
+# Snappy (Lightless Sync & Snowcloak)
 #### (Formerly XIVSnapper)
 ### A forked and maintained mod originally based on work by @eqbot, @ViviAshe and @astrodoobs.
 
-This is now updated for use with [Lightless Sync](https://github.com/Light-Public-Syncshells/LightlessClient).
+This is now updated for use with [Lightless Sync](https://github.com/Light-Public-Syncshells/LightlessClient) and [Snowcloak](https://github.com/Eauldane/SnowcloakClient).
 
+This now bypasses Snowcloak/other forks derived off of the same codebase's Snappy detection (by using a scuffed method). They might update their detection in the future making Snappy detected again, if this happens I'm not responsible for you getting banned on any of these services. I'm using a self-hosted server for myself and friends, so I'm not sure how actively I'm gonna maintain this if they decide to join in on the cat and mouse game.
 
 ### What is it?
 Ever had a friend ask you to share your character’s appearance because it looked especially sharp that day - only to realize you’d have to dig through your mod list or settle for the limited Mare Character Data Format (MCDF)? Snappy solves that problem.

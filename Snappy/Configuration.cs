@@ -1,6 +1,10 @@
 using Dalamud.Configuration;
 using Dalamud.Plugin;
 using System;
+using System.IO;
+using System.Reflection;
+using Newtonsoft.Json;
+using Serilog;
 
 namespace Snappy
 {
@@ -26,7 +30,63 @@ namespace Snappy
 
         public void Save()
         {
-            this.PluginInterface!.SavePluginConfig(this);
+            // Use hardcoded "Snappy" name instead of randomized internal name
+            SaveWithSnappyName();
+        }
+        
+        private void SaveWithSnappyName()
+        {
+            try
+            {
+                // Get the config directory path directly
+                var configDir = GetSnappyConfigDirectory();
+                if (!string.IsNullOrEmpty(configDir))
+                {
+                    var configPath = Path.Combine(configDir, "Snappy.json");
+                    var configJson = JsonConvert.SerializeObject(this, Formatting.Indented);
+                    
+                    // Ensure directory exists
+                    Directory.CreateDirectory(configDir);
+                    
+                    // Write config file directly
+                    File.WriteAllText(configPath, configJson);
+                    Log.Debug($"Configuration saved directly to: {configPath}");
+                    return;
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Failed to save config directly, falling back to default");
+            }
+            
+            // Fallback to default save method
+            PluginInterface!.SavePluginConfig(this);
+        }
+        
+        private string GetSnappyConfigDirectory()
+        {
+            try
+            {
+                var pluginInterfaceType = PluginInterface!.GetType();
+                var configsField = pluginInterfaceType.GetField("configs", BindingFlags.NonPublic | BindingFlags.Instance);
+                
+                if (configsField?.GetValue(PluginInterface) is { } configs)
+                {
+                    var configsType = configs.GetType();
+                    var getDirectoryMethod = configsType.GetMethod("GetDirectory");
+                    
+                    if (getDirectoryMethod != null)
+                    {
+                        return getDirectoryMethod.Invoke(configs, new object[] { "Snappy" }) as string ?? string.Empty;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Failed to get Snappy config directory");
+            }
+            
+            return string.Empty;
         }
     }
 }
