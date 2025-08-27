@@ -1,10 +1,6 @@
 using Dalamud.Game.ClientState.Objects.Types;
 using Dalamud.Plugin;
-using Dalamud.Plugin.Ipc;
-using Dalamud.Plugin.Services;
-using ECommons.DalamudServices;
 using ECommons.Reflection;
-using Newtonsoft.Json;
 using Snappy.Managers.Customize;
 using Snappy.Managers.Glamourer;
 using Snappy.Managers.Penumbra;
@@ -13,7 +9,6 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
 using System.Text;
 using Action = System.Action;
 
@@ -44,8 +39,6 @@ public class IpcManager : IDisposable
         _penumbra = new PenumbraIpc(pi, dalamudUtil, actionQueue);
         _glamourer = new GlamourerIpc(pi, dalamudUtil, actionQueue);
         _customize = new CustomizeIpc(pi, dalamudUtil);
-
-        InitializeMareIpc();
 
         _glamourer.GPoseChanged += OnGPoseChanged;
         _dalamudUtil.FrameworkUpdate += HandleActionQueue;
@@ -90,104 +83,23 @@ public class IpcManager : IDisposable
     public GlamourerIpc GlamourerIpc => _glamourer;
     public string GetGlamourerState(ICharacter c) => _glamourer.GetCharacterCustomization(c.Address);
 
-    // IPC subscribers for checking which plugin handles a character
-    private ICallGateSubscriber<List<nint>>? lightlessSyncHandledAddresses;
-    private ICallGateSubscriber<List<nint>>? snowcloakHandledAddresses;
-    
-    // Initialize IPC subscribers in constructor or initialization method
-    private void InitializeMareIpc()
-    {
-        lightlessSyncHandledAddresses = Svc.PluginInterface.GetIpcSubscriber<List<nint>>("LightlessSync.GetHandledAddresses");
-        snowcloakHandledAddresses = Svc.PluginInterface.GetIpcSubscriber<List<nint>>("MareSynchronos.GetHandledAddresses");
-    }
-    
-    // Check which plugin is handling a specific character
-    private string? GetHandlingPlugin(nint characterAddress)
-    {
-        // Check LightlessSync first
-        if (lightlessSyncHandledAddresses?.HasFunction == true)
-        {
-            try
-            {
-                var lightlessAddresses = lightlessSyncHandledAddresses.InvokeFunc();
-                if (lightlessAddresses.Contains(characterAddress))
-                    return "LightlessSync";
-            }
-            catch { /* Ignore IPC errors */ }
-        }
-        
-        // Check Snowcloak
-        if (snowcloakHandledAddresses?.HasFunction == true)
-        {
-            try
-            {
-                var snowcloakAddresses = snowcloakHandledAddresses.InvokeFunc();
-                if (snowcloakAddresses.Contains(characterAddress))
-                    return "Snowcloak";
-            }
-            catch { /* Ignore IPC errors */ }
-        }
-        
-        return null;
-    }
-    
     // Common private helper for Mare reflection
     private string GetMareData(ICharacter character, string dataPropertyName, string friendlyName)
     {
-        // First, check which plugin is handling this specific character
-        var handlingPlugin = GetHandlingPlugin(character.Address);
-        
-        if (handlingPlugin == "LightlessSync")
-        {
-            if (DalamudReflector.TryGetDalamudPlugin("LightlessSync", out var lightlessPlugin, true))
-            {
-                Logger.Debug($"Character {character.Name.TextValue} is handled by LightlessSync, getting {friendlyName}");
-                return GetMareDataFromPlugin(character, dataPropertyName, friendlyName, lightlessPlugin, "LightlessSync");
-            }
-        }
-        else if (handlingPlugin == "Snowcloak")
-        {
-            if (DalamudReflector.TryGetDalamudPlugin("Snowcloak", out var snowcloakPlugin, true))
-            {
-                Logger.Debug($"Character {character.Name.TextValue} is handled by Snowcloak, getting {friendlyName}");
-                return GetMareDataFromPlugin(character, dataPropertyName, friendlyName, snowcloakPlugin, "MareSynchronos");
-            }
-        }
-        
-        // Fallback: try both plugins if character isn't specifically handled
-        Logger.Debug($"Character {character.Name.TextValue} not found in handled addresses, trying fallback approach");
-        
-        // Check for LightlessSync first
-        if (DalamudReflector.TryGetDalamudPlugin("LightlessSync", out var marePlugin, true))
-        {
-            Logger.Debug($"Attempting to get {friendlyName} from LightlessSync for {character.Name.TextValue}");
-            var result = GetMareDataFromPlugin(character, dataPropertyName, friendlyName, marePlugin, "LightlessSync");
-            if (!string.IsNullOrEmpty(result))
-                return result;
-        }
-        
-        // Check for Snowcloak if LightlessSync didn't return data
-        if (DalamudReflector.TryGetDalamudPlugin("Snowcloak", out marePlugin, true))
-        {
-            Logger.Debug($"Attempting to get {friendlyName} from Snowcloak for {character.Name.TextValue}");
-            return GetMareDataFromPlugin(character, dataPropertyName, friendlyName, marePlugin, "MareSynchronos");
-        }
-        
-        Logger.Warn("Neither LightlessSync nor Snowcloak plugin found or loaded. Cannot reflect for data.");
-        return string.Empty;
-    }
-    
-    // Helper method to extract data from either plugin
-    private string GetMareDataFromPlugin(ICharacter character, string dataPropertyName, string friendlyName, object marePlugin, string namespacePrefix)
-    {
         string resultData = string.Empty;
-        
+        Logger.Debug($"Attempting to get {friendlyName} from Lightless for {character.Name.TextValue}");
+        if (!DalamudReflector.TryGetDalamudPlugin("LightlessSync", out var marePlugin, true))
+        {
+            Logger.Warn("Lightless Sync plugin not found or not loaded. Cannot reflect for data.");
+            return string.Empty;
+        }
+
         try
         {
             var host = marePlugin.GetFoP("_host");
             if (host == null)
             {
-                Logger.Warn($"Reflection failed: Could not find _host in {namespacePrefix} plugin.");
+                Logger.Warn("Reflection failed: Could not find _host in Mare Synchronos plugin.");
                 return string.Empty;
             }
 
@@ -198,10 +110,10 @@ public class IpcManager : IDisposable
                 return string.Empty;
             }
 
-            var pairManagerType = marePlugin.GetType().Assembly.GetType($"{namespacePrefix}.PlayerData.Pairs.PairManager");
+            var pairManagerType = marePlugin.GetType().Assembly.GetType("LightlessSync.PlayerData.Pairs.PairManager");
             if (pairManagerType == null)
             {
-                Logger.Warn($"Reflection failed: Could not find type {namespacePrefix}.PlayerData.Pairs.PairManager.");
+                Logger.Warn("Reflection failed: Could not find type LightlessSync.PlayerData.Pairs.PairManager.");
                 return string.Empty;
             }
 
@@ -284,7 +196,7 @@ public class IpcManager : IDisposable
         }
         catch (Exception e)
         {
-            Logger.Error($"An exception occurred while reflecting into {namespacePrefix} for {friendlyName} data.", e);
+            Logger.Error($"An exception occurred while reflecting into Mare Synchronos for {friendlyName} data.", e);
         }
 
         return resultData;
