@@ -1,6 +1,6 @@
 [
   {
-    "Author": "Eqbot, ViviAshe, astrodoobs",
+    "Author": "Eqbot, ViviAshe, astrodoobs, BeSlightly",
     "Name": "Snappy",
     "InternalName": "Snappy",
     "AssemblyVersion": "0.2.1.16",
@@ -21,8 +21,8 @@
     "DownloadLinkInstall": "https://github.com/BeSlightly/Snappy/releases/download/v0.2.1.16/latest.zip",
     "DownloadLinkUpdate": "https://github.com/BeSlightly/Snappy/releases/download/v0.2.1.16/latest.zip",
     "DownloadLinkTesting": "https://github.com/BeSlightly/Snappy/releases/download/v0.2.1.16/latest.zip",
-    "IconUrl": "https://github.com/BeSlightly/Snappy/raw/refs/heads/0.2.0-dev/snappy.png",
+    "IconUrl": "https://raw.githubusercontent.com/BeSlightly/Snappy/refs/heads/master/snappy.png",
     "LastUpdate": 1756508549,
-    "Changelog": "Updated submodules, replace Mare with Lightless Sync."
+    "Changelog": ""
   }
 ]

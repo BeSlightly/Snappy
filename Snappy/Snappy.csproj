@@ -1,44 +1,44 @@
-﻿<Project Sdk="Dalamud.NET.Sdk/13.0.0">
-  <PropertyGroup>
-    <Authors>eqbot, ViviAshe, astrodoobs</Authors>
-    <Company></Company>
-    <Version>0.2.1.16</Version>
-    <Description>Snappy</Description>
-    <Copyright></Copyright>
-    <PackageProjectUrl>https://github.com/astrodoobs/XIVSnapper</PackageProjectUrl>
-  </PropertyGroup>
-
-  <PropertyGroup>
-    <TargetFramework>net9.0-windows7.0</TargetFramework>
-    <Platforms>x64</Platforms>
-    <Nullable>enable</Nullable>
-    <LangVersion>latest</LangVersion>
-    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <ProduceReferenceAssembly>false</ProduceReferenceAssembly>
-    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
-    <CopyLocalLockfileAssemblies>true</CopyLocalLockfileAssemblies>
-    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
-  </PropertyGroup>
-
-  <PropertyGroup>
-    <DalamudLibPath>$(appdata)\XIVLauncher\addon\Hooks\dev\</DalamudLibPath>
-  </PropertyGroup>
-  
-   <PropertyGroup Condition="'$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::Linux)))'">
-    <DalamudLibPath>$(DALAMUD_HOME)/</DalamudLibPath>
-  </PropertyGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="..\Glamourer.Api\Glamourer.Api.csproj" />
-    <ProjectReference Include="..\Penumbra\Penumbra.GameData\Penumbra.GameData.csproj" />
-    <ProjectReference Include="..\Penumbra\Penumbra\Penumbra.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
-        <PackageReference Include="ECommons" Version="3.0.1.9" />
-        <PackageReference Include="Lumina" Version="6.5.1" />
-        <PackageReference Include="Lumina.Excel" Version="7.3.1" />
-        <PackageReference Include="lz4net" Version="1.0.15.93" />
-        <PackageReference Include="Microsoft.Extensions.Logging" Version="9.0.8" />
+﻿<Project Sdk="Dalamud.NET.Sdk/13.1.0">
+    <PropertyGroup>
+        <Authors>eqbot, ViviAshe, astrodoobs, BeSlightly</Authors>
+        <Version>0.4.0.0</Version>
+        <Description>Snappy</Description>
+        <PackageProjectUrl>https://github.com/BeSlightly/Snappy</PackageProjectUrl>
+    </PropertyGroup>
+    <PropertyGroup>
+        <TargetFramework>net9.0-windows7.0</TargetFramework>
+        <Platforms>x64</Platforms>
+        <Nullable>enable</Nullable>
+        <LangVersion>latest</LangVersion>
+        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+        <ProduceReferenceAssembly>false</ProduceReferenceAssembly>
+        <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+        <CopyLocalLockfileAssemblies>true</CopyLocalLockfileAssemblies>
+        <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    </PropertyGroup>
+    <PropertyGroup>
+        <DalamudLibPath>$(appdata)\XIVLauncher\addon\Hooks\dev\</DalamudLibPath>
+    </PropertyGroup>
+    <PropertyGroup Condition="'$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::Linux)))'">
+        <DalamudLibPath>$(DALAMUD_HOME)/</DalamudLibPath>
+    </PropertyGroup>
+    <ItemGroup>
+        <None Include=".editorconfig"/>
+    </ItemGroup>
+    <ItemGroup>
+        <ProjectReference Include="..\Glamourer.Api\Glamourer.Api.csproj"/>
+        <ProjectReference Include="..\Penumbra\Penumbra.GameData\Penumbra.GameData.csproj"/>
+        <ProjectReference Include="..\Penumbra\Penumbra\Penumbra.csproj"/>
+    </ItemGroup>
+    <ItemGroup>
+        <PackageReference Include="ECommons" Version="3.0.1.16"/>
+        <PackageReference Include="lz4net" Version="1.0.15.93"/>
+        <PackageReference Include="Microsoft.Extensions.Logging" Version="9.0.9"/>
+    </ItemGroup>
+    <ItemGroup>
+        <Reference Include="Newtonsoft.Json">
+            <HintPath>$(DalamudLibPath)Newtonsoft.Json.dll</HintPath>
+            <Private>false</Private>
+        </Reference>
     </ItemGroup>
 </Project>

@@ -14,6 +14,12 @@ Add this custom repo to Dalamud (check their documentation if you’re unfamilia
 
 `https://github.com/BeSlightly/Snappy/raw/refs/heads/master/repo.json`
 
+The old version (0.2) is still available on the 0.20-dev branch.
+Migrated Snapshots will not be compatible with that version.
+
+`https://github.com/BeSlightly/Snappy/raw/refs/heads/0.2.0-dev/repo.json`
+
+
 ### How to use it:
 1. **Set a working directory** in the settings menu.
   - Optionally, also set a Glamourer Fallback string in case the plugin can't get your Glamourer string.

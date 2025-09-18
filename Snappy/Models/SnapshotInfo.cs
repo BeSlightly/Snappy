@@ -1,12 +1,12 @@
-using System.Collections.Generic;
+namespace Snappy.Models;
 
-namespace Snappy.Models
+public record SnapshotInfo
 {
-    internal class SnapshotInfo
-    {
-        public string GlamourerString { get; set; } = string.Empty;
-        public string CustomizeData { get; set; } = string.Empty;
-        public string ManipulationString { get; set; } = string.Empty;
-        public Dictionary<string, List<string>> FileReplacements { get; set; } = new();
-    }
+    public int FormatVersion { get; set; } = 1;
+    public string SourceActor { get; set; } = string.Empty;
+    public int? SourceWorldId { get; set; }
+    public string LastUpdate { get; set; } = string.Empty;
+
+    public Dictionary<string, string> FileReplacements { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+    public string ManipulationString { get; set; } = string.Empty;
 }
