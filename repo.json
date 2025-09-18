@@ -5,7 +5,7 @@
     "InternalName": "Snappy",
     "AssemblyVersion": "0.4.0.0",
     "Description": "Want to export your character and mods exactly as-is in a single collection *without* Mare? This plugin saves and loads your character's current appearance, and allows you to share modded characters without relying on MCDF.",
-    "RepoUrl": "https://github.com/astrodoobs/Snappy",
+    "RepoUrl": "https://github.com/BeSlightly/Snappy",
     "ApplicableVersion": "any",
     "Tags": [
       "utility"
