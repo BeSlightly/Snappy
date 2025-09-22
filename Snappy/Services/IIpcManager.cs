@@ -23,5 +23,6 @@ public interface IIpcManager : IDisposable
     Dictionary<string, bool> GetMarePluginStatus();
     bool IsMarePairedAddress(nint address);
     bool IsLightlessAddress(nint address);
+    bool IsPlayerSyncAddress(nint address);
     bool IsSnowcloakAddress(nint address);
 }

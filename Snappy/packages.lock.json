@@ -4,9 +4,9 @@
     "net9.0-windows7.0": {
       "DalamudPackager": {
         "type": "Direct",
-        "requested": "[13.0.0, )",
-        "resolved": "13.0.0",
-        "contentHash": "Mb3cUDSK/vDPQ8gQIeuCw03EMYrej1B4J44a1AvIJ9C759p9XeqdU9Hg4WgOmlnlPe0G7ILTD32PKSUpkQNa8w=="
+        "requested": "[13.1.0, )",
+        "resolved": "13.1.0",
+        "contentHash": "XdoNhJGyFby5M/sdcRhnc5xTop9PHy+H50PTWpzLhJugjB19EDBiHD/AsiDF66RETM+0qKUdJBZrNuebn7qswQ=="
       },
       "DotNet.ReproducibleBuilds": {
         "type": "Direct",
@@ -1094,7 +1094,7 @@
           "EmbedIO": "[3.5.2, )",
           "OtterGui": "[1.0.0, )",
           "PeNet": "[5.1.0, )",
-          "Penumbra.Api": "[5.10.0, )",
+          "Penumbra.Api": "[5.12.0, )",
           "Penumbra.CrashHandler": "[1.0.0, )",
           "Penumbra.GameData": "[1.0.0, )",
           "Penumbra.String": "[1.0.6, )",
@@ -1116,7 +1116,7 @@
           "FlatSharp.Compiler": "[7.9.0, )",
           "FlatSharp.Runtime": "[7.9.0, )",
           "OtterGui": "[1.0.0, )",
-          "Penumbra.Api": "[5.10.0, )",
+          "Penumbra.Api": "[5.12.0, )",
           "Penumbra.String": "[1.0.6, )"
         }
       },

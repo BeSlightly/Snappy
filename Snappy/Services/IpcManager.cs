@@ -137,6 +137,11 @@ public class IpcManager : IIpcManager, IDisposable
         return _mare.IsAddressHandledByLightless(address);
     }
 
+    public bool IsPlayerSyncAddress(nint address)
+    {
+        return _mare.IsAddressHandledByPlayerSync(address);
+    }
+
     public bool IsSnowcloakAddress(nint address)
     {
         return _mare.IsAddressHandledBySnowcloak(address);

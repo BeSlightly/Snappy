@@ -105,6 +105,7 @@ public sealed class ConfigWindow : Window
             {
                 "LightlessSync" => "Lightless Sync",
                 "Snowcloak" => "Snowcloak",
+                "MareSempiterne" => "Player Sync",
                 _ => pluginName
             };
 

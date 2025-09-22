@@ -21,7 +21,8 @@ public sealed class MareIpc : IpcSubscriber
     private readonly Dictionary<string, MarePluginInfo> _marePlugins = new()
     {
         { "LightlessSync", new MarePluginInfo("LightlessSync", "LightlessSync") },
-        { "Snowcloak", new MarePluginInfo("Snowcloak", "MareSynchronos") }
+        { "Snowcloak", new MarePluginInfo("Snowcloak", "MareSynchronos") },
+        { "MareSempiterne", new MarePluginInfo("Player Sync", "MareSynchronos") }
     };
 
     private class MarePluginInfo
@@ -58,6 +59,14 @@ public sealed class MareIpc : IpcSubscriber
     // Manual IPC subscribers for different plugins
     private ICallGateSubscriber<List<nint>>? _lightlessSyncHandledAddresses;
     private ICallGateSubscriber<List<nint>>? _snowcloakHandledAddresses;
+
+    private bool IsPluginActive(string pluginKey)
+    {
+        if (!_marePlugins.TryGetValue(pluginKey, out var pluginInfo)) return false;
+
+        pluginInfo.IsAvailable = DalamudReflector.TryGetDalamudPlugin(pluginKey, out _, false, true);
+        return pluginInfo.IsAvailable;
+    }
 
     public override bool IsReady()
     {
@@ -125,7 +134,7 @@ public sealed class MareIpc : IpcSubscriber
         foreach (var kvp in _marePlugins)
             kvp.Value.IsAvailable = DalamudReflector.TryGetDalamudPlugin(kvp.Key, out _, false, true);
 
-        // Get addresses from MareSynchronos/Snowcloak
+        // Get addresses from MareSynchronos/Snowcloak/Player Sync
         if (GetHandledAddressesIpc != null)
             try
             {
@@ -151,7 +160,7 @@ public sealed class MareIpc : IpcSubscriber
                 PluginLog.Debug($"Failed to get LightlessSync handled addresses: {ex.Message}");
             }
 
-        // Get addresses from Snowcloak (if different from Mare)
+        // Get addresses from Snowcloak/Player Sync (if different from Mare)
         if (_snowcloakHandledAddresses?.HasFunction == true)
             try
             {
@@ -186,6 +195,8 @@ public sealed class MareIpc : IpcSubscriber
 
     public bool IsAddressHandledBySnowcloak(nint address)
     {
+        if (!IsPluginActive("Snowcloak")) return false;
+
         try
         {
             // Prefer direct EzIPC if available
@@ -210,6 +221,33 @@ public sealed class MareIpc : IpcSubscriber
         return false;
     }
 
+
+    public bool IsAddressHandledByPlayerSync(nint address)
+    {
+        if (!IsPluginActive("MareSempiterne")) return false;
+
+        try
+        {
+            if (GetHandledAddressesIpc != null)
+            {
+                var addresses = GetHandledAddressesIpc.Invoke();
+                if (addresses != null && addresses.Contains(address))
+                    return true;
+            }
+
+            if (_snowcloakHandledAddresses?.HasFunction == true)
+            {
+                var addresses = _snowcloakHandledAddresses.InvokeFunc();
+                return addresses.Contains(address);
+            }
+        }
+        catch (Exception ex)
+        {
+            PluginLog.Debug($"Failed Player Sync address check: {ex.Message}");
+        }
+
+        return false;
+    }
 
     public object? GetCharacterData(ICharacter character)
     {
@@ -421,7 +459,7 @@ public sealed class MareIpc : IpcSubscriber
 
     public override void HandlePluginListChanged(IEnumerable<string> affectedPluginNames)
     {
-        // Check if any of the plugins we manage (LightlessSync, Snowcloak) were affected
+        // Check if any of the plugins we manage (LightlessSync, Snowcloak, Player Sync) were affected
         if (affectedPluginNames.Intersect(_marePlugins.Keys).Any())
         {
             var isAvailable = IsReady();

@@ -134,6 +134,7 @@ public partial class MainWindow
 
         var isSnowcloak = _ipcManager.IsSnowcloakAddress(selectablePlayer.Address);
         var isLightless = !isSnowcloak && _ipcManager.IsLightlessAddress(selectablePlayer.Address);
+        var isPlayerSync = !isSnowcloak && !isLightless && _ipcManager.IsPlayerSyncAddress(selectablePlayer.Address);
 
         if (isSnowcloak)
         {
@@ -159,6 +160,27 @@ public partial class MainWindow
         else if (isLightless)
         {
             using var _ = ImRaii.PushColor(ImGuiCol.Text, new Vector4(0.6784f, 0.5412f, 0.9608f, 1f));
+            if (ImUtf8.Selectable(label, isSelected))
+            {
+                if (isSelected)
+                {
+                    // Clicking the same actor again deselects it
+                    ClearSelectedActorState();
+                }
+                else
+                {
+                    // Selecting a different actor
+                    currentLabel = label;
+                    player = selectablePlayer;
+                    objIdxSelected = objIdx;
+                    selectedActorAddress = selectablePlayer.Address;
+                    UpdateSelectedActorState();
+                }
+            }
+        }
+        else if (isPlayerSync)
+        {
+            using var _ = ImRaii.PushColor(ImGuiCol.Text, new Vector4(0.4745f, 0.8392f, 0.7569f, 1f));
             if (ImUtf8.Selectable(label, isSelected))
             {
                 if (isSelected)

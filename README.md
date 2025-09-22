@@ -1,8 +1,15 @@
-# Snappy (Lightless Sync & Snowcloak)
+# Snappy
 #### (Formerly XIVSnapper)
 ### A forked and maintained mod originally based on work by @eqbot, @ViviAshe and @astrodoobs.
 
-This is now updated for use with [Lightless Sync](https://github.com/Light-Public-Syncshells/LightlessClient) and [Snowcloak](https://github.com/Eauldane/SnowcloakClient).
+### Currently supported Mare forks
+
+
+[Lightless Sync](https://git.lightless-sync.org/Lightless-Sync/LightlessClient) <br>
+[Snowcloak](https://github.com/Eauldane/SnowcloakClient)<br>
+[Player Sync](https://github.com/universalconquistador/MareSynchronosClient)
+
+I will eventually move back to getting files directly via Penumbra, Glamourer and C+ so, in the future it should work with majority of forks again.
 
 ### What is it?
 Ever had a friend ask you to share your character’s appearance because it looked especially sharp that day - only to realize you’d have to dig through your mod list or settle for the limited Mare Character Data Format (MCDF)? Snappy solves that problem.
@@ -37,3 +44,4 @@ I am acutely aware of the controversial nature of this plugin. I've decided to m
 For the love of all that’s decent, use this like a reasonable adult. Use it in good faith. Do **not** use it for creepy, inappropriate, or what I call 'goonish' behavior. Do **not** use it to pirate paid mods, and **do not** use it to exploit characters that aren’t your own. This plugin retains its original ability to capture appearances from other players: what this means is that if they’re using mods, you’ll obtain them too. That makes consent **absolutely** a **non-negotiable**. Always ask. Always get permission. If you’re using this tool without consent, you’re crossing a hard line that I can neither support nor tolerate. Support the creators who pour countless hours into their work. Their time is not free. It’s a priceless currency, and it deserves your respect. If your first instinct is to twist this tool into something it was never meant for, congratulations: ***you’re the problem***. Don’t be that person. Just because the technology allows something doesn’t mean you should do it.
 
 If this existence of this mod upsets you, understand this: it is being maintained with honest, transparent, and constructive intentions. Its purpose, while I maintain it, will always serve primarily as utility and never exploitation. It’s about preserving creativity, not crossing lines. **Yes**, I maintain this project. **No**, I am not responsible for how others choose to misuse it. I cannot police the internet, and I won’t pretend like I can. What I *can* do is ensure the tool is accessible, functional, and clear in what it’s meant for. Beyond that, the responsibility lies with the user, including how **you** interact with the game and with mods. The ability to capture someone’s mods, glamourer setup, and overall character appearance already exists, *with or without* this plugin. The methods this tool uses are not new. If you're synced on Mare - **especially** on Syncshells, your mods will, guaranteed, be at risk of being captured and your character's appearance replicated. **That’s the reality.** So if you're concerned, **sync responsibly**, know the risks, know the tools, and act accordingly.
+
