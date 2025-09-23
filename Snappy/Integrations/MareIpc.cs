@@ -1,8 +1,6 @@
 using System.Collections;
 using System.Reflection;
-using Dalamud.Plugin;
 using Dalamud.Plugin.Ipc;
-using ECommons.EzIpcManager;
 using ECommons.Reflection;
 using Snappy.Services;
 
@@ -12,9 +10,6 @@ public sealed class MareIpc : IpcSubscriber
 {
     private const string PluginName = "LightlessSync";
 
-    private readonly IDalamudPluginInterface _pluginInterface;
-
-    private bool _isInitialized;
     private bool _isUiOpen;
 
     // Multi-Mare support
@@ -44,21 +39,16 @@ public sealed class MareIpc : IpcSubscriber
 
     public MareIpc() : base(PluginName)
     {
-        _pluginInterface = Svc.PluginInterface;
-
-        // Initialize manual IPC subscribers for other Mare plugins
+        // Initialize manual IPC subscribers
         _lightlessSyncHandledAddresses =
             Svc.PluginInterface.GetIpcSubscriber<List<nint>>("LightlessSync.GetHandledAddresses");
-        _snowcloakHandledAddresses =
-            Svc.PluginInterface.GetIpcSubscriber<List<nint>>("MareSynchronos.GetHandledAddresses");
+        _snowcloakSyncHandledAddresses =
+            Svc.PluginInterface.GetIpcSubscriber<List<nint>>("SnowcloakSync.GetHandledAddresses");
     }
-
-    [EzIPC("MareSynchronos.GetHandledAddresses", false, wrapper: SafeWrapper.AnyException)]
-    public Func<List<nint>>? GetHandledAddressesIpc { get; set; }
 
     // Manual IPC subscribers for different plugins
     private ICallGateSubscriber<List<nint>>? _lightlessSyncHandledAddresses;
-    private ICallGateSubscriber<List<nint>>? _snowcloakHandledAddresses;
+    private ICallGateSubscriber<List<nint>>? _snowcloakSyncHandledAddresses;
 
     private bool IsPluginActive(string pluginKey)
     {
@@ -69,21 +59,12 @@ public sealed class MareIpc : IpcSubscriber
     }
 
     public override bool IsReady()
-    {
-        // Check if any Mare plugin is available
-        foreach (var pluginName in _marePlugins.Keys)
-            if (DalamudReflector.TryGetDalamudPlugin(pluginName, out _, false, true))
-                return true;
-
-        return false;
-    }
+        => _marePlugins.Keys.Any(name => DalamudReflector.TryGetDalamudPlugin(name, out _, false, true));
 
     public Dictionary<string, bool> GetMarePluginStatus()
     {
-        // Update availability status for each plugin
         foreach (var kvp in _marePlugins)
             kvp.Value.IsAvailable = DalamudReflector.TryGetDalamudPlugin(kvp.Key, out _, false, true);
-
         return _marePlugins.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.IsAvailable);
     }
 
@@ -92,7 +73,7 @@ public sealed class MareIpc : IpcSubscriber
         if (_isUiOpen == isOpen) return;
         _isUiOpen = isOpen;
 
-        PluginLog.Debug($"UI {(isOpen ? "opened" : "closed")} - using real-time Mare data.");
+        PluginLog.Debug($"UI {(isOpen ? "opened" : "closed")}");
     }
 
 
@@ -100,7 +81,6 @@ public sealed class MareIpc : IpcSubscriber
     {
         if (!_isUiOpen || !IsReady()) return new List<ICharacter>();
 
-        // Get fresh addresses from Mare plugins (Peepy's real approach)
         var pairedAddresses = GetCurrentPairedAddresses();
 
         // Convert to ICharacter objects
@@ -113,19 +93,12 @@ public sealed class MareIpc : IpcSubscriber
         return result;
     }
 
-    /// <summary>
-    /// Real-time address checking (Peepy's actual approach - direct IPC call)
-    /// </summary>
     public bool IsHandledAddress(nint address)
     {
-        // Get fresh data every time (like Peepy does)
         var pairedAddresses = GetCurrentPairedAddresses();
         return pairedAddresses.Contains(address);
     }
 
-    /// <summary>
-    /// Get current paired addresses from all Mare plugins (Peepy's real approach - no caching)
-    /// </summary>
     private HashSet<nint> GetCurrentPairedAddresses()
     {
         var pairedAddresses = new HashSet<nint>();
@@ -134,21 +107,6 @@ public sealed class MareIpc : IpcSubscriber
         foreach (var kvp in _marePlugins)
             kvp.Value.IsAvailable = DalamudReflector.TryGetDalamudPlugin(kvp.Key, out _, false, true);
 
-        // Get addresses from MareSynchronos/Snowcloak/Player Sync
-        if (GetHandledAddressesIpc != null)
-            try
-            {
-                var addresses = GetHandledAddressesIpc.Invoke();
-                if (addresses != null)
-                    foreach (var addr in addresses)
-                        pairedAddresses.Add(addr);
-            }
-            catch (Exception ex)
-            {
-                PluginLog.Debug($"Failed to get Mare handled addresses: {ex.Message}");
-            }
-
-        // Get addresses from LightlessSync
         if (_lightlessSyncHandledAddresses?.HasFunction == true)
             try
             {
@@ -160,17 +118,30 @@ public sealed class MareIpc : IpcSubscriber
                 PluginLog.Debug($"Failed to get LightlessSync handled addresses: {ex.Message}");
             }
 
-        // Get addresses from Snowcloak/Player Sync (if different from Mare)
-        if (_snowcloakHandledAddresses?.HasFunction == true)
+        if (_snowcloakSyncHandledAddresses?.HasFunction == true)
             try
             {
-                var addresses = _snowcloakHandledAddresses.InvokeFunc();
+                var addresses = _snowcloakSyncHandledAddresses.InvokeFunc();
                 foreach (var addr in addresses) pairedAddresses.Add(addr);
             }
             catch (Exception ex)
             {
-                PluginLog.Debug($"Failed to get Snowcloak handled addresses: {ex.Message}");
+                PluginLog.Debug($"Failed to get SnowcloakSync handled addresses: {ex.Message}");
             }
+
+        if (IsPluginActive("MareSempiterne"))
+        {
+            try
+            {
+                var pluginInfo = _marePlugins["MareSempiterne"];
+                foreach (var addr in GetPlayerSyncAddressesViaPairs(pluginInfo))
+                    pairedAddresses.Add(addr);
+            }
+            catch (Exception ex)
+            {
+                PluginLog.Debug($"Failed to reflect PlayerSync pair addresses: {ex.Message}");
+            }
+        }
 
         return pairedAddresses;
     }
@@ -199,19 +170,14 @@ public sealed class MareIpc : IpcSubscriber
 
         try
         {
-            // Prefer direct EzIPC if available
-            if (GetHandledAddressesIpc != null)
+            // Prefer explicit Snowcloak label first
+            if (_snowcloakSyncHandledAddresses?.HasFunction == true)
             {
-                var addresses = GetHandledAddressesIpc.Invoke();
-                if (addresses != null && addresses.Contains(address))
-                    return true;
+                var addresses = _snowcloakSyncHandledAddresses.InvokeFunc();
+                if (addresses.Contains(address)) return true;
             }
 
-            if (_snowcloakHandledAddresses?.HasFunction == true)
-            {
-                var addresses = _snowcloakHandledAddresses.InvokeFunc();
-                return addresses.Contains(address);
-            }
+            // Do not read Mare label to avoid ambiguity
         }
         catch (Exception ex)
         {
@@ -228,18 +194,11 @@ public sealed class MareIpc : IpcSubscriber
 
         try
         {
-            if (GetHandledAddressesIpc != null)
-            {
-                var addresses = GetHandledAddressesIpc.Invoke();
-                if (addresses != null && addresses.Contains(address))
-                    return true;
-            }
+            var pluginInfo = _marePlugins["MareSempiterne"];
+            var viaPairs = GetPlayerSyncAddressesViaPairs(pluginInfo);
+            if (viaPairs.Contains(address)) return true;
 
-            if (_snowcloakHandledAddresses?.HasFunction == true)
-            {
-                var addresses = _snowcloakHandledAddresses.InvokeFunc();
-                return addresses.Contains(address);
-            }
+            // Do not read Mare label to avoid ambiguity
         }
         catch (Exception ex)
         {
@@ -348,6 +307,103 @@ public sealed class MareIpc : IpcSubscriber
         return null;
     }
 
+    private HashSet<nint> GetHandledAddressesViaReflection(MarePluginInfo pluginInfo)
+    {
+        var results = new HashSet<nint>();
+        try
+        {
+            if (!pluginInfo.IsAvailable)
+                return results;
+
+            // Re-acquire the service provider each time in case plugin reloaded
+            if (!DalamudReflector.TryGetDalamudPlugin(pluginInfo.PluginName, out var marePlugin, true, true))
+                return results;
+
+            var host = marePlugin.GetFoP("_host");
+            if (host?.GetFoP("Services") is not IServiceProvider serviceProvider)
+                return results;
+
+            var assembly = marePlugin.GetType().Assembly;
+            var ipcProviderType = assembly.GetType($"{pluginInfo.NamespacePrefix}.Interop.Ipc.IpcProvider");
+            if (ipcProviderType == null)
+                return results;
+
+            var ipcProvider = serviceProvider.GetService(ipcProviderType);
+            if (ipcProvider == null)
+                return results;
+
+            var activeHandlersField = ipcProviderType.GetField("_activeGameObjectHandlers", BindingFlags.Instance | BindingFlags.NonPublic);
+            if (activeHandlersField?.GetValue(ipcProvider) is not IEnumerable handlers)
+                return results;
+
+            foreach (var handler in handlers)
+            {
+                var addrObj = handler.GetFoP("Address");
+                if (addrObj is IntPtr ip && ip != IntPtr.Zero)
+                    results.Add((nint)ip);
+                else if (addrObj is nint np && np != nint.Zero)
+                    results.Add(np);
+            }
+        }
+        catch (Exception e)
+        {
+            PluginLog.Debug($"[Mare IPC] Reflection for handled addresses failed in {pluginInfo.PluginName}: {e.Message}");
+        }
+
+        return results;
+    }
+
+    private HashSet<nint> GetPlayerSyncAddressesViaPairs(MarePluginInfo pluginInfo)
+    {
+        var results = new HashSet<nint>();
+        try
+        {
+            if (!pluginInfo.IsAvailable)
+                return results;
+
+            if (pluginInfo.Plugin == null || pluginInfo.PairManager == null)
+                InitializeAllPlugins();
+
+            if (pluginInfo.PairManager == null)
+                return results;
+
+            var pairManager = pluginInfo.PairManager;
+            var pmType = pairManager.GetType();
+
+            var getOnlinePairs = pmType.GetMethod("GetOnlineUserPairs", BindingFlags.Instance | BindingFlags.Public);
+            if (getOnlinePairs == null)
+                return results;
+
+            if (getOnlinePairs.Invoke(pairManager, null) is not IEnumerable onlinePairs)
+                return results;
+
+            foreach (var pair in onlinePairs)
+            {
+                var pairType = pair.GetType();
+                var hasCachedObj = pairType.GetProperty("HasCachedPlayer", BindingFlags.Instance | BindingFlags.Public)?.GetValue(pair);
+                var isVisibleObj = pairType.GetProperty("IsVisible", BindingFlags.Instance | BindingFlags.Public)?.GetValue(pair);
+                bool hasCached = hasCachedObj is bool b1 && b1;
+                bool isVisible = isVisibleObj is bool b2 && b2;
+                if (!hasCached) continue;
+
+                var cachedPlayer = pairType.GetProperty("CachedPlayer", BindingFlags.Instance | BindingFlags.NonPublic)?.GetValue(pair);
+                if (cachedPlayer == null) continue;
+
+                var addrObj = cachedPlayer.GetType().GetProperty("PlayerCharacter", BindingFlags.Instance | BindingFlags.Public)?.GetValue(cachedPlayer);
+                if (addrObj is nint np && np != nint.Zero)
+                {
+                    if (isVisible)
+                        results.Add(np);
+                }
+            }
+        }
+        catch (Exception e)
+        {
+            PluginLog.Debug($"[Mare IPC] PairManager reflection failed for {pluginInfo.PluginName}: {e.Message}");
+        }
+
+        return results;
+    }
     private void InitializeAllPlugins()
     {
         foreach (var kvp in _marePlugins)
@@ -416,8 +472,6 @@ public sealed class MareIpc : IpcSubscriber
                 pluginInfo.IsAvailable = false;
             }
         }
-
-        _isInitialized = _marePlugins.Values.Any(p => p.IsAvailable);
     }
 
     private IDictionary? GetAllMareClientPairsFromPlugin(MarePluginInfo pluginInfo)
@@ -487,10 +541,6 @@ public sealed class MareIpc : IpcSubscriber
             pluginInfo.GetFileCacheByHashMethod = null;
         }
 
-        // Reset initialization state
-        _isInitialized = false;
-
-        // Re-initialize EzIPC if plugin became available
-        if (isAvailable) EzIPC.Init(this, identifier, SafeWrapper.AnyException);
+        // No EzIPC providers/subscribers defined in this class anymore
     }
 }
