@@ -3,7 +3,7 @@
     "Author": "Eqbot, ViviAshe, astrodoobs, BeSlightly",
     "Name": "Snappy",
     "InternalName": "Snappy",
-    "AssemblyVersion": "0.4.0.2",
+    "AssemblyVersion": "0.4.0.3",
     "Description": "Want to export your character and mods exactly as-is in a single collection *without* Mare? This plugin saves and loads your character's current appearance, and allows you to share modded characters without relying on MCDF.",
     "RepoUrl": "https://github.com/BeSlightly/Snappy",
     "ApplicableVersion": "any",
@@ -18,11 +18,11 @@
     "Punchline": "Plugin to save current appearance and applied mods of a character",
     "AcceptsFeedback": false,
     "IsTestingExclusive": "False",
-    "DownloadLinkInstall": "https://github.com/BeSlightly/Snappy/releases/download/v0.4.0.2/latest.zip",
-    "DownloadLinkUpdate": "https://github.com/BeSlightly/Snappy/releases/download/v0.4.0.2/latest.zip",
-    "DownloadLinkTesting": "https://github.com/BeSlightly/Snappy/releases/download/v0.4.0.2/latest.zip",
+    "DownloadLinkInstall": "https://github.com/BeSlightly/Snappy/releases/download/v0.4.0.3/latest.zip",
+    "DownloadLinkUpdate": "https://github.com/BeSlightly/Snappy/releases/download/v0.4.0.3/latest.zip",
+    "DownloadLinkTesting": "https://github.com/BeSlightly/Snappy/releases/download/v0.4.0.3/latest.zip",
     "IconUrl": "https://raw.githubusercontent.com/BeSlightly/Snappy/refs/heads/master/snappy.png",
-    "LastUpdate": 1758624465,
+    "LastUpdate": 1760275524,
     "Changelog": ""
   }
 ]
