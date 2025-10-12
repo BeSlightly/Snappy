@@ -5,6 +5,7 @@ using Snappy.Common;
 using Snappy.Features;
 using Snappy.Features.Pmp.Models;
 using Snappy.Common.Utilities;
+using Snappy.Features.Packaging;
 
 namespace Snappy.Features.Pmp;
 
@@ -50,22 +51,14 @@ public class PmpExportManager : IPmpExportManager
             var metaEntry = archive.CreateEntry("meta.json");
             using (var streamWriter = new StreamWriter(metaEntry.Open()))
             {
-                var metadata = new PmpMetadata
-                {
-                    Name = snapshotName,
-                    Author = "Snapper",
-                    Description = $"A snapshot of {snapshotInfo.SourceActor}."
-                };
+                var metadata = ModMetadataBuilder.BuildSnapshotMetadata(snapshotName, snapshotInfo.SourceActor);
                 await streamWriter.WriteAsync(JsonConvert.SerializeObject(metadata, Formatting.Indented));
             }
 
             // Create default_mod.json entry
-            var modData = new PmpDefaultMod
-            {
-                Manipulations = ConvertPenumbraMeta(snapshotInfo.ManipulationString)
-            };
-
-            ModpackExportUtil.AddSnapshotFilesToArchive(archive, snapshotInfo, paths.FilesDirectory, modData.Files);
+            var modData = new PmpDefaultMod();
+            modData.Manipulations = ModPackageBuilder.BuildManipulations(snapshotInfo.ManipulationString);
+            ModPackageBuilder.AddSnapshotFiles(archive, snapshotInfo, paths.FilesDirectory, modData.Files);
 
             var modEntry = archive.CreateEntry("default_mod.json");
             using (var streamWriter = new StreamWriter(modEntry.Open()))
@@ -87,33 +80,4 @@ public class PmpExportManager : IPmpExportManager
     }
 
 
-    private static List<PmpManipulationEntry> ConvertPenumbraMeta(string base64)
-    {
-        var jObjects = PenumbraMetaUtil.ConvertPenumbraMetaToJObjects(base64);
-
-        // PenumbraMetaUtil returns full manipulation objects shaped like:
-        // { "Type": "Imc" | "Eqp" | ..., "Manipulation": { ... } }
-        // PMP schema (schemas/structs/manipulation.json) requires top-level Type and inner Manipulation fields.
-        // Extract them instead of nesting the full object under Manipulation.
-        var list = new List<PmpManipulationEntry>(jObjects.Count);
-        foreach (var jo in jObjects)
-        {
-            var typeToken = jo["Type"];
-            var manipToken = jo["Manipulation"];
-            if (typeToken is null || manipToken is null)
-            {
-                // If somehow not in expected shape, fall back to dumping as object to avoid crashing.
-                list.Add(new PmpManipulationEntry { Manipulation = jo });
-                continue;
-            }
-
-            list.Add(new PmpManipulationEntry
-            {
-                Type = typeToken.Type == JTokenType.String ? (string?)typeToken : typeToken?.ToString(),
-                Manipulation = manipToken
-            });
-        }
-
-        return list;
-    }
 }

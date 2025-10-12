@@ -12,6 +12,7 @@ using Penumbra.GameData.Structs;
 using Penumbra.Meta.Manipulations;
 using Snappy.Common;
 using Snappy.Features;
+using Snappy.Features.Packaging;
 using Snappy.Models;
 using Snappy.Services.SnapshotManager;
 
@@ -187,19 +188,14 @@ public class PcpManager : IPcpManager
 
             // Create metadata
             var snapshotName = Path.GetFileName(snapshotPath);
-            var metadata = new PcpMetadata
-            {
-                Name = actorName, // Use specified/actor name for package name
-                Author = "Snappy Export",
-                Description = $"Exported from Snappy on {DateTime.Now:yyyy-MM-dd HH:mm:ss}"
-            };
+            var meta = ModMetadataBuilder.BuildSnapshotMetadata(snapshotName, snapshotInfo.SourceActor);
 
             // Add meta.json
             var metaEntry = archive.CreateEntry("meta.json");
             using (var metaStream = metaEntry.Open())
             using (var metaWriter = new StreamWriter(metaStream))
             {
-                var metaJson = JsonConvert.SerializeObject(metadata, Formatting.Indented);
+                var metaJson = JsonConvert.SerializeObject(meta, Formatting.Indented);
                 metaWriter.Write(metaJson);
             }
 
@@ -331,8 +327,8 @@ public class PcpManager : IPcpManager
 
             // Create mod data and add files
             var modData = new PcpModData();
-            modData.Manipulations = ConvertPenumbraMetaToJObjects(snapshotInfo.ManipulationString);
-            ModpackExportUtil.AddSnapshotFilesToArchive(archive, snapshotInfo, paths.FilesDirectory, modData.Files);
+            modData.Manipulations = ModPackageBuilder.BuildManipulations(snapshotInfo.ManipulationString);
+            ModPackageBuilder.AddSnapshotFiles(archive, snapshotInfo, paths.FilesDirectory, modData.Files);
 
             // Add default_mod.json
             var modEntry = archive.CreateEntry("default_mod.json");
@@ -431,10 +427,6 @@ public class PcpManager : IPcpManager
         return Convert.ToBase64String(resultStream.ToArray());
     }
 
-    private static List<JObject> ConvertPenumbraMetaToJObjects(string base64)
-    {
-        return PenumbraMetaUtil.ConvertPenumbraMetaToJObjects(base64);
-    }
 
     private static string DecompressCustomizeTemplate(string base64Template)
     {
