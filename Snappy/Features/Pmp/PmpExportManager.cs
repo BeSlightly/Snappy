@@ -1,5 +1,6 @@
 using System.IO.Compression;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using Snappy.Common;
 using Snappy.Features;
 using Snappy.Features.Pmp.Models;
@@ -89,6 +90,30 @@ public class PmpExportManager : IPmpExportManager
     private static List<PmpManipulationEntry> ConvertPenumbraMeta(string base64)
     {
         var jObjects = PenumbraMetaUtil.ConvertPenumbraMetaToJObjects(base64);
-        return jObjects.Select(jo => new PmpManipulationEntry { Manipulation = jo }).ToList();
+
+        // PenumbraMetaUtil returns full manipulation objects shaped like:
+        // { "Type": "Imc" | "Eqp" | ..., "Manipulation": { ... } }
+        // PMP schema (schemas/structs/manipulation.json) requires top-level Type and inner Manipulation fields.
+        // Extract them instead of nesting the full object under Manipulation.
+        var list = new List<PmpManipulationEntry>(jObjects.Count);
+        foreach (var jo in jObjects)
+        {
+            var typeToken = jo["Type"];
+            var manipToken = jo["Manipulation"];
+            if (typeToken is null || manipToken is null)
+            {
+                // If somehow not in expected shape, fall back to dumping as object to avoid crashing.
+                list.Add(new PmpManipulationEntry { Manipulation = jo });
+                continue;
+            }
+
+            list.Add(new PmpManipulationEntry
+            {
+                Type = typeToken.Type == JTokenType.String ? (string?)typeToken : typeToken?.ToString(),
+                Manipulation = manipToken
+            });
+        }
+
+        return list;
     }
 }
