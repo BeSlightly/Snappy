@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Dalamud.NET.Sdk/13.1.0">
     <PropertyGroup>
         <Authors>eqbot, ViviAshe, astrodoobs, BeSlightly</Authors>
-        <Version>0.4.0.2</Version>
+        <Version>0.4.0.3</Version>
         <Description>Snappy</Description>
         <PackageProjectUrl>https://github.com/BeSlightly/Snappy</PackageProjectUrl>
     </PropertyGroup>
