@@ -31,9 +31,10 @@
         <ProjectReference Include="..\Penumbra\Penumbra\Penumbra.csproj"/>
     </ItemGroup>
     <ItemGroup>
-        <PackageReference Include="ECommons" Version="3.0.1.16"/>
+        <PackageReference Include="ECommons" Version="3.0.1.28" />
         <PackageReference Include="lz4net" Version="1.0.15.93"/>
         <PackageReference Include="Microsoft.Extensions.Logging" Version="9.0.9"/>
+        <PackageReference Update="DotNet.ReproducibleBuilds" Version="1.2.39" />
     </ItemGroup>
     <ItemGroup>
         <Reference Include="Newtonsoft.Json">
