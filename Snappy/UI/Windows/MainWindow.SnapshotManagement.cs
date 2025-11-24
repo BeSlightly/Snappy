@@ -1,6 +1,8 @@
 ﻿using Dalamud.Utility;
 using System.Globalization;
 using Dalamud.Interface.Colors;
+using System;
+using System.IO;
 
 namespace Snappy.UI.Windows;
 
@@ -568,6 +570,66 @@ public partial class MainWindow
 
         ImGui.SameLine();
 
+        var pmpDisabled = _selectedSnapshot == null || _pmpExportManager.IsExporting;
+        var pmpTooltip = _pmpExportManager.IsExporting
+            ? "An export is already in progress..."
+            : "Export this entry's state to a Penumbra Mod Pack (.pmp).";
+        if (ImUtf8.IconButton(FontAwesomeIcon.BoxOpen, pmpTooltip, default, pmpDisabled))
+        {
+            var defaultName =
+                $"{_selectedSnapshot!.Name}_{SanitizeForFileName(entry.Description ?? \"entry\")}.pmp";
+            _snappy.FileDialogManager.SaveFileDialog(
+                "Export PMP for Entry",
+                ".pmp",
+                defaultName,
+                ".pmp",
+                (status, path) =>
+                {
+                    if (!status || string.IsNullOrEmpty(path))
+                        return;
+
+                    Notify.Info($"Starting PMP export for entry '{entry.Description ?? \"\"}'...");
+                    var mapId = entry.FileMapId ?? _selectedSnapshotInfo?.CurrentFileMapId;
+                    _snappy.ExecuteBackgroundTask(() =>
+                        _pmpExportManager.SnapshotToPMPAsync(_selectedSnapshot!.FullName, mapId));
+                },
+                _snappy.Configuration.WorkingDirectory);
+        }
+
+        ImGui.SameLine();
+
+        var pcpDisabled = _selectedSnapshot == null || string.IsNullOrWhiteSpace(_pcpPlayerNameOverride);
+        var pcpTooltip = pcpDisabled
+            ? "Set a player name and select a snapshot to export to PCP."
+            : "Export this entry's state to a PCP.";
+        if (ImUtf8.IconButton(FontAwesomeIcon.FileExport, pcpTooltip, default, pcpDisabled))
+        {
+            var defaultName =
+                $"{_selectedSnapshot!.Name}_{SanitizeForFileName(entry.Description ?? \"entry\")}.pcp";
+            _snappy.FileDialogManager.SaveFileDialog(
+                "Export PCP for Entry",
+                ".pcp",
+                defaultName,
+                ".pcp",
+                (status, path) =>
+                {
+                    if (!status || string.IsNullOrEmpty(path))
+                        return;
+
+                    Notify.Info($"Starting PCP export for entry '{entry.Description ?? \"\"}'...");
+                    var glam = entry as GlamourerHistoryEntry;
+                    var cust = entry as CustomizeHistoryEntry;
+                    var nameOverride = _pcpPlayerNameOverride;
+                    var worldOverride = _pcpSelectedWorldIdOverride;
+                    _snappy.ExecuteBackgroundTask(() =>
+                        _pcpManager.ExportPcp(_selectedSnapshot!.FullName, path, glam, cust, nameOverride,
+                            worldOverride));
+                },
+                _snappy.Configuration.WorkingDirectory);
+        }
+
+        ImGui.SameLine();
+
         if (ImUtf8.IconButton(FontAwesomeIcon.Pen, "Rename Entry", default))
         {
             _historyEntryToRename = entry;
@@ -578,5 +640,20 @@ public partial class MainWindow
         ImGui.SameLine();
 
         if (ImUtf8.IconButton(FontAwesomeIcon.Trash, "Delete Entry", default)) _historyEntryToDelete = entry;
+    }
+
+    private static string SanitizeForFileName(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return "entry";
+
+        var sanitized = value;
+        foreach (var c in Path.GetInvalidFileNameChars()) sanitized = sanitized.Replace(c, '_');
+        sanitized = sanitized.Trim('.', ' ');
+
+        if (string.IsNullOrWhiteSpace(sanitized))
+            sanitized = "entry";
+
+        return sanitized;
     }
 }
