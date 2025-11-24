@@ -49,70 +49,19 @@ public class PcpManager : IPcpManager
             using var archive = ZipFile.OpenRead(filePath);
 
             // Read metadata
-            var metaEntry = archive.GetEntry("meta.json");
-            if (metaEntry == null)
-            {
-                Notify.Error("Invalid PCP file: missing meta.json");
-                return;
-            }
-
-            PcpMetadata? metadata;
-            using (var metaStream = metaEntry.Open())
-            using (var metaReader = new StreamReader(metaStream))
-            {
-                var metaJson = metaReader.ReadToEnd();
-                metadata = JsonConvert.DeserializeObject<PcpMetadata>(metaJson);
-            }
-
-            if (metadata == null)
-            {
-                Notify.Error("Failed to parse meta.json from PCP file.");
-                return;
-            }
+            var metadata = ArchiveUtil.ReadJsonEntry<PcpMetadata>(archive, "meta.json", Notify.Error,
+                "Invalid PCP file: missing meta.json", "Failed to parse meta.json from PCP file.");
+            if (metadata == null) return;
 
             // Read character data
-            var characterEntry = archive.GetEntry("character.json");
-            if (characterEntry == null)
-            {
-                Notify.Error("Invalid PCP file: missing character.json");
-                return;
-            }
-
-            PcpCharacterData? characterData;
-            using (var characterStream = characterEntry.Open())
-            using (var characterReader = new StreamReader(characterStream))
-            {
-                var characterJson = characterReader.ReadToEnd();
-                characterData = JsonConvert.DeserializeObject<PcpCharacterData>(characterJson);
-            }
-
-            if (characterData == null)
-            {
-                Notify.Error("Failed to parse character.json from PCP file.");
-                return;
-            }
+            var characterData = ArchiveUtil.ReadJsonEntry<PcpCharacterData>(archive, "character.json", Notify.Error,
+                "Invalid PCP file: missing character.json", "Failed to parse character.json from PCP file.");
+            if (characterData == null) return;
 
             // Read mod data
-            var modEntry = archive.GetEntry("default_mod.json");
-            if (modEntry == null)
-            {
-                Notify.Error("Invalid PCP file: missing default_mod.json");
-                return;
-            }
-
-            PcpModData? modData;
-            using (var modStream = modEntry.Open())
-            using (var modReader = new StreamReader(modStream))
-            {
-                var modJson = modReader.ReadToEnd();
-                modData = JsonConvert.DeserializeObject<PcpModData>(modJson);
-            }
-
-            if (modData == null)
-            {
-                Notify.Error("Failed to parse default_mod.json from PCP file.");
-                return;
-            }
+            var modData = ArchiveUtil.ReadJsonEntry<PcpModData>(archive, "default_mod.json", Notify.Error,
+                "Invalid PCP file: missing default_mod.json", "Failed to parse default_mod.json from PCP file.");
+            if (modData == null) return;
 
             // Create snapshot
             var snapshotPath = CreateSnapshotDirectory(metadata.Name);
@@ -202,14 +151,7 @@ public class PcpManager : IPcpManager
             var snapshotName = Path.GetFileName(snapshotPath);
             var meta = ModMetadataBuilder.BuildSnapshotMetadata(snapshotName, snapshotInfo.SourceActor);
 
-            // Add meta.json
-            var metaEntry = archive.CreateEntry("meta.json");
-            using (var metaStream = metaEntry.Open())
-            using (var metaWriter = new StreamWriter(metaStream))
-            {
-                var metaJson = JsonConvert.SerializeObject(meta, Formatting.Indented);
-                metaWriter.Write(metaJson);
-            }
+            ArchiveUtil.WriteJsonEntry(archive, "meta.json", meta);
 
             // Create character data with proper structure for Penumbra
             var characterData = new PcpCharacterData
@@ -328,14 +270,7 @@ public class PcpManager : IPcpManager
                         $"Failed to export Customize+ data to PCP for snapshot '{snapshotName}': {ex.Message}");
                 }
 
-            // Add character.json
-            var characterEntry = archive.CreateEntry("character.json");
-            using (var characterStream = characterEntry.Open())
-            using (var characterWriter = new StreamWriter(characterStream))
-            {
-                var characterJson = JsonConvert.SerializeObject(characterData, Formatting.Indented);
-                characterWriter.Write(characterJson);
-            }
+            ArchiveUtil.WriteJsonEntry(archive, "character.json", characterData);
 
             // Create mod data and add files
             var modData = new PcpModData();
@@ -344,13 +279,7 @@ public class PcpManager : IPcpManager
                 resolvedFileMap);
 
             // Add default_mod.json
-            var modEntry = archive.CreateEntry("default_mod.json");
-            using (var modStream = modEntry.Open())
-            using (var modWriter = new StreamWriter(modStream))
-            {
-                var modJson = JsonConvert.SerializeObject(modData, Formatting.Indented);
-                modWriter.Write(modJson);
-            }
+            ArchiveUtil.WriteJsonEntry(archive, "default_mod.json", modData);
 
             Notify.Success($"Successfully exported PCP: {outputPath}");
         }

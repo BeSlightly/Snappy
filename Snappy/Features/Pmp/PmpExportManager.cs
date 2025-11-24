@@ -2,12 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.IO.Compression;
 using System.Linq;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 using Snappy.Common;
 using Snappy.Features;
 using Snappy.Features.Pmp.Models;
-using Snappy.Common.Utilities;
 using Snappy.Features.Packaging;
 using Snappy.Common.Utilities;
 
@@ -59,13 +56,8 @@ public class PmpExportManager : IPmpExportManager
             using var fileStream = new FileStream(pmpOutputPath, FileMode.Create, FileAccess.Write, FileShare.None);
             using var archive = new ZipArchive(fileStream, ZipArchiveMode.Create);
 
-            // Create meta.json entry
-            var metaEntry = archive.CreateEntry("meta.json");
-            using (var streamWriter = new StreamWriter(metaEntry.Open()))
-            {
-                var metadata = ModMetadataBuilder.BuildSnapshotMetadata(snapshotName, snapshotInfo.SourceActor);
-                await streamWriter.WriteAsync(JsonConvert.SerializeObject(metadata, Formatting.Indented));
-            }
+            var metadata = ModMetadataBuilder.BuildSnapshotMetadata(snapshotName, snapshotInfo.SourceActor);
+            ArchiveUtil.WriteJsonEntry(archive, "meta.json", metadata);
 
             // Create default_mod.json entry
             var modData = new PmpDefaultMod();
@@ -73,11 +65,7 @@ public class PmpExportManager : IPmpExportManager
             ModPackageBuilder.AddSnapshotFiles(archive, snapshotInfo, paths.FilesDirectory, modData.Files,
                 resolvedFileMap);
 
-            var modEntry = archive.CreateEntry("default_mod.json");
-            using (var streamWriter = new StreamWriter(modEntry.Open()))
-            {
-                await streamWriter.WriteAsync(JsonConvert.SerializeObject(modData, Formatting.Indented));
-            }
+            ArchiveUtil.WriteJsonEntry(archive, "default_mod.json", modData);
 
             Notify.Success($"Successfully exported {snapshotName} to {pmpOutputPath}");
         }
