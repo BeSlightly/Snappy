@@ -577,7 +577,7 @@ public partial class MainWindow
         if (ImUtf8.IconButton(FontAwesomeIcon.BoxOpen, pmpTooltip, default, pmpDisabled))
         {
             var defaultName =
-                $"{_selectedSnapshot!.Name}_{SanitizeForFileName(entry.Description ?? \"entry\")}.pmp";
+                $"{_selectedSnapshot!.Name}_{SanitizeForFileName(entry.Description ?? "entry")}.pmp";
             _snappy.FileDialogManager.SaveFileDialog(
                 "Export PMP for Entry",
                 ".pmp",
@@ -588,7 +588,7 @@ public partial class MainWindow
                     if (!status || string.IsNullOrEmpty(path))
                         return;
 
-                    Notify.Info($"Starting PMP export for entry '{entry.Description ?? \"\"}'...");
+                    Notify.Info($"Starting PMP export for entry '{entry.Description ?? ""}'...");
                     var mapId = entry.FileMapId ?? _selectedSnapshotInfo?.CurrentFileMapId;
                     _snappy.ExecuteBackgroundTask(() =>
                         _pmpExportManager.SnapshotToPMPAsync(_selectedSnapshot!.FullName, mapId));
@@ -605,7 +605,7 @@ public partial class MainWindow
         if (ImUtf8.IconButton(FontAwesomeIcon.FileExport, pcpTooltip, default, pcpDisabled))
         {
             var defaultName =
-                $"{_selectedSnapshot!.Name}_{SanitizeForFileName(entry.Description ?? \"entry\")}.pcp";
+                $"{_selectedSnapshot!.Name}_{SanitizeForFileName(entry.Description ?? "entry")}.pcp";
             _snappy.FileDialogManager.SaveFileDialog(
                 "Export PCP for Entry",
                 ".pcp",
@@ -616,7 +616,7 @@ public partial class MainWindow
                     if (!status || string.IsNullOrEmpty(path))
                         return;
 
-                    Notify.Info($"Starting PCP export for entry '{entry.Description ?? \"\"}'...");
+                    Notify.Info($"Starting PCP export for entry '{entry.Description ?? ""}'...");
                     var glam = entry as GlamourerHistoryEntry;
                     var cust = entry as CustomizeHistoryEntry;
                     var nameOverride = _pcpPlayerNameOverride;
