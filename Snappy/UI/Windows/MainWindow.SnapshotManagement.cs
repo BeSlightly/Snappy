@@ -3,6 +3,7 @@ using System.Globalization;
 using Dalamud.Interface.Colors;
 using System;
 using System.IO;
+using System.Numerics;
 
 namespace Snappy.UI.Windows;
 
@@ -481,7 +482,7 @@ public partial class MainWindow
         ImUtf8.TableSetupColumn(
             "Controls",
             ImGuiTableColumnFlags.WidthFixed,
-            120f * ImGuiHelpers.GlobalScale
+            260f * ImGuiHelpers.GlobalScale
         );
 
         var rowHeight = ImGui.GetFrameHeight() + 20f * ImGuiHelpers.GlobalScale;
@@ -525,10 +526,16 @@ public partial class MainWindow
             return;
 
         using var id = ImRaii.PushId(entry.GetHashCode());
-        using var style = ImRaii.PushStyle(
-            ImGuiStyleVar.ItemSpacing,
-            new Vector2(6 * ImGuiHelpers.GlobalScale, 0)
-        );
+        var spacingX = 6 * ImGuiHelpers.GlobalScale;
+        var buttonSize = ImGui.GetFrameHeight();
+        const int buttonCount = 6;
+        var totalWidth = buttonCount * buttonSize + (buttonCount - 1) * spacingX;
+
+        using var style = ImRaii.PushStyle(ImGuiStyleVar.ItemSpacing, new Vector2(spacingX, 0));
+
+        var available = ImGui.GetContentRegionAvail().X;
+        var startX = ImGui.GetCursorPosX() + Math.Max(0, available - totalWidth);
+        ImGui.SetCursorPosX(startX);
 
         if (
             ImUtf8.IconButton(

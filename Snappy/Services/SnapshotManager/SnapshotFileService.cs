@@ -92,7 +92,8 @@ public class SnapshotFileService : ISnapshotFileService
 
         var incomingFileMap = new Dictionary<string, string>(snapshotData.FileReplacements, StringComparer.OrdinalIgnoreCase);
         var mapChanges = FileMapUtil.CalculateChanges(resolvedCurrentMap, incomingFileMap);
-        if (mapChanges.Any())
+        var mapChanged = mapChanges.Any();
+        if (mapChanged)
         {
             var newMapId = Guid.NewGuid().ToString("N");
             snapshotInfo.FileMaps.Add(new FileMapEntry
@@ -128,6 +129,7 @@ public class SnapshotFileService : ISnapshotFileService
         snapshotInfo.ManipulationString = snapshotData.Manipulation;
 
         var lastGlamourerEntry = glamourerHistory.Entries.LastOrDefault();
+        var glamourerEntryCreated = false;
         if (lastGlamourerEntry == null || lastGlamourerEntry.GlamourerString != snapshotData.Glamourer)
         {
             var entryStamp = DateTime.UtcNow;
@@ -135,6 +137,17 @@ public class SnapshotFileService : ISnapshotFileService
                 $"Glamourer Update - {entryStamp:yyyy-MM-dd HH:mm:ss} UTC", snapshotInfo.CurrentFileMapId);
             glamourerHistory.Entries.Add(newEntry);
             PluginLog.Debug("New Glamourer version detected. Appending to history.");
+            glamourerEntryCreated = true;
+        }
+        else if (mapChanged && !string.IsNullOrEmpty(snapshotData.Glamourer))
+        {
+            // Glamourer string unchanged but files changed; record a new entry so users can pick the correct file map.
+            var entryStamp = DateTime.UtcNow;
+            var newEntry = GlamourerHistoryEntry.Create(snapshotData.Glamourer,
+                $"Files Update - {entryStamp:yyyy-MM-dd HH:mm:ss} UTC", snapshotInfo.CurrentFileMapId);
+            glamourerHistory.Entries.Add(newEntry);
+            PluginLog.Debug("File map changed without Glamourer change. Added history entry to capture file map.");
+            glamourerEntryCreated = true;
         }
 
         var b64Customize = string.IsNullOrEmpty(snapshotData.Customize)
