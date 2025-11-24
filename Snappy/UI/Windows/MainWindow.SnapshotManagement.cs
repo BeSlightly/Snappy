@@ -504,7 +504,7 @@ public partial class MainWindow
         using var id = ImRaii.PushId(entry.GetHashCode());
         var spacingX = 6 * ImGuiHelpers.GlobalScale;
         var buttonSize = ImGui.GetFrameHeight();
-        const int buttonCount = 6;
+        const int buttonCount = 5;
         var totalWidth = buttonCount * buttonSize + (buttonCount - 1) * spacingX;
 
         using var style = ImRaii.PushStyle(ImGuiStyleVar.ItemSpacing, new Vector2(spacingX, 0));
@@ -578,38 +578,6 @@ public partial class MainWindow
                 },
                 _snappy.Configuration.WorkingDirectory);
             }
-
-        ImGui.SameLine();
-
-        var pcpDisabled = _selectedSnapshot == null || string.IsNullOrWhiteSpace(_pcpPlayerNameOverride);
-        var pcpTooltip = pcpDisabled
-            ? "Set a player name and select a snapshot to export to PCP."
-            : "Export this entry's state to a PCP.";
-        if (ImUtf8.IconButton(FontAwesomeIcon.FileExport, pcpTooltip, default, pcpDisabled))
-        {
-            var defaultName =
-                $"{_selectedSnapshot!.Name}_{SanitizeForFileName(entry.Description ?? "entry")}.pcp";
-            _snappy.FileDialogManager.SaveFileDialog(
-                "Export PCP for Entry",
-                ".pcp",
-                defaultName,
-                ".pcp",
-                (status, path) =>
-                {
-                    if (!status || string.IsNullOrEmpty(path))
-                        return;
-
-                    Notify.Info($"Starting PCP export for entry '{entry.Description ?? ""}'...");
-                    var glam = entry as GlamourerHistoryEntry;
-                    var cust = entry as CustomizeHistoryEntry;
-                    var nameOverride = _pcpPlayerNameOverride;
-                    var worldOverride = _pcpSelectedWorldIdOverride;
-                    _snappy.ExecuteBackgroundTask(() =>
-                        _pcpManager.ExportPcp(_selectedSnapshot!.FullName, path, glam, cust, nameOverride,
-                            worldOverride));
-                },
-                _snappy.Configuration.WorkingDirectory);
-        }
 
         ImGui.SameLine();
 
