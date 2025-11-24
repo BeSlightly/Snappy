@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.IO.Compression;
 using System.Linq;
 using Snappy.Common;
-using Snappy.Features;
 using Snappy.Features.Pmp.Models;
 using Snappy.Features.Packaging;
 using Snappy.Common.Utilities;
