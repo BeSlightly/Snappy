@@ -49,7 +49,7 @@ public partial class MainWindow : Window, IDisposable
     private string _tempHistoryEntryName = string.Empty;
     private string _tempSnapshotName = string.Empty;
     private string _tempSourceActorName = string.Empty;
-    private global::SnappyExtras.UI.WorldSelector _pcpWorldSelector = new("##pcpWorld");
+    private WorldSelector _pcpWorldSelector = new("##pcpWorld");
 
     public MainWindow(Snappy snappy, IActorService actorService, IActiveSnapshotManager activeSnapshotManager,
         IMcdfManager mcdfManager, IPcpManager pcpManager,

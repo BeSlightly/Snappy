@@ -10,7 +10,7 @@ using ECommons.GameHelpers;
 using ECommons.ImGuiMethods;
 using Lumina.Excel.Sheets;
 
-namespace SnappyExtras.UI;
+namespace Snappy.UI;
 
 // Adapted from Lifestream NightmareUI WorldSelector for grouped region/DC world selection.
 public class WorldSelector
