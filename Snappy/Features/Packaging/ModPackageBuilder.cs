@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.IO.Compression;
 using Newtonsoft.Json.Linq;
 using Snappy.Common.Utilities;
@@ -14,7 +15,8 @@ public static class ModPackageBuilder
         ZipArchive archive,
         SnapshotInfo snapshotInfo,
         string sourceFilesDirectory,
-        Dictionary<string, string> filesDictionary)
-        => ModpackExportUtil.AddSnapshotFilesToArchive(archive, snapshotInfo, sourceFilesDirectory, filesDictionary);
+        Dictionary<string, string> filesDictionary,
+        IReadOnlyDictionary<string, string>? resolvedFileMap = null)
+        => ModpackExportUtil.AddSnapshotFilesToArchive(archive, snapshotInfo, sourceFilesDirectory, filesDictionary,
+            resolvedFileMap);
 }
-

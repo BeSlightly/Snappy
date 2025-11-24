@@ -1,6 +1,8 @@
+using System.Collections.Generic;
 using Dalamud.Utility;
 using ECommons.GameHelpers;
 using Snappy.Common;
+using Snappy.Common.Utilities;
 using Penumbra.GameData.Structs;
 
 namespace Snappy.Services.SnapshotManager;
@@ -54,17 +56,22 @@ public class SnapshotApplicationService : ISnapshotApplicationService
 
         var glamourerToApply = glamourerOverride ?? glamourerHistory.Entries.LastOrDefault();
         var customizeToApply = customizeOverride ?? customizeHistory.Entries.LastOrDefault();
+        var mapIdToUse = glamourerToApply?.FileMapId ?? customizeToApply?.FileMapId ?? snapshotInfo.CurrentFileMapId;
+        var resolvedFileMap = FileMapUtil.ResolveFileMap(snapshotInfo, mapIdToUse);
+        if (!resolvedFileMap.Any() && snapshotInfo.FileReplacements.Any())
+            resolvedFileMap = new Dictionary<string, string>(snapshotInfo.FileReplacements,
+                StringComparer.OrdinalIgnoreCase);
 
-        if (glamourerToApply == null && customizeToApply == null && !snapshotInfo.FileReplacements.Any())
+        if (glamourerToApply == null && customizeToApply == null && !resolvedFileMap.Any())
         {
             Notify.Error("Could not load snapshot: No data (files, glamour, C+) to apply.");
             return false;
         }
 
         var moddedPaths = new Dictionary<string, string>();
-        if (snapshotInfo.FileReplacements.Any())
+        if (resolvedFileMap.Any())
         {
-            foreach (var (gamePath, hash) in snapshotInfo.FileReplacements)
+            foreach (var (gamePath, hash) in resolvedFileMap)
             {
                 var hashedFilePath = paths.GetHashedFilePath(hash);
 

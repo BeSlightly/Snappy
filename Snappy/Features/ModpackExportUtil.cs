@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.IO.Compression;
 using System.Linq;
 using Snappy.Common;
@@ -11,11 +12,13 @@ public static class ModpackExportUtil
         ZipArchive archive,
         SnapshotInfo snapshotInfo,
         string sourceFilesDirectory,
-        Dictionary<string, string> filesDictionary)
+        Dictionary<string, string> filesDictionary,
+        IReadOnlyDictionary<string, string>? resolvedFileMap = null)
     {
         if (!Directory.Exists(sourceFilesDirectory)) return;
 
-        var gamePathsByHash = snapshotInfo.FileReplacements
+        var fileMap = resolvedFileMap ?? snapshotInfo.FileReplacements;
+        var gamePathsByHash = fileMap
             .GroupBy(kvp => kvp.Value, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(g => g.Key, g => g.Select(kvp => kvp.Key).ToList(), StringComparer.OrdinalIgnoreCase);
 

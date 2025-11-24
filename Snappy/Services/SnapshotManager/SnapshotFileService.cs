@@ -1,6 +1,12 @@
+using System;
 using System.Collections;
+using System.Collections.Generic;
+using System.Globalization;
+using System.Linq;
 using ECommons.Reflection;
 using Snappy.Common;
+using Snappy.Common.Utilities;
+using Snappy.Models;
 
 namespace Snappy.Services.SnapshotManager;
 
@@ -21,6 +27,8 @@ public class SnapshotFileService : ISnapshotFileService
     public async Task<string?> UpdateSnapshotAsync(ICharacter character, bool isSelf,
         Dictionary<string, HashSet<string>>? penumbraReplacements)
     {
+        var now = DateTime.UtcNow;
+
         if (!character.IsValid())
         {
             Notify.Error("Invalid character selected for snapshot update.");
@@ -67,6 +75,40 @@ public class SnapshotFileService : ISnapshotFileService
         var customizeHistory = await JsonUtil.DeserializeAsync<CustomizeHistory>(paths.CustomizeHistoryFile) ??
                                new CustomizeHistory();
 
+        var resolvedCurrentMap = FileMapUtil.ResolveFileMap(snapshotInfo, snapshotInfo.CurrentFileMapId);
+        if (!resolvedCurrentMap.Any() && snapshotInfo.FileReplacements.Any())
+            resolvedCurrentMap = new Dictionary<string, string>(snapshotInfo.FileReplacements,
+                StringComparer.OrdinalIgnoreCase);
+
+        FileMapUtil.CreateBaseMapIfMissing(snapshotInfo, resolvedCurrentMap, now);
+        if (snapshotInfo.CurrentFileMapId != null)
+        {
+            foreach (var entry in glamourerHistory.Entries.Where(e => string.IsNullOrEmpty(e.FileMapId)))
+                entry.FileMapId = snapshotInfo.CurrentFileMapId;
+            foreach (var entry in customizeHistory.Entries.Where(e => string.IsNullOrEmpty(e.FileMapId)))
+                entry.FileMapId = snapshotInfo.CurrentFileMapId;
+        }
+        resolvedCurrentMap = FileMapUtil.ResolveFileMap(snapshotInfo, snapshotInfo.CurrentFileMapId);
+
+        var incomingFileMap = new Dictionary<string, string>(snapshotData.FileReplacements, StringComparer.OrdinalIgnoreCase);
+        var mapChanges = FileMapUtil.CalculateChanges(resolvedCurrentMap, incomingFileMap);
+        if (mapChanges.Any())
+        {
+            var newMapId = Guid.NewGuid().ToString("N");
+            snapshotInfo.FileMaps.Add(new FileMapEntry
+            {
+                Id = newMapId,
+                BaseId = snapshotInfo.CurrentFileMapId,
+                Changes = mapChanges,
+                Timestamp = now.ToString("o", CultureInfo.InvariantCulture)
+            });
+            snapshotInfo.CurrentFileMapId = newMapId;
+        }
+
+        resolvedCurrentMap = FileMapUtil.ResolveFileMap(snapshotInfo, snapshotInfo.CurrentFileMapId);
+        snapshotInfo.FileReplacements = new Dictionary<string, string>(resolvedCurrentMap,
+            StringComparer.OrdinalIgnoreCase);
+
         foreach (var (gamePath, hash) in snapshotData.FileReplacements)
         {
             snapshotInfo.FileReplacements[gamePath] = hash;
@@ -88,9 +130,9 @@ public class SnapshotFileService : ISnapshotFileService
         var lastGlamourerEntry = glamourerHistory.Entries.LastOrDefault();
         if (lastGlamourerEntry == null || lastGlamourerEntry.GlamourerString != snapshotData.Glamourer)
         {
-            var now = DateTime.UtcNow;
+            var entryStamp = DateTime.UtcNow;
             var newEntry = GlamourerHistoryEntry.Create(snapshotData.Glamourer,
-                $"Glamourer Update - {now:yyyy-MM-dd HH:mm:ss} UTC");
+                $"Glamourer Update - {entryStamp:yyyy-MM-dd HH:mm:ss} UTC", snapshotInfo.CurrentFileMapId);
             glamourerHistory.Entries.Add(newEntry);
             PluginLog.Debug("New Glamourer version detected. Appending to history.");
         }
@@ -102,14 +144,14 @@ public class SnapshotFileService : ISnapshotFileService
         if ((lastCustomizeEntry == null || lastCustomizeEntry.CustomizeData != b64Customize) &&
             !string.IsNullOrEmpty(b64Customize))
         {
-            var now = DateTime.UtcNow;
+            var entryStamp = DateTime.UtcNow;
             var newEntry = CustomizeHistoryEntry.CreateFromBase64(b64Customize, snapshotData.Customize,
-                $"Customize+ Update - {now:yyyy-MM-dd HH:mm:ss} UTC");
+                $"Customize+ Update - {entryStamp:yyyy-MM-dd HH:mm:ss} UTC", snapshotInfo.CurrentFileMapId);
             customizeHistory.Entries.Add(newEntry);
             PluginLog.Debug("New Customize+ version detected. Appending to history.");
         }
 
-        snapshotInfo.LastUpdate = DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture);
+        snapshotInfo.LastUpdate = now.ToString("o", CultureInfo.InvariantCulture);
 
         SaveSnapshotToDisk(snapshotPath, snapshotInfo, glamourerHistory, customizeHistory);
 

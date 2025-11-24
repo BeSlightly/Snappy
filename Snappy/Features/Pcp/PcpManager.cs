@@ -1,6 +1,9 @@
+using System;
+using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.IO.Compression;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -11,6 +14,7 @@ using Penumbra.GameData.Files.AtchStructs;
 using Penumbra.GameData.Structs;
 using Penumbra.Meta.Manipulations;
 using Snappy.Common;
+using Snappy.Common.Utilities;
 using Snappy.Features;
 using Snappy.Features.Packaging;
 using Snappy.Models;
@@ -123,11 +127,13 @@ public class PcpManager : IPcpManager
 
             // Create Glamourer history
             var glamourerHistory = new GlamourerHistory();
-            if (characterData.Glamourer != null) glamourerHistory = CreateGlamourerHistory(characterData);
+            if (characterData.Glamourer != null)
+                glamourerHistory = CreateGlamourerHistory(characterData, snapshotInfo.CurrentFileMapId);
 
             // Create Customize+ history
             var customizeHistory = new CustomizeHistory();
-            if (characterData.CustomizePlus != null) customizeHistory = CreateCustomizeHistory(characterData);
+            if (characterData.CustomizePlus != null)
+                customizeHistory = CreateCustomizeHistory(characterData, snapshotInfo.CurrentFileMapId);
 
             // Save all data to disk
             _snapshotFileService.SaveSnapshotToDisk(paths.RootPath, snapshotInfo, glamourerHistory, customizeHistory);
@@ -177,6 +183,12 @@ public class PcpManager : IPcpManager
                                    new GlamourerHistory();
             var customizeHistory = await JsonUtil.DeserializeAsync<CustomizeHistory>(paths.CustomizeHistoryFile) ??
                                    new CustomizeHistory();
+
+            var fileMapId = selectedGlamourer?.FileMapId ?? selectedCustomize?.FileMapId ?? snapshotInfo.CurrentFileMapId;
+            var resolvedFileMap = FileMapUtil.ResolveFileMap(snapshotInfo, fileMapId);
+            if (!resolvedFileMap.Any())
+                resolvedFileMap = new Dictionary<string, string>(snapshotInfo.FileReplacements,
+                    StringComparer.OrdinalIgnoreCase);
 
             using var archive = ZipFile.Open(outputPath, ZipArchiveMode.Create);
 
@@ -328,7 +340,8 @@ public class PcpManager : IPcpManager
             // Create mod data and add files
             var modData = new PcpModData();
             modData.Manipulations = ModPackageBuilder.BuildManipulations(snapshotInfo.ManipulationString);
-            ModPackageBuilder.AddSnapshotFiles(archive, snapshotInfo, paths.FilesDirectory, modData.Files);
+            ModPackageBuilder.AddSnapshotFiles(archive, snapshotInfo, paths.FilesDirectory, modData.Files,
+                resolvedFileMap);
 
             // Add default_mod.json
             var modEntry = archive.CreateEntry("default_mod.json");
@@ -396,7 +409,7 @@ public class PcpManager : IPcpManager
                 PluginLog.Warning($"Failed to process manipulations from PCP: {ex.Message}");
             }
 
-        return new SnapshotInfo
+        var snapshotInfo = new SnapshotInfo
         {
             SourceActor = characterData.Actor.PlayerName,
             SourceWorldId = characterData.Actor.HomeWorld,
@@ -404,6 +417,22 @@ public class PcpManager : IPcpManager
             FileReplacements = gamePathToHashMap,
             ManipulationString = manipulationString
         };
+
+        if (snapshotInfo.FileReplacements.Any())
+        {
+            var baseId = Guid.NewGuid().ToString("N");
+            snapshotInfo.FileMaps.Add(new FileMapEntry
+            {
+                Id = baseId,
+                BaseId = null,
+                Changes = new Dictionary<string, string>(snapshotInfo.FileReplacements,
+                    StringComparer.OrdinalIgnoreCase),
+                Timestamp = DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture)
+            });
+            snapshotInfo.CurrentFileMapId = baseId;
+        }
+
+        return snapshotInfo;
     }
 
     private static string ConvertPcpManipulationsToPenumbraFormat(List<JObject> pcpManipulations)
@@ -459,7 +488,7 @@ public class PcpManager : IPcpManager
         }
     }
 
-    private static GlamourerHistory CreateGlamourerHistory(PcpCharacterData characterData)
+    private static GlamourerHistory CreateGlamourerHistory(PcpCharacterData characterData, string? fileMapId)
     {
         var history = new GlamourerHistory();
         if (characterData.Glamourer != null)
@@ -474,7 +503,7 @@ public class PcpManager : IPcpManager
                     // This is the new Glamourer PCP format - convert the Design to Base64
                     var designJson = JsonConvert.SerializeObject(glamourerObj["Design"], Formatting.None);
                     var designBase64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(designJson));
-                    history.Entries.Add(GlamourerHistoryEntry.Create(designBase64, "Imported from PCP"));
+                    history.Entries.Add(GlamourerHistoryEntry.Create(designBase64, "Imported from PCP", fileMapId));
                 }
                 else
                 {
@@ -483,7 +512,7 @@ public class PcpManager : IPcpManager
                     var designJson = JsonConvert.SerializeObject(glamourerObj, Formatting.None);
                     var designBase64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(designJson));
                     history.Entries.Add(GlamourerHistoryEntry.Create(designBase64,
-                        "Imported from PCP (Legacy Format)"));
+                        "Imported from PCP (Legacy Format)", fileMapId));
                 }
             }
             catch (Exception ex)
@@ -494,7 +523,7 @@ public class PcpManager : IPcpManager
         return history;
     }
 
-    private static CustomizeHistory CreateCustomizeHistory(PcpCharacterData characterData)
+    private static CustomizeHistory CreateCustomizeHistory(PcpCharacterData characterData, string? fileMapId)
     {
         var history = new CustomizeHistory();
         if (characterData.CustomizePlus != null)
@@ -512,7 +541,8 @@ public class PcpManager : IPcpManager
                     // Convert to Base64 for Snappy's format
                     var customizeBase64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(templateJson));
                     var customizeEntry =
-                        CustomizeHistoryEntry.CreateFromBase64(customizeBase64, templateJson, "Imported from PCP");
+                        CustomizeHistoryEntry.CreateFromBase64(customizeBase64, templateJson, "Imported from PCP",
+                            fileMapId);
                     history.Entries.Add(customizeEntry);
                 }
                 else
@@ -521,7 +551,7 @@ public class PcpManager : IPcpManager
                     var customizeJson = JsonConvert.SerializeObject(characterData.CustomizePlus);
                     var customizeBase64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(customizeJson));
                     var customizeEntry = CustomizeHistoryEntry.CreateFromBase64(customizeBase64, customizeJson,
-                        "Imported from PCP (Legacy Format)");
+                        "Imported from PCP (Legacy Format)", fileMapId);
                     history.Entries.Add(customizeEntry);
                 }
             }

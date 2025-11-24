@@ -1,5 +1,12 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Text;
 using LZ4;
 using Snappy.Common;
+using Snappy.Common.Utilities;
+using Snappy.Models;
 using Snappy.Services.SnapshotManager;
 
 namespace Snappy.Features.Mcdf;
@@ -40,8 +47,8 @@ public class McdfManager : IMcdfManager
             var gamePathToHashMap = ExtractAndHashMapFiles(charaFile, reader, paths.FilesDirectory);
 
             var snapshotInfo = CreateSnapshotInfo(charaFile, snapshotDirName, gamePathToHashMap);
-            var glamourerHistory = CreateGlamourerHistory(charaFile);
-            var customizeHistory = CreateCustomizeHistory(charaFile);
+            var glamourerHistory = CreateGlamourerHistory(charaFile, snapshotInfo.CurrentFileMapId);
+            var customizeHistory = CreateCustomizeHistory(charaFile, snapshotInfo.CurrentFileMapId);
 
             _snapshotFileService
                 .SaveSnapshotToDisk(paths.RootPath, snapshotInfo, glamourerHistory, customizeHistory);
@@ -79,7 +86,7 @@ public class McdfManager : IMcdfManager
     private static SnapshotInfo CreateSnapshotInfo(McdfHeader charaFile, string snapshotDirName,
         Dictionary<string, string> gamePathToHashMap)
     {
-        return new SnapshotInfo
+        var snapshotInfo = new SnapshotInfo
         {
             SourceActor = Path.GetFileName(snapshotDirName),
             SourceWorldId = null,
@@ -87,23 +94,41 @@ public class McdfManager : IMcdfManager
             ManipulationString = charaFile.CharaFileData.ManipulationData,
             FileReplacements = gamePathToHashMap
         };
+
+        if (snapshotInfo.FileReplacements.Any())
+        {
+            var baseId = Guid.NewGuid().ToString("N");
+            snapshotInfo.FileMaps.Add(new FileMapEntry
+            {
+                Id = baseId,
+                BaseId = null,
+                Changes = new Dictionary<string, string>(snapshotInfo.FileReplacements,
+                    StringComparer.OrdinalIgnoreCase),
+                Timestamp = DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture)
+            });
+            snapshotInfo.CurrentFileMapId = baseId;
+        }
+
+        return snapshotInfo;
     }
 
-    private static GlamourerHistory CreateGlamourerHistory(McdfHeader charaFile)
+    private static GlamourerHistory CreateGlamourerHistory(McdfHeader charaFile, string? fileMapId)
     {
         var history = new GlamourerHistory();
-        history.Entries.Add(GlamourerHistoryEntry.Create(charaFile.CharaFileData.GlamourerData, "Imported from MCDF"));
+        history.Entries.Add(
+            GlamourerHistoryEntry.Create(charaFile.CharaFileData.GlamourerData, "Imported from MCDF", fileMapId));
         return history;
     }
 
-    private static CustomizeHistory CreateCustomizeHistory(McdfHeader charaFile)
+    private static CustomizeHistory CreateCustomizeHistory(McdfHeader charaFile, string? fileMapId)
     {
         var history = new CustomizeHistory();
         var cplusData = charaFile.CharaFileData.CustomizePlusData;
         if (!string.IsNullOrEmpty(cplusData))
         {
             var cplusJson = Encoding.UTF8.GetString(Convert.FromBase64String(cplusData));
-            var customizeEntry = CustomizeHistoryEntry.CreateFromBase64(cplusData, cplusJson, "Imported from MCDF");
+            var customizeEntry =
+                CustomizeHistoryEntry.CreateFromBase64(cplusData, cplusJson, "Imported from MCDF", fileMapId);
             history.Entries.Add(customizeEntry);
         }
 

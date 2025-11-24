@@ -1,4 +1,8 @@
-﻿namespace Snappy.Models;
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+
+namespace Snappy.Models;
 
 public class GlamourerHistory
 {
@@ -9,13 +13,14 @@ public record GlamourerHistoryEntry : HistoryEntryBase
 {
     public string GlamourerString { get; set; } = string.Empty;
 
-    public static GlamourerHistoryEntry Create(string glamourerString, string description)
+    public static GlamourerHistoryEntry Create(string glamourerString, string description, string? fileMapId = null)
     {
         return new GlamourerHistoryEntry
         {
             Timestamp = DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture),
             Description = description,
-            GlamourerString = glamourerString
+            GlamourerString = glamourerString,
+            FileMapId = fileMapId
         };
     }
 }

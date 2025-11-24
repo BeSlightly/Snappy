@@ -1,4 +1,7 @@
+using System;
+using System.Collections.Generic;
 using System.IO.Compression;
+using System.Linq;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Snappy.Common;
@@ -6,6 +9,7 @@ using Snappy.Features;
 using Snappy.Features.Pmp.Models;
 using Snappy.Common.Utilities;
 using Snappy.Features.Packaging;
+using Snappy.Common.Utilities;
 
 namespace Snappy.Features.Pmp;
 
@@ -20,7 +24,7 @@ public class PmpExportManager : IPmpExportManager
 
     public bool IsExporting { get; private set; }
 
-    public async Task SnapshotToPMPAsync(string snapshotPath)
+    public async Task SnapshotToPMPAsync(string snapshotPath, string? fileMapId = null)
     {
         if (IsExporting)
         {
@@ -43,6 +47,10 @@ public class PmpExportManager : IPmpExportManager
 
             var snapshotName = new DirectoryInfo(snapshotPath).Name;
             var pmpOutputPath = Path.Combine(_configuration.WorkingDirectory, $"{snapshotName}.pmp");
+            var resolvedFileMap = FileMapUtil.ResolveFileMap(snapshotInfo, fileMapId ?? snapshotInfo.CurrentFileMapId);
+            if (!resolvedFileMap.Any())
+                resolvedFileMap = new Dictionary<string, string>(snapshotInfo.FileReplacements,
+                    StringComparer.OrdinalIgnoreCase);
 
             using var fileStream = new FileStream(pmpOutputPath, FileMode.Create, FileAccess.Write, FileShare.None);
             using var archive = new ZipArchive(fileStream, ZipArchiveMode.Create);
@@ -58,7 +66,8 @@ public class PmpExportManager : IPmpExportManager
             // Create default_mod.json entry
             var modData = new PmpDefaultMod();
             modData.Manipulations = ModPackageBuilder.BuildManipulations(snapshotInfo.ManipulationString);
-            ModPackageBuilder.AddSnapshotFiles(archive, snapshotInfo, paths.FilesDirectory, modData.Files);
+            ModPackageBuilder.AddSnapshotFiles(archive, snapshotInfo, paths.FilesDirectory, modData.Files,
+                resolvedFileMap);
 
             var modEntry = archive.CreateEntry("default_mod.json");
             using (var streamWriter = new StreamWriter(modEntry.Open()))

@@ -1,4 +1,13 @@
-﻿using Snappy.Common;
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.IO;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using Snappy.Common;
+using Snappy.Common.Utilities;
+using Snappy.Models;
 
 namespace Snappy.Services;
 
@@ -48,9 +57,23 @@ public static class SnapshotMigrator
                 foreach (var gamePath in gamePaths) newInfo.FileReplacements[gamePath] = hash;
             }
 
+            if (newInfo.FileReplacements.Any())
+            {
+                var baseId = Guid.NewGuid().ToString("N");
+                newInfo.FileMaps.Add(new FileMapEntry
+                {
+                    Id = baseId,
+                    BaseId = null,
+                    Changes = new Dictionary<string, string>(newInfo.FileReplacements,
+                        StringComparer.OrdinalIgnoreCase),
+                    Timestamp = DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture)
+                });
+                newInfo.CurrentFileMapId = baseId;
+            }
+
             var glamourerHistory = new GlamourerHistory();
             glamourerHistory.Entries.Add(GlamourerHistoryEntry.Create(oldInfo.GlamourerString,
-                "Migrated from old format"));
+                "Migrated from old format", newInfo.CurrentFileMapId));
 
             var customizeHistory = new CustomizeHistory();
             if (!string.IsNullOrEmpty(oldInfo.CustomizeData) && ipcManager.IsCustomizePlusAvailable())
@@ -61,7 +84,7 @@ public static class SnapshotMigrator
 
                 var customizeEntry =
                     CustomizeHistoryEntry.CreateFromBase64(oldInfo.CustomizeData, cplusJson,
-                        "Migrated from old format");
+                        "Migrated from old format", newInfo.CurrentFileMapId);
                 customizeHistory.Entries.Add(customizeEntry);
             }
 
