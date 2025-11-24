@@ -1,4 +1,5 @@
 using System.IO.Compression;
+using System.Linq;
 using Snappy.Common;
 using Snappy.Models;
 
@@ -14,21 +15,23 @@ public static class ModpackExportUtil
     {
         if (!Directory.Exists(sourceFilesDirectory)) return;
 
+        var gamePathsByHash = snapshotInfo.FileReplacements
+            .GroupBy(kvp => kvp.Value, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.Select(kvp => kvp.Key).ToList(), StringComparer.OrdinalIgnoreCase);
+
         foreach (var file in Directory.GetFiles(sourceFilesDirectory, "*", SearchOption.AllDirectories))
         {
             var fileName = Path.GetFileName(file);
             var hash = Path.GetFileNameWithoutExtension(fileName);
 
-            // Find the corresponding game path from the snapshot info  
-            var gamePath = snapshotInfo.FileReplacements
-                .FirstOrDefault(kvp => kvp.Value == hash).Key;
+            if (!gamePathsByHash.TryGetValue(hash, out var gamePaths) || gamePaths.Count == 0)
+                continue;
 
-            if (!string.IsNullOrEmpty(gamePath))
-            {
-                var archiveFilePath = $"files/{fileName}";
-                archive.CreateEntryFromFile(file, archiveFilePath);
-                filesDictionary[gamePath] = archiveFilePath.Replace('/', '\\'); // Penumbra expects backslashes  
-            }
+            var archiveFilePath = $"files/{fileName}";
+            archive.CreateEntryFromFile(file, archiveFilePath);
+
+            foreach (var gamePath in gamePaths.Distinct(StringComparer.OrdinalIgnoreCase))
+                filesDictionary[gamePath] = archiveFilePath.Replace('/', '\\'); // Penumbra expects backslashes
         }
     }
 }
