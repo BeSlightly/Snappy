@@ -129,7 +129,6 @@ public class SnapshotFileService : ISnapshotFileService
         snapshotInfo.ManipulationString = snapshotData.Manipulation;
 
         var lastGlamourerEntry = glamourerHistory.Entries.LastOrDefault();
-        var glamourerEntryCreated = false;
         if (lastGlamourerEntry == null || lastGlamourerEntry.GlamourerString != snapshotData.Glamourer)
         {
             var entryStamp = DateTime.UtcNow;
@@ -137,7 +136,6 @@ public class SnapshotFileService : ISnapshotFileService
                 $"Glamourer Update - {entryStamp:yyyy-MM-dd HH:mm:ss} UTC", snapshotInfo.CurrentFileMapId);
             glamourerHistory.Entries.Add(newEntry);
             PluginLog.Debug("New Glamourer version detected. Appending to history.");
-            glamourerEntryCreated = true;
         }
         else if (mapChanged && !string.IsNullOrEmpty(snapshotData.Glamourer))
         {
@@ -147,7 +145,6 @@ public class SnapshotFileService : ISnapshotFileService
                 $"Files Update - {entryStamp:yyyy-MM-dd HH:mm:ss} UTC", snapshotInfo.CurrentFileMapId);
             glamourerHistory.Entries.Add(newEntry);
             PluginLog.Debug("File map changed without Glamourer change. Added history entry to capture file map.");
-            glamourerEntryCreated = true;
         }
 
         var b64Customize = string.IsNullOrEmpty(snapshotData.Customize)
