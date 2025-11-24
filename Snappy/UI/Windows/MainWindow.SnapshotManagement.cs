@@ -132,7 +132,7 @@ public partial class MainWindow
     {
         const ImGuiTableFlags tableFlags = ImGuiTableFlags.SizingStretchSame;
 
-        if (ImGui.BeginTable("ActionButtonsTable", 4, tableFlags))
+        if (ImGui.BeginTable("ActionButtonsTable", 3, tableFlags))
         {
             using var style = ImRaii.PushStyle(ImGuiStyleVar.FrameBorderSize, 0f);
 
@@ -182,30 +182,6 @@ public partial class MainWindow
                     1,
                     _snappy.Configuration.WorkingDirectory
                 );
-
-            ImGui.TableNextColumn();
-            var exportIsInProgress = _pmpExportManager.IsExporting;
-            var exportDisabled = _selectedSnapshot == null || exportIsInProgress;
-            string exportTooltip;
-            if (exportIsInProgress)
-                exportTooltip = "An export is already in progress...";
-            else if (_selectedSnapshot == null)
-                exportTooltip = "Select a snapshot to export it as a Penumbra Mod Pack.";
-            else
-                exportTooltip = "Export the selected snapshot as a Penumbra Mod Pack (.pmp).";
-            if (
-                UiHelpers.DrawStretchedIconButtonWithText(
-                    FontAwesomeIcon.FileExport,
-                    "Export to PMP",
-                    exportTooltip,
-                    exportDisabled
-                )
-            )
-            {
-                Notify.Info($"Starting background export for '{_selectedSnapshot!.Name}'...");
-                _snappy.ExecuteBackgroundTask(() => _pmpExportManager.SnapshotToPMPAsync(_selectedSnapshot!.FullName));
-            }
-
 
             ImGui.TableNextColumn();
             var renameActorDisabled = _selectedSnapshot == null;
