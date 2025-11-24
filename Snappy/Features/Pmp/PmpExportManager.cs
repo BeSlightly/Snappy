@@ -24,7 +24,7 @@ public class PmpExportManager : IPmpExportManager
 
     public bool IsExporting { get; private set; }
 
-    public async Task SnapshotToPMPAsync(string snapshotPath, string? fileMapId = null)
+    public async Task SnapshotToPMPAsync(string snapshotPath, string? outputPath = null, string? fileMapId = null)
     {
         if (IsExporting)
         {
@@ -46,7 +46,11 @@ public class PmpExportManager : IPmpExportManager
             }
 
             var snapshotName = new DirectoryInfo(snapshotPath).Name;
-            var pmpOutputPath = Path.Combine(_configuration.WorkingDirectory, $"{snapshotName}.pmp");
+            var pmpOutputPath = outputPath;
+            if (string.IsNullOrWhiteSpace(pmpOutputPath))
+                pmpOutputPath = Path.Combine(_configuration.WorkingDirectory, $"{snapshotName}.pmp");
+            else
+                pmpOutputPath = Path.ChangeExtension(pmpOutputPath, ".pmp");
             var resolvedFileMap = FileMapUtil.ResolveFileMap(snapshotInfo, fileMapId ?? snapshotInfo.CurrentFileMapId);
             if (!resolvedFileMap.Any())
                 resolvedFileMap = new Dictionary<string, string>(snapshotInfo.FileReplacements,

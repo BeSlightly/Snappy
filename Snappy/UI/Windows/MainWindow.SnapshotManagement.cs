@@ -557,11 +557,11 @@ public partial class MainWindow
         var pmpTooltip = _pmpExportManager.IsExporting
             ? "An export is already in progress..."
             : "Export this entry's state to a Penumbra Mod Pack (.pmp).";
-        if (ImUtf8.IconButton(FontAwesomeIcon.BoxOpen, pmpTooltip, default, pmpDisabled))
-        {
-            var defaultName =
-                $"{_selectedSnapshot!.Name}_{SanitizeForFileName(entry.Description ?? "entry")}.pmp";
-            _snappy.FileDialogManager.SaveFileDialog(
+            if (ImUtf8.IconButton(FontAwesomeIcon.BoxOpen, pmpTooltip, default, pmpDisabled))
+            {
+                var defaultName =
+                    $"{_selectedSnapshot!.Name}_{SanitizeForFileName(entry.Description ?? "entry")}.pmp";
+                _snappy.FileDialogManager.SaveFileDialog(
                 "Export PMP for Entry",
                 ".pmp",
                 defaultName,
@@ -574,10 +574,10 @@ public partial class MainWindow
                     Notify.Info($"Starting PMP export for entry '{entry.Description ?? ""}'...");
                     var mapId = entry.FileMapId ?? _selectedSnapshotInfo?.CurrentFileMapId;
                     _snappy.ExecuteBackgroundTask(() =>
-                        _pmpExportManager.SnapshotToPMPAsync(_selectedSnapshot!.FullName, mapId));
+                        _pmpExportManager.SnapshotToPMPAsync(_selectedSnapshot!.FullName, path, mapId));
                 },
                 _snappy.Configuration.WorkingDirectory);
-        }
+            }
 
         ImGui.SameLine();
 
