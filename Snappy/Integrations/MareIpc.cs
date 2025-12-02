@@ -43,7 +43,7 @@ public sealed class MareIpc : IpcSubscriber
         _lightlessSyncHandledAddresses =
             Svc.PluginInterface.GetIpcSubscriber<List<nint>>("LightlessSync.GetHandledAddresses");
         _snowcloakSyncHandledAddresses =
-            Svc.PluginInterface.GetIpcSubscriber<List<nint>>("SnowcloakSync.GetHandledAddresses");
+            Svc.PluginInterface.GetIpcSubscriber<List<nint>>("Snowcloak.GetHandledAddresses");
     }
 
     // Manual IPC subscribers for different plugins
