@@ -1,12 +1,12 @@
 <div align="center">
-  <img src="snappy.png" alt="Snappy Logo" width="200" />
+  <img src="snappy.png" alt="Snappy Logo" width="150" />
   <h1>Snappy</h1>
   <p><strong>(Formerly XIVSnapper)</strong></p>
-  <p>A forked and maintained mod originally based on work by @eqbot, @ViviAshe and @astrodoobs.</p>
+  <p>A forked and maintained mod originally based on work by <a href="https://github.com/eqbot">@eqbot</a>, <a href="https://github.com/ViviAshe">@ViviAshe</a> and <a href="https://github.com/astrodoobs">@astrodoobs</a>.</p>
 
   <!-- Badges -->
   <a href="https://github.com/BeSlightly/Snappy/releases"><img src="https://img.shields.io/github/v/release/BeSlightly/Snappy?style=for-the-badge&color=blue" alt="Latest Release"></a>
-  <a href="https://github.com/BeSlightly/Snappy/raw/refs/heads/master/repo.json"><img src="https://img.shields.io/badge/Dalamud-Repo-blue?style=for-the-badge" alt="Custom Repo"></a>
+  <a href="https://raw.githubusercontent.com/BeSlightly/PortraitStealer2/refs/heads/main/repo.json"><img src="https://img.shields.io/badge/-Plugin_Repo-blue?style=for-the-badge" alt="Custom Repo"></a>
 </div>
 
 ---
@@ -44,7 +44,7 @@ https://github.com/BeSlightly/Snappy/raw/refs/heads/master/repo.json
 ```
 
 ### Legacy Version (0.2)
-The old version (0.2) is still available on the `0.20-dev` branch.
+The old version (0.2) is still available on the `0.2.0-dev` branch.
 *   ⚠️ Migrated Snapshots will not be compatible with that version.
 *   ⚠️ This version will eventually stop functioning.
 
