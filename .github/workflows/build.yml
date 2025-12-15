@@ -9,6 +9,11 @@ on:
         description: "The tag to create and release (e.g., v0.3.0-alpha)"
         required: true
         type: string
+      prerelease:
+        description: "Is this a pre-release?"
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -41,28 +46,55 @@ jobs:
         id: prep
         run: |
           $releaseTag = "${{ github.event.inputs.tag }}"
-          echo "Processing release for tag: $releaseTag"
+          $isPrerelease = "${{ github.event.inputs.prerelease }}" -eq "true"
+          echo "Processing release for tag: $releaseTag (Pre-release: $isPrerelease)"
+          
           $version = (Select-Xml -Path Snappy/Snappy.csproj -XPath "/Project/PropertyGroup/Version").Node.InnerText
           echo "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          
           $repoJsonPath = "./repo.json"
           $repoJson = Get-Content -Path $repoJsonPath -Raw | ConvertFrom-Json
           if ($repoJson -isnot [System.Array]) { $repoJson = @($repoJson) }
-          $repoJson[0].AssemblyVersion = $version
+          
           $repoJson[0].LastUpdate = [int64](([datetimeoffset](Get-Date)).ToUnixTimeSeconds())
-          $repoJson[0].DownloadLinkInstall = "https://github.com/${{ github.repository }}/releases/download/$releaseTag/latest.zip"
-          $repoJson[0].DownloadLinkTesting = $repoJson[0].DownloadLinkInstall
-          $repoJson[0].DownloadLinkUpdate = $repoJson[0].DownloadLinkInstall
+          $downloadLink = "https://github.com/${{ github.repository }}/releases/download/$releaseTag/latest.zip"
+
+          if ($isPrerelease) {
+            $repoJson[0] | Add-Member -NotePropertyName "TestingAssemblyVersion" -NotePropertyValue $version -Force
+            $repoJson[0].DownloadLinkTesting = $downloadLink
+          } else {
+            $repoJson[0].AssemblyVersion = $version
+            $repoJson[0].DownloadLinkInstall = $downloadLink
+            $repoJson[0].DownloadLinkUpdate = $downloadLink
+          }
+          
           $jsonOutput = ConvertTo-Json $repoJson -Depth 5 -Compress:$false
           $jsonOutput | Set-Content -Path $repoJsonPath -Encoding UTF8
         shell: pwsh
 
-      - name: Create GitHub Pre-Release and Tag
+      - name: Generate Changelog
+        id: changelog
+        shell: bash
+        run: |
+          PREV_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          echo "Previous tag: $PREV_TAG"
+          if [ -z "$PREV_TAG" ]; then
+            LOGS=$(git log --pretty=format:"- %s (%h)")
+          else
+            LOGS=$(git log $PREV_TAG..HEAD --pretty=format:"- %s (%h)")
+          fi
+          
+          echo "logs<<EOF" >> $GITHUB_OUTPUT
+          echo "$LOGS" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release and Tag
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.event.inputs.tag }}
           name: Release ${{ github.event.inputs.tag }}
-          body: "${{ steps.prep.outputs.version }}"
-          generate_release_notes: true
+          body: ${{ steps.changelog.outputs.logs }}
+          prerelease: ${{ github.event.inputs.prerelease }}
           files: Snappy/bin/Release/Snappy/latest.zip
 
       - name: Commit and Push Updated repo.json
