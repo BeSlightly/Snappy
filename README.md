@@ -5,9 +5,8 @@
   <p>A forked and maintained mod originally based on work by <a href="https://github.com/eqbot">@eqbot</a>, <a href="https://github.com/ViviAshe">@ViviAshe</a> and <a href="https://github.com/astrodoobs">@astrodoobs</a>.</p>
 
   <!-- Badges -->
-  <a href="https://github.com/BeSlightly/Snappy/releases"><img src="https://img.shields.io/github/v/release/BeSlightly/Snappy?style=for-the-badge&color=blue" alt="Latest Release"></a>
-  <a href="https://raw.githubusercontent.com/BeSlightly/PortraitStealer2/refs/heads/main/repo.json"><img src="https://img.shields.io/badge/-Plugin_Repo-blue?style=for-the-badge" alt="Custom Repo"></a>
-</div>
+  <a href="https://github.com/BeSlightly/Snappy/releases"><img src="https://img.shields.io/github/v/release/BeSlightly/Snappy?style=for-the-badge&color=blue" alt="Latest Release"></a>   <a href="https://github.com/BeSlightly/Snappy/releases"><img src="https://img.shields.io/github/v/release/BeSlightly/Snappy?include_prereleases&label=Testing&style=for-the-badge&color=orange" alt="Latest Testing (Pre-release)"></a>
+  </div>
 
 ---
 
