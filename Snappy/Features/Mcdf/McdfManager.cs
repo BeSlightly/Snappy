@@ -153,7 +153,9 @@ public class McdfManager : IMcdfManager
             }
 
             var hash = PluginUtil.GetFileHash(buffer);
-            var hashedFilePath = Path.Combine(filesDir, hash + Constants.DataFileExtension);
+            var representativeGamePath = fileData.GamePaths.FirstOrDefault() ?? string.Empty;
+            var existingPath = SnapshotBlobUtil.FindAnyExistingBlobPath(filesDir, hash);
+            var hashedFilePath = existingPath ?? SnapshotBlobUtil.GetPreferredBlobPath(filesDir, hash, representativeGamePath);
 
             if (!File.Exists(hashedFilePath)) File.WriteAllBytes(hashedFilePath, buffer);
 

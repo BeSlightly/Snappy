@@ -114,7 +114,8 @@ public class SnapshotFileService : ISnapshotFileService
         {
             snapshotInfo.FileReplacements[gamePath] = hash;
 
-            var hashedFilePath = paths.GetHashedFilePath(hash);
+            var existingFilePath = paths.FindAnyExistingHashedFilePath(hash);
+            var hashedFilePath = existingFilePath ?? paths.GetPreferredHashedFilePath(hash, gamePath);
             if (!File.Exists(hashedFilePath))
             {
                 var sourceFile = isSelf ? snapshotData.ResolvedPaths[hash] : _ipcManager.GetMareFileCachePath(hash);

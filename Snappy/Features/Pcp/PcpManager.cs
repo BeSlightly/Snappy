@@ -501,11 +501,15 @@ public class PcpManager : IPcpManager
 
             var fileName = Path.GetFileName(archivePath);
             var hash = Path.GetFileNameWithoutExtension(fileName);
-            var outputPath = Path.Combine(filesDir, hash + Constants.DataFileExtension);
+            var existingPath = SnapshotBlobUtil.FindAnyExistingBlobPath(filesDir, hash);
+            var outputPath = existingPath ?? SnapshotBlobUtil.GetPreferredBlobPath(filesDir, hash, gamePath);
 
-            using var entryStream = entry.Open();
-            using var outputStream = File.Create(outputPath);
-            entryStream.CopyTo(outputStream);
+            if (!File.Exists(outputPath))
+            {
+                using var entryStream = entry.Open();
+                using var outputStream = File.Create(outputPath);
+                entryStream.CopyTo(outputStream);
+            }
 
             // Store the hash for the game path
             gamePathToHashMap[gamePath] = hash;

@@ -1,3 +1,5 @@
+using Snappy.Common.Utilities;
+
 namespace Snappy.Common;
 
 public class SnapshotPaths
@@ -24,8 +26,23 @@ public class SnapshotPaths
         return new SnapshotPaths(snapshotPath);
     }
 
-    public string GetHashedFilePath(string hash)
+    public string GetLegacyHashedFilePath(string hash)
     {
         return Path.Combine(FilesDirectory, hash + Constants.DataFileExtension);
+    }
+
+    public string GetPreferredHashedFilePath(string hash, string gamePath)
+    {
+        return SnapshotBlobUtil.GetPreferredBlobPath(FilesDirectory, hash, gamePath);
+    }
+
+    public string? FindAnyExistingHashedFilePath(string hash)
+    {
+        return SnapshotBlobUtil.FindAnyExistingBlobPath(FilesDirectory, hash);
+    }
+
+    public string ResolveHashedFilePath(string hash, string gamePath)
+    {
+        return SnapshotBlobUtil.ResolveBlobPath(FilesDirectory, hash, gamePath);
     }
 }

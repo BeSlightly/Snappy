@@ -73,7 +73,7 @@ public class SnapshotApplicationService : ISnapshotApplicationService
         {
             foreach (var (gamePath, hash) in resolvedFileMap)
             {
-                var hashedFilePath = paths.GetHashedFilePath(hash);
+                var hashedFilePath = paths.ResolveHashedFilePath(hash, gamePath);
 
                 if (File.Exists(hashedFilePath))
                     moddedPaths[gamePath] = hashedFilePath;

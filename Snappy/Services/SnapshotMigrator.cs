@@ -50,7 +50,7 @@ public static class SnapshotMigrator
 
                 var fileBytes = await File.ReadAllBytesAsync(sourceFilePath);
                 var hash = PluginUtil.GetFileHash(fileBytes);
-                var newHashedPath = paths.GetHashedFilePath(hash);
+                var newHashedPath = paths.GetPreferredHashedFilePath(hash, sourceFileName);
 
                 if (!File.Exists(newHashedPath)) await File.WriteAllBytesAsync(newHashedPath, fileBytes);
 
