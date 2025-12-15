@@ -110,6 +110,8 @@ public partial class MainWindow : Window, IDisposable
     private void OnSnapshotsChanged()
     {
         LoadSnapshots();
+        if (_selectedSnapshot != null && Directory.Exists(_selectedSnapshot.FullName))
+            _snappy.ExecuteBackgroundTask(LoadHistoryForSelectedSnapshotAsync);
         if (player != null) UpdateSelectedActorState();
     }
 
