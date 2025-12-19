@@ -11,7 +11,7 @@
       "utility"
     ],
     "DalamudApiLevel": 13,
-    "TestingDalamudApiLevel": 13,
+    "TestingDalamudApiLevel": 14,
     "LoadRequiredState": 0,
     "LoadSync": false,
     "CanUnloadAsync": false,

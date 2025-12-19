@@ -1,12 +1,12 @@
-﻿<Project Sdk="Dalamud.NET.Sdk/13.1.0">
+﻿<Project Sdk="Dalamud.NET.Sdk/14.0.1">
     <PropertyGroup>
         <Authors>eqbot, ViviAshe, astrodoobs, BeSlightly</Authors>
-        <Version>0.4.1.0</Version>
+        <Version>0.4.1.1</Version>
         <Description>Snappy</Description>
         <PackageProjectUrl>https://github.com/BeSlightly/Snappy</PackageProjectUrl>
     </PropertyGroup>
     <PropertyGroup>
-        <TargetFramework>net9.0-windows7.0</TargetFramework>
+        <TargetFramework>net10.0-windows</TargetFramework>
         <Platforms>x64</Platforms>
         <Nullable>enable</Nullable>
         <LangVersion>latest</LangVersion>
@@ -31,7 +31,7 @@
         <ProjectReference Include="..\Penumbra\Penumbra\Penumbra.csproj"/>
     </ItemGroup>
     <ItemGroup>
-        <PackageReference Include="ECommons" Version="3.0.1.28" />
+        <PackageReference Include="ECommons" Version="3.1.0.5" />
         <PackageReference Include="lz4net" Version="1.0.15.93"/>
         <PackageReference Include="Microsoft.Extensions.Logging" Version="9.0.9"/>
         <PackageReference Update="DotNet.ReproducibleBuilds" Version="1.2.39" />
