@@ -42,7 +42,9 @@ public sealed class ConfigWindow : Window
                 if (Player.Available)
                 {
                     PluginLog.Debug("DisableAutomaticRevert unticked, reverting local player.");
-                    _activeSnapshotManager.RevertSnapshotForCharacter(Player.Object);
+                    var localPlayer = Player.Object;
+                    if (localPlayer != null)
+                        _activeSnapshotManager.RevertSnapshotForCharacter(localPlayer);
                 }
 
             _configuration.DisableAutomaticRevert = disableRevert;

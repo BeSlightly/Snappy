@@ -29,7 +29,9 @@ public class ActorService : IActorService
             return gposeActors;
         }
 
-        var localPlayer = Player.Available ? new[] { Player.Object } : Enumerable.Empty<ICharacter>();
+        var localPlayer = Player.Object is { } player
+            ? new[] { player }
+            : Enumerable.Empty<ICharacter>();
         var marePlayers = _ipcManager.GetMarePairedPlayers().Where(p => p.IsValid());
 
         return localPlayer

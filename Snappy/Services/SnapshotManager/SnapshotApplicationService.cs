@@ -113,7 +113,8 @@ public class SnapshotApplicationService : ISnapshotApplicationService
 
         _ipcManager.PenumbraRedraw(objIdx);
 
-        var isOnLocalPlayer = (Player.Available && characterApplyTo.ObjectIndex == Player.Object.ObjectIndex) ||
+        var localPlayer = Player.Object;
+        var isOnLocalPlayer = (localPlayer != null && characterApplyTo.ObjectIndex == localPlayer.ObjectIndex) ||
                               characterApplyTo.ObjectIndex == ObjectIndex.GPosePlayer.Index;
 
         _activeSnapshotManager.AddSnapshot(new ActiveSnapshot(characterApplyTo.ObjectIndex, cplusProfileId,

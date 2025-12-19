@@ -54,11 +54,12 @@ public class ActiveSnapshotManager : IActiveSnapshotManager
             $"Reverting {snapshotsToRevert.Count} snapshots for character {character.Name.TextValue}.");
 
         var indicesToRedraw = new HashSet<int>();
+        var localPlayer = Player.Object;
 
         foreach (var snapshot in snapshotsToRevert)
         {
             var target = Svc.Objects[snapshot.ObjectIndex];
-            if (target == null && snapshot.IsOnLocalPlayer) target = Player.Object;
+            if (target == null && snapshot.IsOnLocalPlayer) target = localPlayer;
 
             if (target != null)
             {
@@ -181,12 +182,13 @@ public class ActiveSnapshotManager : IActiveSnapshotManager
     {
         var gposeSnapshot =
             _activeSnapshots.FirstOrDefault(s => s.ObjectIndex == ObjectIndex.GPosePlayer.Index && s.IsOnLocalPlayer);
-        if (gposeSnapshot != null && Player.Available)
+        var localPlayer = Player.Object;
+        if (gposeSnapshot != null && localPlayer != null)
         {
             _activeSnapshots.Remove(gposeSnapshot);
 
             var regularSnapshot = new ActiveSnapshot(
-                Player.Object.ObjectIndex,
+                localPlayer.ObjectIndex,
                 gposeSnapshot.CustomizePlusProfileId,
                 gposeSnapshot.IsOnLocalPlayer,
                 gposeSnapshot.CharacterName,
@@ -195,7 +197,7 @@ public class ActiveSnapshotManager : IActiveSnapshotManager
             _activeSnapshots.Add(regularSnapshot);
 
             PluginLog.Debug(
-                $"Updated GPose snapshot tracking from index {ObjectIndex.GPosePlayer.Index} to regular player index {Player.Object.ObjectIndex}");
+                $"Updated GPose snapshot tracking from index {ObjectIndex.GPosePlayer.Index} to regular player index {localPlayer.ObjectIndex}");
         }
     }
 
@@ -219,12 +221,16 @@ public class ActiveSnapshotManager : IActiveSnapshotManager
         if (!snapshot.IsOnLocalPlayer || !Player.Available)
             return false;
 
+        var localPlayer = Player.Object;
+        if (localPlayer == null)
+            return false;
+
         // If snapshot is on GPose actor, check if the character is the player
-        if (snapshot.ObjectIndex == ObjectIndex.GPosePlayer.Index && character.Address == Player.Object.Address)
+        if (snapshot.ObjectIndex == ObjectIndex.GPosePlayer.Index && character.Address == localPlayer.Address)
             return true;
 
         // If we are not in GPose, check if the character is the player
-        if (!PluginUtil.IsInGpose() && character.Address == Player.Object.Address)
+        if (!PluginUtil.IsInGpose() && character.Address == localPlayer.Address)
             return true;
 
         return false;
@@ -257,6 +263,7 @@ public class ActiveSnapshotManager : IActiveSnapshotManager
             $"Reverting {snapshotsToRevert.Count} snapshots. Keeping {snapshotsToKeep.Count} snapshots active.");
 
         var indicesToRedraw = new HashSet<int>();
+        var localPlayer = Player.Object;
 
         foreach (var snapshot in snapshotsToRevert)
         {
@@ -266,7 +273,7 @@ public class ActiveSnapshotManager : IActiveSnapshotManager
             {
                 PluginLog.Information(
                     $"Stale snapshot for local player (original index {snapshot.ObjectIndex}) detected. Retargeting to current player character.");
-                target = Player.Object;
+                target = localPlayer;
             }
 
             if (target != null)

@@ -94,15 +94,19 @@ public class WorldSelector
 
         if (DisplayCurrent && Player.Available)
         {
-            ImGui.SetNextItemOpen(false);
-            var current = Player.Object.CurrentWorld.RowId;
-            if (ImGuiEx.TreeNode($"Current: {ExcelWorldHelper.GetName(current)}",
-                    ImGuiTreeNodeFlags.NoTreePushOnOpen | ImGuiTreeNodeFlags.Bullet | (current == worldConfig
-                        ? ImGuiTreeNodeFlags.Selected
-                        : ImGuiTreeNodeFlags.None)))
+            var localPlayer = Player.Object;
+            var currentWorld = localPlayer?.CurrentWorld.RowId;
+            if (currentWorld is { } current)
             {
-                worldConfig = (int)current;
-                ImGui.CloseCurrentPopup();
+                ImGui.SetNextItemOpen(false);
+                if (ImGuiEx.TreeNode($"Current: {ExcelWorldHelper.GetName(current)}",
+                        ImGuiTreeNodeFlags.NoTreePushOnOpen | ImGuiTreeNodeFlags.Bullet | (current == worldConfig
+                            ? ImGuiTreeNodeFlags.Selected
+                            : ImGuiTreeNodeFlags.None)))
+                {
+                    worldConfig = (int)current;
+                    ImGui.CloseCurrentPopup();
+                }
             }
         }
 
