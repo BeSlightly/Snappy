@@ -480,6 +480,7 @@ public sealed class MareIpc : IpcSubscriber
             {
                 PluginLog.Error($"[Mare IPC] An exception occurred during {pluginName} initialization: {e}");
                 pluginInfo.IsAvailable = false;
+                pluginInfo.Plugin = null;
             }
         }
     }
@@ -510,16 +511,31 @@ public sealed class MareIpc : IpcSubscriber
                     .GetMethod("GetAllEntries", BindingFlags.Instance | BindingFlags.Public);
                 if (getAllEntriesMethod?.Invoke(pluginInfo.PairLedger, null) is IEnumerable entries)
                 {
+                    int entryCount = 0;
                     foreach (var entry in entries)
                     {
+                        entryCount++;
                         var handler = entry.GetFoP("Handler");
                         if (handler == null) continue;
 
+                        // Try matching by Address first (More robust)
+                        var addrObj = handler.GetFoP("PlayerCharacter");
+                        if (addrObj is nint ptr && ptr == character.Address)
+                        {
+                            return handler;
+                        }
+                        if (addrObj is IntPtr iptr && iptr == character.Address)
+                        {
+                            return handler;
+                        }
+
+                        // Fallback to Name matching
                         var handlerName = handler.GetFoP("PlayerName") as string;
                         if (!string.IsNullOrEmpty(handlerName) &&
                             string.Equals(handlerName, character.Name.TextValue, StringComparison.Ordinal))
                             return handler;
                     }
+                    PluginLog.Debug($"[Mare IPC] Checked {entryCount} PairLedger entries in {pluginInfo.PluginName}, no match found for {character.Name.TextValue} (Addr: {character.Address:X})");
                 }
             }
             catch (Exception e)
@@ -551,6 +567,15 @@ public sealed class MareIpc : IpcSubscriber
     public override void HandlePluginListChanged(IEnumerable<string> affectedPluginNames)
     {
         // Check if any of the plugins we manage (LightlessSync, Snowcloak, Player Sync) were affected
+        foreach (var name in affectedPluginNames)
+        {
+            if (_marePlugins.TryGetValue(name, out var info))
+            {
+                PluginLog.Debug($"[Mare IPC] Managed plugin {name} was affected. Resetting cache.");
+                ResetPluginInfo(info);
+            }
+        }
+
         if (affectedPluginNames.Intersect(_marePlugins.Keys).Any())
         {
             var isAvailable = IsReady();
@@ -558,7 +583,8 @@ public sealed class MareIpc : IpcSubscriber
             {
                 PluginLog.Information(
                     $"[{string.Join("/", _marePlugins.Keys)} IPC] A managed plugin's state changed via plugin list event: {_wasAvailable} -> {isAvailable}");
-                OnPluginStateChanged(isAvailable, _wasAvailable);
+                // OnPluginStateChanged calls ResetAll, but strictly speaking we only need to update the availability flag here
+                // since we already reset the specific plugin info above.
                 _wasAvailable = isAvailable;
             }
         }
@@ -571,14 +597,17 @@ public sealed class MareIpc : IpcSubscriber
         // Reset all plugin states
         foreach (var pluginInfo in _marePlugins.Values)
         {
-            pluginInfo.IsAvailable = false;
-            pluginInfo.Plugin = null;
-            pluginInfo.PairManager = null;
-            pluginInfo.PairLedger = null;
-            pluginInfo.FileCacheManager = null;
-            pluginInfo.GetFileCacheByHashMethod = null;
+            ResetPluginInfo(pluginInfo);
         }
+    }
 
-        // No EzIPC providers/subscribers defined in this class anymore
+    private void ResetPluginInfo(MarePluginInfo pluginInfo)
+    {
+        pluginInfo.IsAvailable = false;
+        pluginInfo.Plugin = null;
+        pluginInfo.PairManager = null;
+        pluginInfo.PairLedger = null;
+        pluginInfo.FileCacheManager = null;
+        pluginInfo.GetFileCacheByHashMethod = null;
     }
 }
