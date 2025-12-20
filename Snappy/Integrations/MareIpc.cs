@@ -16,7 +16,7 @@ public sealed class MareIpc : IpcSubscriber
     private readonly Dictionary<string, MarePluginInfo> _marePlugins = new()
     {
         { "LightlessSync", new MarePluginInfo("LightlessSync", "LightlessSync") },
-        { "Snowcloak", new MarePluginInfo("Snowcloak", "MareSynchronos") },
+        { "Snowcloak", new MarePluginInfo("Snowcloak", "Snowcloak") },
         { "MareSempiterne", new MarePluginInfo("Player Sync", "MareSynchronos") }
     };
 
