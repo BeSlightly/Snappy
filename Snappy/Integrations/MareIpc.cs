@@ -27,6 +27,7 @@ public sealed class MareIpc : IpcSubscriber
         public bool IsAvailable { get; set; }
         public object? Plugin { get; set; }
         public object? PairManager { get; set; }
+        public object? PairLedger { get; set; }
         public object? FileCacheManager { get; set; }
         public MethodInfo? GetFileCacheByHashMethod { get; set; }
 
@@ -442,6 +443,15 @@ public sealed class MareIpc : IpcSubscriber
                         PluginLog.Warning($"[Mare IPC] Could not get PairManager service for {pluginName}.");
                 }
 
+                var pairLedgerType = marePlugin.GetType().Assembly
+                    .GetType($"{pluginInfo.NamespacePrefix}.PlayerData.Pairs.PairLedger");
+                if (pairLedgerType != null)
+                {
+                    pluginInfo.PairLedger = serviceProvider.GetService(pairLedgerType);
+                    if (pluginInfo.PairLedger == null)
+                        PluginLog.Warning($"[Mare IPC] Could not get PairLedger service for {pluginName}.");
+                }
+
                 var fileCacheManagerType = marePlugin.GetType().Assembly
                     .GetType($"{pluginInfo.NamespacePrefix}.FileCache.FileCacheManager");
                 if (fileCacheManagerType != null)
@@ -492,6 +502,33 @@ public sealed class MareIpc : IpcSubscriber
 
     private object? GetMarePairFromPlugin(ICharacter character, MarePluginInfo pluginInfo)
     {
+        if (pluginInfo.PairLedger != null)
+        {
+            try
+            {
+                var getAllEntriesMethod = pluginInfo.PairLedger.GetType()
+                    .GetMethod("GetAllEntries", BindingFlags.Instance | BindingFlags.Public);
+                if (getAllEntriesMethod?.Invoke(pluginInfo.PairLedger, null) is IEnumerable entries)
+                {
+                    foreach (var entry in entries)
+                    {
+                        var handler = entry.GetFoP("Handler");
+                        if (handler == null) continue;
+
+                        var handlerName = handler.GetFoP("PlayerName") as string;
+                        if (!string.IsNullOrEmpty(handlerName) &&
+                            string.Equals(handlerName, character.Name.TextValue, StringComparison.Ordinal))
+                            return handler;
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                PluginLog.Error(
+                    $"An exception occurred while processing {pluginInfo.PluginName} pair ledger entries.\n{e}");
+            }
+        }
+
         var allClientPairs = GetAllMareClientPairsFromPlugin(pluginInfo);
         if (allClientPairs == null) return null;
 
@@ -537,6 +574,7 @@ public sealed class MareIpc : IpcSubscriber
             pluginInfo.IsAvailable = false;
             pluginInfo.Plugin = null;
             pluginInfo.PairManager = null;
+            pluginInfo.PairLedger = null;
             pluginInfo.FileCacheManager = null;
             pluginInfo.GetFileCacheByHashMethod = null;
         }
