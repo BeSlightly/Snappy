@@ -1,0 +1,26 @@
+<Solution>
+  <Project Path="Snappy/Snappy.csproj">
+    <Platform Project="x64" />
+  </Project>
+  <Project Path="Glamourer.Api/Glamourer.Api.csproj">
+    <Platform Project="x64" />
+  </Project>
+  <Project Path="Penumbra/Penumbra/Penumbra.csproj">
+    <Platform Project="x64" />
+  </Project>
+  <Project Path="Penumbra/Penumbra.GameData/Penumbra.GameData.csproj">
+    <Platform Project="x64" />
+  </Project>
+  <Project Path="Penumbra/OtterGui/OtterGui.csproj">
+    <Platform Project="x64" />
+  </Project>
+  <Project Path="Penumbra/Penumbra.Api/Penumbra.Api.csproj">
+    <Platform Project="x64" />
+  </Project>
+  <Project Path="Penumbra/Penumbra.CrashHandler/Penumbra.CrashHandler.csproj">
+    <Platform Project="x64" />
+  </Project>
+  <Project Path="Penumbra/Penumbra.String/Penumbra.String.csproj">
+    <Platform Project="x64" />
+  </Project>
+</Solution>
