@@ -1,9 +1,7 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
-using ECommons.Reflection;
 using Snappy.Common;
 using Snappy.Common.Utilities;
 using Snappy.Models;
@@ -24,7 +22,7 @@ public class SnapshotFileService : ISnapshotFileService
         _snapshotIndexService = snapshotIndexService;
     }
 
-    public async Task<string?> UpdateSnapshotAsync(ICharacter character, bool isSelf,
+    public async Task<string?> UpdateSnapshotAsync(ICharacter character,
         Dictionary<string, HashSet<string>>? penumbraReplacements)
     {
         var now = DateTime.UtcNow;
@@ -35,9 +33,7 @@ public class SnapshotFileService : ISnapshotFileService
             return null;
         }
 
-        var snapshotData = isSelf
-            ? await BuildSnapshotFromLocalPlayer(character, penumbraReplacements!)
-            : BuildSnapshotFromMareData(character);
+        var snapshotData = await BuildSnapshotFromLiveActor(character, penumbraReplacements);
 
         if (snapshotData == null) return null;
 
@@ -118,7 +114,7 @@ public class SnapshotFileService : ISnapshotFileService
             var hashedFilePath = existingFilePath ?? paths.GetPreferredHashedFilePath(hash, gamePath);
             if (!File.Exists(hashedFilePath))
             {
-                var sourceFile = isSelf ? snapshotData.ResolvedPaths[hash] : _ipcManager.GetMareFileCachePath(hash);
+                snapshotData.ResolvedPaths.TryGetValue(hash, out var sourceFile);
 
                 if (!string.IsNullOrEmpty(sourceFile) && File.Exists(sourceFile))
                     await Task.Run(() => File.Copy(sourceFile, hashedFilePath, true));
@@ -212,15 +208,17 @@ public class SnapshotFileService : ISnapshotFileService
         JsonUtil.Serialize(customizeHistory, paths.CustomizeHistoryFile);
     }
 
-    private async Task<SnapshotData?> BuildSnapshotFromLocalPlayer(ICharacter character,
-        Dictionary<string, HashSet<string>> penumbraReplacements)
+    private async Task<SnapshotData?> BuildSnapshotFromLiveActor(ICharacter character,
+        Dictionary<string, HashSet<string>>? penumbraReplacements)
     {
-        PluginLog.Debug($"Building snapshot for local player: {character.Name.TextValue}");
+        PluginLog.Debug($"Building snapshot from live data for: {character.Name.TextValue}");
         var newGlamourer = _ipcManager.GetGlamourerState(character);
         var newCustomize = _ipcManager.GetCustomizePlusScale(character);
         var newManipulation = _ipcManager.GetMetaManipulations(character.ObjectIndex);
         var newFileReplacements = new Dictionary<string, string>();
         var resolvedPaths = new Dictionary<string, string>();
+
+        penumbraReplacements ??= _ipcManager.PenumbraGetGameObjectResourcePaths(character.ObjectIndex);
 
         foreach (var (resolvedPath, gamePaths) in penumbraReplacements)
         {
@@ -234,54 +232,6 @@ public class SnapshotFileService : ISnapshotFileService
         }
 
         return new SnapshotData(newGlamourer, newCustomize, newManipulation, newFileReplacements, resolvedPaths);
-    }
-
-    private SnapshotData? BuildSnapshotFromMareData(ICharacter character)
-    {
-        PluginLog.Debug($"Building snapshot for other player from Mare data: {character.Name.TextValue}");
-        var mareCharaData = _ipcManager.GetCharacterDataFromMare(character);
-        if (mareCharaData == null)
-        {
-            Notify.Error($"Could not get Mare data for {character.Name.TextValue}.");
-            return null;
-        }
-
-        var newManipulation = mareCharaData.GetFoP("ManipulationData") as string ?? string.Empty;
-
-        var glamourerDict = mareCharaData.GetFoP("GlamourerData") as IDictionary;
-        var newGlamourer =
-            glamourerDict?.Count > 0 && glamourerDict.Keys.Cast<object>().FirstOrDefault(k => (int)k == 0) is
-                { } glamourerKey
-                ? glamourerDict[glamourerKey] as string ?? string.Empty
-                : string.Empty;
-
-        var customizeDict = mareCharaData.GetFoP("CustomizePlusData") as IDictionary;
-        var remoteB64Customize =
-            customizeDict?.Count > 0 && customizeDict.Keys.Cast<object>().FirstOrDefault(k => (int)k == 0) is
-                { } customizeKey
-                ? customizeDict[customizeKey] as string ?? string.Empty
-                : string.Empty;
-
-        var newCustomize = string.IsNullOrEmpty(remoteB64Customize)
-            ? string.Empty
-            : Encoding.UTF8.GetString(Convert.FromBase64String(remoteB64Customize));
-
-        var newFileReplacements = new Dictionary<string, string>();
-        var fileReplacementsDict = mareCharaData.GetFoP("FileReplacements") as IDictionary;
-        if (fileReplacementsDict != null &&
-            fileReplacementsDict.Keys.Cast<object>().FirstOrDefault(k => (int)k == 0) is { } playerKey)
-            if (fileReplacementsDict[playerKey] is IEnumerable fileList)
-                foreach (var fileData in fileList)
-                {
-                    var gamePaths = fileData.GetFoP("GamePaths") as string[];
-                    var hash = fileData.GetFoP("Hash") as string;
-                    if (gamePaths != null && !string.IsNullOrEmpty(hash))
-                        foreach (var path in gamePaths)
-                            newFileReplacements[path] = hash;
-                }
-
-        return new SnapshotData(newGlamourer, newCustomize, newManipulation, newFileReplacements,
-            new Dictionary<string, string>());
     }
 
     private record SnapshotData(

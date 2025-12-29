@@ -112,16 +112,6 @@ public class IpcManager : IIpcManager, IDisposable
         return _mare.GetPairedPlayers();
     }
 
-    public object? GetCharacterDataFromMare(ICharacter character)
-    {
-        return _mare.GetCharacterData(character);
-    }
-
-    public string? GetMareFileCachePath(string hash)
-    {
-        return _mare.GetFileCachePath(hash);
-    }
-
     public Dictionary<string, bool> GetMarePluginStatus()
     {
         return _mare.GetMarePluginStatus();

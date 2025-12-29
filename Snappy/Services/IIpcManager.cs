@@ -18,8 +18,6 @@ public interface IIpcManager : IDisposable
     string? GetBrioActorName(IGameObject actor);
     void SetUiOpen(bool isOpen);
     List<ICharacter> GetMarePairedPlayers();
-    object? GetCharacterDataFromMare(ICharacter character);
-    string? GetMareFileCachePath(string hash);
     Dictionary<string, bool> GetMarePluginStatus();
     bool IsMarePairedAddress(nint address);
     bool IsLightlessAddress(nint address);

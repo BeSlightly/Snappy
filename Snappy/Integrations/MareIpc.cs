@@ -27,9 +27,6 @@ public sealed class MareIpc : IpcSubscriber
         public bool IsAvailable { get; set; }
         public object? Plugin { get; set; }
         public object? PairManager { get; set; }
-        public object? PairLedger { get; set; }
-        public object? FileCacheManager { get; set; }
-        public MethodInfo? GetFileCacheByHashMethod { get; set; }
 
         public MarePluginInfo(string pluginName, string namespacePrefix)
         {
@@ -209,105 +206,6 @@ public sealed class MareIpc : IpcSubscriber
         return false;
     }
 
-    public object? GetCharacterData(ICharacter character)
-    {
-        // Update plugin availability first
-        foreach (var kvp in _marePlugins)
-            kvp.Value.IsAvailable = DalamudReflector.TryGetDalamudPlugin(kvp.Key, out _, false, true);
-
-        var availablePlugins = _marePlugins.Values.Where(p => p.IsAvailable).ToList();
-        if (!availablePlugins.Any())
-        {
-            PluginLog.Debug($"No Mare plugins available when trying to get data for {character.Name.TextValue}");
-            return null;
-        }
-
-        return Svc.Framework.RunOnFrameworkThread(() =>
-        {
-            InitializeAllPlugins();
-
-            // Try each available plugin to find character data
-            foreach (var marePlugin in availablePlugins)
-            {
-                var pairObject = GetMarePairFromPlugin(character, marePlugin);
-                if (pairObject == null) continue;
-
-                var characterData = pairObject.GetFoP("LastReceivedCharacterData");
-                if (characterData != null)
-                {
-                    PluginLog.Debug(
-                        $"Successfully retrieved Mare data for {character.Name.TextValue} from {marePlugin.PluginName}");
-                    return characterData;
-                }
-            }
-
-            PluginLog.Debug($"No Mare pair found for character {character.Name.TextValue} in any available plugin.");
-            return null;
-        }).Result;
-    }
-
-    public string? GetFileCachePath(string hash)
-    {
-        // Update plugin availability first
-        foreach (var kvp in _marePlugins)
-            kvp.Value.IsAvailable = DalamudReflector.TryGetDalamudPlugin(kvp.Key, out _, false, true);
-
-        var availablePlugins = _marePlugins.Values.Where(p => p.IsAvailable).ToList();
-        if (!availablePlugins.Any()) return null;
-
-        InitializeAllPlugins();
-
-        // Try each available plugin to find the file cache
-        foreach (var marePlugin in availablePlugins)
-        {
-            if (marePlugin.FileCacheManager == null || marePlugin.GetFileCacheByHashMethod == null) continue;
-
-            try
-            {
-                object? fileCacheEntityObject;
-                // Check if the method was found during initialization before using it
-                if (marePlugin.GetFileCacheByHashMethod == null) continue;
-
-                var methodParams = marePlugin.GetFileCacheByHashMethod.GetParameters();
-
-                if (methodParams.Length == 2 && methodParams[0].ParameterType == typeof(string) &&
-                    methodParams[1].ParameterType == typeof(bool)) // This is Snowcloak's signature
-                {
-                    var parameters = new object[] { hash, false }; // Provide the default value for 'preferSubst'
-                    fileCacheEntityObject =
-                        marePlugin.GetFileCacheByHashMethod.Invoke(marePlugin.FileCacheManager, parameters);
-                }
-                else if (methodParams.Length == 1 &&
-                         methodParams[0].ParameterType == typeof(string)) // This is LightlessSync's signature
-                {
-                    fileCacheEntityObject =
-                        marePlugin.GetFileCacheByHashMethod.Invoke(marePlugin.FileCacheManager, new object[] { hash });
-                }
-                else
-                {
-                    // Signature doesn't match what we expect, so we can't call it.
-                    PluginLog.Warning(
-                        $"[Mare IPC] Method GetFileCacheByHash for {marePlugin.PluginName} has an unexpected signature.");
-                    continue; // Skip to the next plugin
-                }
-
-                var filePath = fileCacheEntityObject?.GetFoP("ResolvedFilepath") as string;
-                if (!string.IsNullOrEmpty(filePath))
-                {
-                    PluginLog.Debug($"Found file cache path from {marePlugin.PluginName}: {filePath}");
-                    return filePath;
-                }
-            }
-            catch (Exception e)
-            {
-                PluginLog.Error(
-                    $"An exception occurred while reflecting into {marePlugin.PluginName} for file cache path.\n{e}");
-            }
-        }
-
-        return null;
-    }
-
     private HashSet<nint> GetHandledAddressesViaReflection(MarePluginInfo pluginInfo)
     {
         var results = new HashSet<nint>();
@@ -443,37 +341,6 @@ public sealed class MareIpc : IpcSubscriber
                         PluginLog.Warning($"[Mare IPC] Could not get PairManager service for {pluginName}.");
                 }
 
-                var pairLedgerType = marePlugin.GetType().Assembly
-                    .GetType($"{pluginInfo.NamespacePrefix}.PlayerData.Pairs.PairLedger");
-                if (pairLedgerType != null)
-                {
-                    pluginInfo.PairLedger = serviceProvider.GetService(pairLedgerType);
-                    if (pluginInfo.PairLedger == null)
-                        PluginLog.Warning($"[Mare IPC] Could not get PairLedger service for {pluginName}.");
-                }
-
-                var fileCacheManagerType = marePlugin.GetType().Assembly
-                    .GetType($"{pluginInfo.NamespacePrefix}.FileCache.FileCacheManager");
-                if (fileCacheManagerType != null)
-                {
-                    pluginInfo.FileCacheManager = serviceProvider.GetService(fileCacheManagerType);
-                    if (pluginInfo.FileCacheManager != null)
-                    {
-                        // Try to find the Snowcloak version first (string, bool)
-                        pluginInfo.GetFileCacheByHashMethod = fileCacheManagerType.GetMethod("GetFileCacheByHash",
-                            new[] { typeof(string), typeof(bool) });
-
-                        // If that fails, fall back to the LightlessSync version (string)
-                        if (pluginInfo.GetFileCacheByHashMethod == null)
-                            pluginInfo.GetFileCacheByHashMethod =
-                                fileCacheManagerType.GetMethod("GetFileCacheByHash", new[] { typeof(string) });
-
-                        if (pluginInfo.GetFileCacheByHashMethod == null)
-                            PluginLog.Warning(
-                                $"[Mare IPC] Could not find method GetFileCacheByHash in FileCacheManager for {pluginName}.");
-                    }
-                }
-
                 PluginLog.Information($"[Mare IPC] {pluginName} initialization complete.");
             }
             catch (Exception e)
@@ -483,85 +350,6 @@ public sealed class MareIpc : IpcSubscriber
                 pluginInfo.Plugin = null;
             }
         }
-    }
-
-    private IDictionary? GetAllMareClientPairsFromPlugin(MarePluginInfo pluginInfo)
-    {
-        if (!pluginInfo.IsAvailable || pluginInfo.PairManager == null) return null;
-
-        try
-        {
-            return pluginInfo.PairManager.GetFoP("_allClientPairs") as IDictionary;
-        }
-        catch (Exception e)
-        {
-            PluginLog.Error(
-                $"An exception occurred while reflecting into {pluginInfo.PluginName} to get client pairs.\n{e}");
-            return null;
-        }
-    }
-
-    private object? GetMarePairFromPlugin(ICharacter character, MarePluginInfo pluginInfo)
-    {
-        if (pluginInfo.PairLedger != null)
-        {
-            try
-            {
-                var getAllEntriesMethod = pluginInfo.PairLedger.GetType()
-                    .GetMethod("GetAllEntries", BindingFlags.Instance | BindingFlags.Public);
-                if (getAllEntriesMethod?.Invoke(pluginInfo.PairLedger, null) is IEnumerable entries)
-                {
-                    int entryCount = 0;
-                    foreach (var entry in entries)
-                    {
-                        entryCount++;
-                        var handler = entry.GetFoP("Handler");
-                        if (handler == null) continue;
-
-                        // Try matching by Address first (More robust)
-                        var addrObj = handler.GetFoP("PlayerCharacter");
-                        if (addrObj is nint ptr && ptr == character.Address)
-                        {
-                            return handler;
-                        }
-                        if (addrObj is IntPtr iptr && iptr == character.Address)
-                        {
-                            return handler;
-                        }
-
-                        // Fallback to Name matching
-                        var handlerName = handler.GetFoP("PlayerName") as string;
-                        if (!string.IsNullOrEmpty(handlerName) &&
-                            string.Equals(handlerName, character.Name.TextValue, StringComparison.Ordinal))
-                            return handler;
-                    }
-                    PluginLog.Debug($"[Mare IPC] Checked {entryCount} PairLedger entries in {pluginInfo.PluginName}, no match found for {character.Name.TextValue} (Addr: {character.Address:X})");
-                }
-            }
-            catch (Exception e)
-            {
-                PluginLog.Error(
-                    $"An exception occurred while processing {pluginInfo.PluginName} pair ledger entries.\n{e}");
-            }
-        }
-
-        var allClientPairs = GetAllMareClientPairsFromPlugin(pluginInfo);
-        if (allClientPairs == null) return null;
-
-        try
-        {
-            foreach (var pairObject in allClientPairs.Values)
-                if (pairObject.GetFoP("PlayerName") is string pairPlayerName &&
-                    string.Equals(pairPlayerName, character.Name.TextValue, StringComparison.Ordinal))
-                    return pairObject;
-        }
-        catch (Exception e)
-        {
-            PluginLog.Error(
-                $"An exception occurred while processing {pluginInfo.PluginName} pairs to find a specific pair.\n{e}");
-        }
-
-        return null;
     }
 
     public override void HandlePluginListChanged(IEnumerable<string> affectedPluginNames)
@@ -606,8 +394,5 @@ public sealed class MareIpc : IpcSubscriber
         pluginInfo.IsAvailable = false;
         pluginInfo.Plugin = null;
         pluginInfo.PairManager = null;
-        pluginInfo.PairLedger = null;
-        pluginInfo.FileCacheManager = null;
-        pluginInfo.GetFileCacheByHashMethod = null;
     }
 }
