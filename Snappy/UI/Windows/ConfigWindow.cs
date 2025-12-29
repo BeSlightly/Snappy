@@ -89,12 +89,20 @@ public sealed class ConfigWindow : Window
         );
         using (var textColor = ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.DalamudGrey))
         {
-            ImUtf8.Text("Note: This only captures resources currently loaded by the actor.");
+            ImUtf8.Text("Note: By default, this only captures resources currently loaded by the actor.");
         }
 
         ImGui.Indent();
         using (var d = ImRaii.Disabled(!useLiveSnapshotData))
         {
+            var useCollectionCache = _configuration.UsePenumbraCollectionCache;
+            if (ImUtf8.Checkbox("Use full Penumbra collection cache (reflection)", ref useCollectionCache))
+            {
+                _configuration.UsePenumbraCollectionCache = useCollectionCache;
+                _configuration.Save();
+            }
+            ImUtf8.HoverTooltip("Captures the full collection replacement map (superset; may include unused files).");
+
             var includeTempActors = _configuration.IncludeVisibleTempCollectionActors;
             if (ImUtf8.Checkbox("Include visible actors with temporary collections", ref includeTempActors))
             {

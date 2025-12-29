@@ -12,6 +12,7 @@ public class SnapshotFileService : ISnapshotFileService
 {
     private readonly Configuration _configuration;
     private readonly IIpcManager _ipcManager;
+    private readonly PenumbraCollectionSnapshotDataBuilder _collectionSnapshotDataBuilder;
     private readonly LiveSnapshotDataBuilder _liveSnapshotDataBuilder;
     private readonly MareSnapshotDataBuilder _mareSnapshotDataBuilder;
     private readonly ISnapshotIndexService _snapshotIndexService;
@@ -21,6 +22,7 @@ public class SnapshotFileService : ISnapshotFileService
     {
         _configuration = configuration;
         _ipcManager = ipcManager;
+        _collectionSnapshotDataBuilder = new PenumbraCollectionSnapshotDataBuilder(ipcManager);
         _liveSnapshotDataBuilder = new LiveSnapshotDataBuilder(ipcManager);
         _mareSnapshotDataBuilder = new MareSnapshotDataBuilder(ipcManager);
         _snapshotIndexService = snapshotIndexService;
@@ -37,11 +39,18 @@ public class SnapshotFileService : ISnapshotFileService
             return null;
         }
 
+        var useLiveData = _configuration.UseLiveSnapshotData || isLocalPlayer;
         SnapshotData? snapshotData;
-        if (_configuration.UseLiveSnapshotData || isLocalPlayer)
-            snapshotData = await _liveSnapshotDataBuilder.BuildAsync(character, penumbraReplacements);
+        if (useLiveData)
+        {
+            snapshotData = _configuration.UsePenumbraCollectionCache
+                ? await _collectionSnapshotDataBuilder.BuildAsync(character)
+                : await _liveSnapshotDataBuilder.BuildAsync(character, penumbraReplacements);
+        }
         else
+        {
             snapshotData = _mareSnapshotDataBuilder.BuildFromMare(character);
+        }
 
         if (snapshotData == null) return null;
 

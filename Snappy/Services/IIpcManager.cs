@@ -6,6 +6,7 @@ public interface IIpcManager : IDisposable
     void PenumbraRedraw(int objIdx);
     string GetMetaManipulations(int objIdx);
     Dictionary<string, HashSet<string>> PenumbraGetGameObjectResourcePaths(int objIdx);
+    Dictionary<string, string> PenumbraGetCollectionResolvedFiles(int objIdx);
     bool PenumbraHasTemporaryCollection(int objIdx);
     void PenumbraSetTempMods(ICharacter character, int? idx, Dictionary<string, string> mods, string manips);
     string GetGlamourerState(ICharacter c);

@@ -48,6 +48,11 @@ public class IpcManager : IIpcManager, IDisposable
         return _penumbra.GetGameObjectResourcePaths(objIdx);
     }
 
+    public Dictionary<string, string> PenumbraGetCollectionResolvedFiles(int objIdx)
+    {
+        return _penumbra.GetCollectionResolvedFiles(objIdx);
+    }
+
     public bool PenumbraHasTemporaryCollection(int objIdx)
     {
         return _penumbra.HasTemporaryCollection(objIdx);

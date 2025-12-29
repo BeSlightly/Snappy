@@ -1,3 +1,6 @@
+using System.Collections;
+using System.Reflection;
+using ECommons.Reflection;
 using Penumbra.Api.Enums;
 using Penumbra.Api.IpcSubscribers;
 using Snappy.Services;
@@ -47,6 +50,31 @@ public sealed class PenumbraIpc : IpcSubscriber
         {
             PluginLog.Error($"Error getting Penumbra resource paths for object index {objIdx}:\n{e}");
             return new Dictionary<string, HashSet<string>>();
+        }
+    }
+
+    public Dictionary<string, string> GetCollectionResolvedFiles(int objIdx)
+    {
+        if (!IsReady()) return new Dictionary<string, string>();
+
+        try
+        {
+            object? resolvedFiles = null;
+            var fetched = Svc.Framework.RunOnFrameworkThread(() =>
+            {
+                resolvedFiles = TryGetResolvedFilesForObject(objIdx);
+                return resolvedFiles != null;
+            }).Result;
+
+            if (!fetched || resolvedFiles == null)
+                return new Dictionary<string, string>();
+
+            return ConvertResolvedFiles(resolvedFiles);
+        }
+        catch (Exception e)
+        {
+            PluginLog.Error($"Error getting Penumbra collection cache for object index {objIdx}:\n{e}");
+            return new Dictionary<string, string>();
         }
     }
 
@@ -173,5 +201,111 @@ public sealed class PenumbraIpc : IpcSubscriber
         }
 
         return _persistentCollectionIds;
+    }
+
+    private object? TryGetResolvedFilesForObject(int objIdx)
+    {
+        var (valid, _, effectiveCollection) = _getCollectionForObject.Invoke(objIdx);
+        if (!valid || effectiveCollection.Id == Guid.Empty)
+            return null;
+
+        if (!TryGetCollectionManager(out var collectionManager, out var penumbraAssembly))
+            return null;
+
+        var collection = TryGetCollectionById(collectionManager, effectiveCollection.Id);
+        if (collection == null)
+            return null;
+
+        return collection.GetFoP("ResolvedFiles")
+               ?? collection.GetType()
+                   .GetProperty("ResolvedFiles", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)
+                   ?.GetValue(collection);
+    }
+
+    private bool TryGetCollectionManager(out object? collectionManager, out Assembly? penumbraAssembly)
+    {
+        collectionManager = null;
+        penumbraAssembly = null;
+
+        if (!DalamudReflector.TryGetDalamudPlugin("Penumbra", out var plugin, false, true))
+            return false;
+
+        penumbraAssembly = plugin.GetType().Assembly;
+        var services = plugin.GetFoP("_services");
+        if (services == null)
+        {
+            PluginLog.Warning("[Penumbra] Could not access _services for collection cache reflection.");
+            return false;
+        }
+
+        var getService = services.GetType().GetMethod("GetService", BindingFlags.Instance | BindingFlags.Public);
+        var collectionManagerType = penumbraAssembly.GetType("Penumbra.Collections.Manager.CollectionManager");
+        if (getService == null || collectionManagerType == null)
+        {
+            PluginLog.Warning("[Penumbra] Could not resolve CollectionManager for collection cache reflection.");
+            return false;
+        }
+
+        collectionManager = getService.MakeGenericMethod(collectionManagerType).Invoke(services, null);
+        return collectionManager != null;
+    }
+
+    private static object? TryGetCollectionById(object collectionManager, Guid id)
+    {
+        var storage = collectionManager.GetFoP("Storage");
+        if (storage != null && TryInvokeCollectionById(storage, "ById", id, out var collection))
+            return collection;
+
+        var tempCollections = collectionManager.GetFoP("Temp");
+        if (tempCollections != null && TryInvokeCollectionById(tempCollections, "CollectionById", id, out collection))
+            return collection;
+
+        return null;
+    }
+
+    private static bool TryInvokeCollectionById(object holder, string methodName, Guid id, out object? collection)
+    {
+        collection = null;
+        var method = holder.GetType().GetMethod(methodName, BindingFlags.Instance | BindingFlags.Public);
+        if (method == null) return false;
+
+        var args = new object?[] { id, null };
+        var result = method.Invoke(holder, args);
+        if (result is bool success && success)
+        {
+            collection = args[1];
+            return collection != null;
+        }
+
+        return false;
+    }
+
+    private static Dictionary<string, string> ConvertResolvedFiles(object resolvedFiles)
+    {
+        var results = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        if (resolvedFiles is not IEnumerable entries)
+            return results;
+
+        foreach (var entry in entries)
+        {
+            var entryType = entry.GetType();
+            var key = entryType.GetProperty("Key")?.GetValue(entry);
+            var value = entryType.GetProperty("Value")?.GetValue(entry);
+            if (key == null || value == null)
+                continue;
+
+            var gamePath = key.ToString();
+            if (string.IsNullOrEmpty(gamePath))
+                continue;
+
+            var pathObj = value.GetType().GetProperty("Path")?.GetValue(value) ?? value.GetFoP("Path");
+            var resolvedPath = pathObj?.ToString();
+            if (string.IsNullOrEmpty(resolvedPath))
+                continue;
+
+            results[gamePath] = resolvedPath;
+        }
+
+        return results;
     }
 }
