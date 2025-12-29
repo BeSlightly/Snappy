@@ -1,3 +1,4 @@
+using Dalamud.Game.ClientState.Objects.SubKinds;
 using ECommons.GameHelpers;
 using ECommons.Reflection;
 using Snappy.Common;
@@ -32,17 +33,19 @@ public class ActorService : IActorService
             return gposeActors;
         }
 
-        var localPlayer = Player.Object is { } player
+        var localPlayer = Player.Object is IPlayerCharacter player
             ? new[] { player }
-            : Enumerable.Empty<ICharacter>();
-        var marePlayers = _ipcManager.GetMarePairedPlayers().Where(p => p.IsValid());
+            : Enumerable.Empty<IPlayerCharacter>();
+        var marePlayers = _ipcManager.GetMarePairedPlayers()
+            .OfType<IPlayerCharacter>()
+            .Where(p => p.IsValid());
 
-        var selectableActors = localPlayer.UnionBy(marePlayers, p => p.Address);
+        IEnumerable<IPlayerCharacter> selectableActors = localPlayer.UnionBy(marePlayers, p => p.Address);
 
         if (_configuration.UseLiveSnapshotData && _configuration.IncludeVisibleTempCollectionActors)
         {
             var tempCollectionActors = Svc.Objects
-                .OfType<ICharacter>()
+                .OfType<IPlayerCharacter>()
                 .Where(c => c.IsValid() && IsActorVisible(c))
                 .Where(c => _ipcManager.PenumbraHasTemporaryCollection(c.ObjectIndex));
 
@@ -52,6 +55,7 @@ public class ActorService : IActorService
         return selectableActors
             .OrderBy(p => p.Address != (Player.Object?.Address ?? IntPtr.Zero))
             .ThenBy(p => p.Name.ToString(), StringComparer.OrdinalIgnoreCase)
+            .Select(p => (ICharacter)p)
             .ToList();
     }
 
