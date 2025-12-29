@@ -54,7 +54,7 @@ public sealed class Snappy : IDalamudPlugin
         }
 
         IpcManager = new IpcManager();
-        ActorService = new ActorService(IpcManager);
+        ActorService = new ActorService(IpcManager, Configuration);
 
         SnapshotIndexService = new SnapshotIndexService(Configuration);
         ActiveSnapshotManager = new ActiveSnapshotManager(IpcManager, Configuration);

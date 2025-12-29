@@ -48,6 +48,11 @@ public class IpcManager : IIpcManager, IDisposable
         return _penumbra.GetGameObjectResourcePaths(objIdx);
     }
 
+    public bool PenumbraHasTemporaryCollection(int objIdx)
+    {
+        return _penumbra.HasTemporaryCollection(objIdx);
+    }
+
     public void PenumbraSetTempMods(ICharacter character, int? idx, Dictionary<string, string> mods, string manips)
     {
         _penumbra.SetTemporaryMods(character, idx, mods, manips);
@@ -110,6 +115,16 @@ public class IpcManager : IIpcManager, IDisposable
     public List<ICharacter> GetMarePairedPlayers()
     {
         return _mare.GetPairedPlayers();
+    }
+
+    public object? GetCharacterDataFromMare(ICharacter character)
+    {
+        return _mare.GetCharacterData(character);
+    }
+
+    public string? GetMareFileCachePath(string hash)
+    {
+        return _mare.GetFileCachePath(hash);
     }
 
     public Dictionary<string, bool> GetMarePluginStatus()

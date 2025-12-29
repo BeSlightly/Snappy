@@ -23,7 +23,7 @@ public sealed class ConfigWindow : Window
     {
         SizeConstraints = new WindowSizeConstraints
         {
-            MinimumSize = new Vector2(380, 200) * ImGuiHelpers.GlobalScale,
+            MinimumSize = new Vector2(380, 260) * ImGuiHelpers.GlobalScale,
             MaximumSize = new Vector2(float.MaxValue, float.MaxValue)
         };
 
@@ -76,6 +76,34 @@ public sealed class ConfigWindow : Window
             ImUtf8.Text("Warning: These features are unsupported and may cause issues.");
         }
 
+        ImGui.Separator();
+
+        var useLiveSnapshotData = _configuration.UseLiveSnapshotData;
+        if (ImUtf8.Checkbox("Use Penumbra/Customize+/Glamourer data for snapshots", ref useLiveSnapshotData))
+        {
+            _configuration.UseLiveSnapshotData = useLiveSnapshotData;
+            _configuration.Save();
+        }
+        ImUtf8.HoverTooltip(
+            "When enabled, snapshots read live data directly from Penumbra, Customize+, and Glamourer instead of Mare reflection."
+        );
+        using (var textColor = ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.DalamudGrey))
+        {
+            ImUtf8.Text("Note: This only captures resources currently loaded by the actor.");
+        }
+
+        ImGui.Indent();
+        using (var d = ImRaii.Disabled(!useLiveSnapshotData))
+        {
+            var includeTempActors = _configuration.IncludeVisibleTempCollectionActors;
+            if (ImUtf8.Checkbox("Include visible actors with temporary collections", ref includeTempActors))
+            {
+                _configuration.IncludeVisibleTempCollectionActors = includeTempActors;
+                _configuration.Save();
+            }
+            ImUtf8.HoverTooltip("Can include actors paired through unsupported Mare forks.");
+        }
+        ImGui.Unindent();
         ImGui.Separator();
 
         if (

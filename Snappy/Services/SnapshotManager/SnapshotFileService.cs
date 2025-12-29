@@ -12,6 +12,8 @@ public class SnapshotFileService : ISnapshotFileService
 {
     private readonly Configuration _configuration;
     private readonly IIpcManager _ipcManager;
+    private readonly LiveSnapshotDataBuilder _liveSnapshotDataBuilder;
+    private readonly MareSnapshotDataBuilder _mareSnapshotDataBuilder;
     private readonly ISnapshotIndexService _snapshotIndexService;
 
     public SnapshotFileService(Configuration configuration, IIpcManager ipcManager,
@@ -19,10 +21,12 @@ public class SnapshotFileService : ISnapshotFileService
     {
         _configuration = configuration;
         _ipcManager = ipcManager;
+        _liveSnapshotDataBuilder = new LiveSnapshotDataBuilder(ipcManager);
+        _mareSnapshotDataBuilder = new MareSnapshotDataBuilder(ipcManager);
         _snapshotIndexService = snapshotIndexService;
     }
 
-    public async Task<string?> UpdateSnapshotAsync(ICharacter character,
+    public async Task<string?> UpdateSnapshotAsync(ICharacter character, bool isLocalPlayer,
         Dictionary<string, HashSet<string>>? penumbraReplacements)
     {
         var now = DateTime.UtcNow;
@@ -33,7 +37,11 @@ public class SnapshotFileService : ISnapshotFileService
             return null;
         }
 
-        var snapshotData = await BuildSnapshotFromLiveActor(character, penumbraReplacements);
+        SnapshotData? snapshotData;
+        if (_configuration.UseLiveSnapshotData || isLocalPlayer)
+            snapshotData = await _liveSnapshotDataBuilder.BuildAsync(character, penumbraReplacements);
+        else
+            snapshotData = _mareSnapshotDataBuilder.BuildFromMare(character);
 
         if (snapshotData == null) return null;
 
@@ -106,6 +114,7 @@ public class SnapshotFileService : ISnapshotFileService
         snapshotInfo.FileReplacements = new Dictionary<string, string>(resolvedCurrentMap,
             StringComparer.OrdinalIgnoreCase);
 
+        var useMareFileCache = !_configuration.UseLiveSnapshotData && !isLocalPlayer;
         foreach (var (gamePath, hash) in snapshotData.FileReplacements)
         {
             snapshotInfo.FileReplacements[gamePath] = hash;
@@ -114,7 +123,11 @@ public class SnapshotFileService : ISnapshotFileService
             var hashedFilePath = existingFilePath ?? paths.GetPreferredHashedFilePath(hash, gamePath);
             if (!File.Exists(hashedFilePath))
             {
-                snapshotData.ResolvedPaths.TryGetValue(hash, out var sourceFile);
+                string? sourceFile = null;
+                if (useMareFileCache)
+                    sourceFile = _ipcManager.GetMareFileCachePath(hash);
+                else
+                    snapshotData.ResolvedPaths.TryGetValue(hash, out sourceFile);
 
                 if (!string.IsNullOrEmpty(sourceFile) && File.Exists(sourceFile))
                     await Task.Run(() => File.Copy(sourceFile, hashedFilePath, true));
@@ -208,36 +221,4 @@ public class SnapshotFileService : ISnapshotFileService
         JsonUtil.Serialize(customizeHistory, paths.CustomizeHistoryFile);
     }
 
-    private async Task<SnapshotData?> BuildSnapshotFromLiveActor(ICharacter character,
-        Dictionary<string, HashSet<string>>? penumbraReplacements)
-    {
-        PluginLog.Debug($"Building snapshot from live data for: {character.Name.TextValue}");
-        var newGlamourer = _ipcManager.GetGlamourerState(character);
-        var newCustomize = _ipcManager.GetCustomizePlusScale(character);
-        var newManipulation = _ipcManager.GetMetaManipulations(character.ObjectIndex);
-        var newFileReplacements = new Dictionary<string, string>();
-        var resolvedPaths = new Dictionary<string, string>();
-
-        penumbraReplacements ??= _ipcManager.PenumbraGetGameObjectResourcePaths(character.ObjectIndex);
-
-        foreach (var (resolvedPath, gamePaths) in penumbraReplacements)
-        {
-            if (!File.Exists(resolvedPath))
-                continue;
-
-            var fileBytes = await File.ReadAllBytesAsync(resolvedPath);
-            var hash = PluginUtil.GetFileHash(fileBytes);
-            resolvedPaths[hash] = resolvedPath;
-            foreach (var gamePath in gamePaths) newFileReplacements[gamePath] = hash;
-        }
-
-        return new SnapshotData(newGlamourer, newCustomize, newManipulation, newFileReplacements, resolvedPaths);
-    }
-
-    private record SnapshotData(
-        string Glamourer,
-        string Customize,
-        string Manipulation,
-        Dictionary<string, string> FileReplacements,
-        Dictionary<string, string> ResolvedPaths);
 }

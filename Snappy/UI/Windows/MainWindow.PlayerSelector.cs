@@ -67,13 +67,14 @@ public partial class MainWindow
         }
         else
         {
-            var isSelf = string.Equals(
-                player.Name.TextValue,
-                Player.Name,
-                StringComparison.Ordinal
-            );
+            var isSelf = Player.Object != null && player.Address == Player.Object.Address;
             var isMarePaired = _ipcManager.IsMarePairedAddress(player.Address);
-            _isActorSnapshottable = isSelf || isMarePaired;
+            var includeTempActors = _snappy.Configuration.UseLiveSnapshotData
+                                    && _snappy.Configuration.IncludeVisibleTempCollectionActors;
+            var hasTempCollection = includeTempActors &&
+                                    _ipcManager.PenumbraHasTemporaryCollection(player.ObjectIndex);
+
+            _isActorSnapshottable = isSelf || isMarePaired || hasTempCollection;
         }
 
         // --- Update lock state ---
@@ -239,11 +240,15 @@ public partial class MainWindow
         }
 
         if (!_isActorSnapshottable)
-            return (
-                "Save Snapshot",
-                "Can only save snapshots of yourself, or players you are paired with in Mare Synchronos.",
-                true
-            );
+        {
+            var restriction = _snappy.Configuration.UseLiveSnapshotData
+                ? _snappy.Configuration.IncludeVisibleTempCollectionActors
+                    ? "Can only save snapshots of yourself, Mare-paired players, or visible actors with temporary Penumbra collections."
+                    : "Can only save snapshots of yourself or Mare-paired players."
+                : "Can only save snapshots of yourself, or players you are paired with in Mare Synchronos.";
+
+            return ("Save Snapshot", restriction, true);
+        }
 
         if (_snapshotExistsForActor)
             return (
@@ -390,13 +395,16 @@ public partial class MainWindow
         )
         {
             var charToSnap = player!;
-            var penumbraReplacements = _ipcManager.PenumbraGetGameObjectResourcePaths(charToSnap.ObjectIndex);
+            var isLocalPlayer = Player.Object != null && charToSnap.Address == Player.Object.Address;
+            Dictionary<string, HashSet<string>>? penumbraReplacements = null;
+            if (_snappy.Configuration.UseLiveSnapshotData || isLocalPlayer)
+                penumbraReplacements = _ipcManager.PenumbraGetGameObjectResourcePaths(charToSnap.ObjectIndex);
 
             Notify.Info($"Snapshotting {GetActorDisplayName(charToSnap)} in the background...");
             _snappy.ExecuteBackgroundTask(async () =>
             {
                 var updatedSnapshotPath =
-                    await _snapshotFileService.UpdateSnapshotAsync(charToSnap, penumbraReplacements);
+                    await _snapshotFileService.UpdateSnapshotAsync(charToSnap, isLocalPlayer, penumbraReplacements);
                 if (updatedSnapshotPath != null)
                     _snappy.QueueAction(() => _snappy.InvokeSnapshotsUpdated());
             });

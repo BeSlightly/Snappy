@@ -6,6 +6,7 @@ public interface IIpcManager : IDisposable
     void PenumbraRedraw(int objIdx);
     string GetMetaManipulations(int objIdx);
     Dictionary<string, HashSet<string>> PenumbraGetGameObjectResourcePaths(int objIdx);
+    bool PenumbraHasTemporaryCollection(int objIdx);
     void PenumbraSetTempMods(ICharacter character, int? idx, Dictionary<string, string> mods, string manips);
     string GetGlamourerState(ICharacter c);
     void ApplyGlamourerState(string? base64, ICharacter c);
@@ -18,6 +19,8 @@ public interface IIpcManager : IDisposable
     string? GetBrioActorName(IGameObject actor);
     void SetUiOpen(bool isOpen);
     List<ICharacter> GetMarePairedPlayers();
+    object? GetCharacterDataFromMare(ICharacter character);
+    string? GetMareFileCachePath(string hash);
     Dictionary<string, bool> GetMarePluginStatus();
     bool IsMarePairedAddress(nint address);
     bool IsLightlessAddress(nint address);
