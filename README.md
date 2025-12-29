@@ -24,13 +24,13 @@ No more relying on MCDF. Just a clean, accurate snapshot of your character, read
 
 ## 🛠️ Supported Mare Forks
 
-Currently supported Mare forks:
+ Supported Mare forks:
 
 *   [Lightless Sync](https://git.lightless-sync.org/Lightless-Sync/LightlessClient)
 *   [Snowcloak](https://github.com/Eauldane/SnowcloakClient)
 *   [Player Sync](https://github.com/universalconquistador/MareSynchronosClient)
 
-*Note: I will eventually move back to getting files directly via Penumbra, Glamourer and C+ so, in the future it should work with majority of forks again.*
+*Note: For unsupported Mare forks, enable "Use Penumbra/Customize+/Glamourer (fallback)" in Settings to snapshot via live Penumbra/Glamourer/C+ data.*
 
 ---
 
