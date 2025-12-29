@@ -8,7 +8,11 @@
     "RepoUrl": "https://github.com/BeSlightly/Snappy",
     "ApplicableVersion": "any",
     "Tags": [
-      "utility"
+      "utility",
+      "snappy",
+      "snapper",
+      "mare",
+      "snapshot"
     ],
     "DalamudApiLevel": 14,
     "TestingDalamudApiLevel": 14,

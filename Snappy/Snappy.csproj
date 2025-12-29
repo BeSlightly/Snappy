@@ -1,45 +1,32 @@
-﻿<Project Sdk="Dalamud.NET.Sdk/14.0.1">
-    <PropertyGroup>
-        <Authors>eqbot, ViviAshe, astrodoobs, BeSlightly</Authors>
-        <Version>0.4.1.6</Version>
-        <Description>Snappy</Description>
-        <PackageProjectUrl>https://github.com/BeSlightly/Snappy</PackageProjectUrl>
-    </PropertyGroup>
-    <PropertyGroup>
-        <TargetFramework>net10.0-windows</TargetFramework>
-        <Platforms>x64</Platforms>
-        <Nullable>enable</Nullable>
-        <LangVersion>latest</LangVersion>
-        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-        <ProduceReferenceAssembly>false</ProduceReferenceAssembly>
-        <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
-        <CopyLocalLockfileAssemblies>true</CopyLocalLockfileAssemblies>
-        <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
-    </PropertyGroup>
-    <PropertyGroup>
-        <DalamudLibPath>$(appdata)\XIVLauncher\addon\Hooks\dev\</DalamudLibPath>
-    </PropertyGroup>
-    <PropertyGroup Condition="'$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::Linux)))'">
-        <DalamudLibPath>$(DALAMUD_HOME)/</DalamudLibPath>
-    </PropertyGroup>
-    <ItemGroup>
-        <None Include=".editorconfig"/>
-    </ItemGroup>
-    <ItemGroup>
-        <ProjectReference Include="..\Glamourer.Api\Glamourer.Api.csproj"/>
-        <ProjectReference Include="..\Penumbra\Penumbra.GameData\Penumbra.GameData.csproj"/>
-        <ProjectReference Include="..\Penumbra\Penumbra\Penumbra.csproj"/>
-    </ItemGroup>
-    <ItemGroup>
-        <PackageReference Include="ECommons" Version="3.1.0.6" />
-        <PackageReference Include="lz4net" Version="1.0.15.93"/>
-        <PackageReference Include="Microsoft.Extensions.Logging" Version="9.0.9"/>
-        <PackageReference Update="DotNet.ReproducibleBuilds" Version="1.2.39" />
-    </ItemGroup>
-    <ItemGroup>
-        <Reference Include="Newtonsoft.Json">
-            <HintPath>$(DalamudLibPath)Newtonsoft.Json.dll</HintPath>
-            <Private>false</Private>
-        </Reference>
-    </ItemGroup>
+<?xml version="1.0" encoding="utf-8"?>
+<Project Sdk="Dalamud.NET.Sdk/14.0.1">
+  <!-- Plugin manifest -->
+  <PropertyGroup>
+    <Name>Snappy</Name>
+    <Version>0.4.2.0</Version>
+    <Author>Eqbot, Vivi, astrodoobs, BeSlightly</Author>
+    <RepoUrl>https://github.com/BeSlightly/Snappy</RepoUrl>
+    <Punchline>Plugin to save current appearance and applied mods of a character</Punchline>
+    <Description>Want to export your character and mods exactly as-is in a single collection *without* Mare? This plugin saves and loads your character's current appearance, and allows you to share modded characters without relying on MCDF.</Description>
+    <Tags>snappy, snapper, utility, mare, snapshot</Tags>
+  </PropertyGroup>
+
+  <!-- Build settings -->
+  <PropertyGroup>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <!-- Project references -->
+  <ItemGroup>
+    <ProjectReference Include="..\Glamourer.Api\Glamourer.Api.csproj" />
+    <ProjectReference Include="..\Penumbra\Penumbra.GameData\Penumbra.GameData.csproj" />
+    <ProjectReference Include="..\Penumbra\Penumbra\Penumbra.csproj" />
+  </ItemGroup>
+
+  <!-- NuGet -->
+  <ItemGroup>
+    <PackageReference Include="ECommons" Version="3.1.0.10" />
+    <PackageReference Include="lz4net" Version="1.0.15.93" />
+  </ItemGroup>
 </Project>
