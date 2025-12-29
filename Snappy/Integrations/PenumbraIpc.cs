@@ -209,7 +209,9 @@ public sealed class PenumbraIpc : IpcSubscriber
         if (!valid || effectiveCollection.Id == Guid.Empty)
             return null;
 
-        if (!TryGetCollectionManager(out var collectionManager, out var penumbraAssembly))
+        if (!TryGetCollectionManager(out var collectionManager, out _))
+            return null;
+        if (collectionManager == null)
             return null;
 
         var collection = TryGetCollectionById(collectionManager, effectiveCollection.Id);

@@ -78,30 +78,28 @@ public sealed class ConfigWindow : Window
 
         ImGui.Separator();
 
+        ImUtf8.Text("Snapshot data source:");
+        ImGui.Indent();
+
         var useLiveSnapshotData = _configuration.UseLiveSnapshotData;
-        if (ImUtf8.Checkbox("Use Penumbra/Customize+/Glamourer data for snapshots", ref useLiveSnapshotData))
+        if (ImUtf8.Checkbox("Use Penumbra/Customize+/Glamourer (fallback)", ref useLiveSnapshotData))
         {
             _configuration.UseLiveSnapshotData = useLiveSnapshotData;
             _configuration.Save();
         }
         ImUtf8.HoverTooltip(
-            "When enabled, snapshots read live data directly from Penumbra, Customize+, and Glamourer instead of Mare reflection."
+            "Fallback for unsupported forks; Mare reflection is usually more complete for supported forks."
         );
-        using (var textColor = ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.DalamudGrey))
-        {
-            ImUtf8.Text("Note: By default, this only captures resources currently loaded by the actor.");
-        }
 
-        ImGui.Indent();
         using (var d = ImRaii.Disabled(!useLiveSnapshotData))
         {
-            var useCollectionCache = _configuration.UsePenumbraCollectionCache;
-            if (ImUtf8.Checkbox("Use full Penumbra collection cache (reflection)", ref useCollectionCache))
+            var useIpcResourcePaths = _configuration.UsePenumbraIpcResourcePaths;
+            if (ImUtf8.Checkbox("Use Penumbra IPC (resource paths)", ref useIpcResourcePaths))
             {
-                _configuration.UsePenumbraCollectionCache = useCollectionCache;
+                _configuration.UsePenumbraIpcResourcePaths = useIpcResourcePaths;
                 _configuration.Save();
             }
-            ImUtf8.HoverTooltip("Captures the full collection replacement map (superset; may include unused files).");
+            ImUtf8.HoverTooltip("IPC uses only currently loaded/on-screen files (no full collection). Use if reflection fails.");
 
             var includeTempActors = _configuration.IncludeVisibleTempCollectionActors;
             if (ImUtf8.Checkbox("Include visible actors with temporary collections", ref includeTempActors))
@@ -109,8 +107,9 @@ public sealed class ConfigWindow : Window
                 _configuration.IncludeVisibleTempCollectionActors = includeTempActors;
                 _configuration.Save();
             }
-            ImUtf8.HoverTooltip("Can include actors paired through unsupported Mare forks.");
+            ImUtf8.HoverTooltip("Adds players with temporary Penumbra collections to the actor selection.");
         }
+
         ImGui.Unindent();
         ImGui.Separator();
 

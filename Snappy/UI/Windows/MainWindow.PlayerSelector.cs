@@ -398,8 +398,8 @@ public partial class MainWindow
             var isLocalPlayer = Player.Object != null && charToSnap.Address == Player.Object.Address;
             Dictionary<string, HashSet<string>>? penumbraReplacements = null;
             var useLiveData = _snappy.Configuration.UseLiveSnapshotData || isLocalPlayer;
-            var useCollectionCache = useLiveData && _snappy.Configuration.UsePenumbraCollectionCache;
-            if (useLiveData && !useCollectionCache)
+            var useIpcResourcePaths = useLiveData && _snappy.Configuration.UsePenumbraIpcResourcePaths;
+            if (useIpcResourcePaths)
                 penumbraReplacements = _ipcManager.PenumbraGetGameObjectResourcePaths(charToSnap.ObjectIndex);
 
             Notify.Info($"Snapshotting {GetActorDisplayName(charToSnap)} in the background...");

@@ -8,7 +8,7 @@ public record Configuration
     public bool DisableAutomaticRevert { get; set; }
     public bool AllowOutsideGpose { get; set; }
     public bool UseLiveSnapshotData { get; set; }
-    public bool UsePenumbraCollectionCache { get; set; }
+    public bool UsePenumbraIpcResourcePaths { get; set; }
     public bool IncludeVisibleTempCollectionActors { get; set; }
 
     public bool IsValid()

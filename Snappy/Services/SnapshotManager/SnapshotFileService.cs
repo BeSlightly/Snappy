@@ -43,9 +43,9 @@ public class SnapshotFileService : ISnapshotFileService
         SnapshotData? snapshotData;
         if (useLiveData)
         {
-            snapshotData = _configuration.UsePenumbraCollectionCache
-                ? await _collectionSnapshotDataBuilder.BuildAsync(character)
-                : await _liveSnapshotDataBuilder.BuildAsync(character, penumbraReplacements);
+            snapshotData = _configuration.UsePenumbraIpcResourcePaths
+                ? await _liveSnapshotDataBuilder.BuildAsync(character, penumbraReplacements)
+                : await _collectionSnapshotDataBuilder.BuildAsync(character);
         }
         else
         {
