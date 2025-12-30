@@ -291,7 +291,14 @@ public class PcpManager : IPcpManager
 
         var snapshotPath = Path.Combine(_configuration.WorkingDirectory, snapshotDirName);
 
-        if (Directory.Exists(snapshotPath)) Directory.Delete(snapshotPath, true);
+        // Generate unique name if directory already exists to prevent data loss
+        var counter = 1;
+        var originalPath = snapshotPath;
+        while (Directory.Exists(snapshotPath))
+        {
+            snapshotPath = $"{originalPath}_{counter}";
+            counter++;
+        }
 
         Directory.CreateDirectory(snapshotPath);
         return snapshotPath;

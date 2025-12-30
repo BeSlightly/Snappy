@@ -73,10 +73,13 @@ public class McdfManager : IMcdfManager
 
         var snapshotPath = Path.Combine(_configuration.WorkingDirectory, snapshotDirName);
 
-        if (Directory.Exists(snapshotPath))
+        var counter = 1;
+        var originalPath = snapshotPath;
+        while (Directory.Exists(snapshotPath))
         {
-            PluginLog.Debug("Snapshot from MCDF already existed, deleting");
-            Directory.Delete(snapshotPath, true);
+            PluginLog.Debug($"Snapshot directory already exists, trying {snapshotDirName}_{counter}");
+            snapshotPath = $"{originalPath}_{counter}";
+            counter++;
         }
 
         Directory.CreateDirectory(snapshotPath);
