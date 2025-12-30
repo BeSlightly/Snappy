@@ -38,9 +38,19 @@ public sealed class MareSnapshotDataBuilder
                 ? customizeDict[customizeKey] as string ?? string.Empty
                 : string.Empty;
 
-        var newCustomize = string.IsNullOrEmpty(remoteB64Customize)
-            ? string.Empty
-            : Encoding.UTF8.GetString(Convert.FromBase64String(remoteB64Customize));
+        var newCustomize = string.Empty;
+        if (!string.IsNullOrEmpty(remoteB64Customize))
+        {
+            try
+            {
+                newCustomize = Encoding.UTF8.GetString(Convert.FromBase64String(remoteB64Customize));
+            }
+            catch (Exception ex)
+            {
+                PluginLog.Warning(
+                    $"Failed to decode Customize+ data from Mare for {character.Name.TextValue}: {ex.Message}");
+            }
+        }
 
         var newFileReplacements = new Dictionary<string, string>();
         var fileReplacementsDict = mareCharaData.GetFoP("FileReplacements") as IDictionary;
