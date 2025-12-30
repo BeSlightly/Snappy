@@ -112,7 +112,7 @@ public partial class MainWindow : Window, IDisposable
         LoadSnapshots();
         if (_selectedSnapshot != null && Directory.Exists(_selectedSnapshot.FullName))
             _snappy.ExecuteBackgroundTask(LoadHistoryForSelectedSnapshotAsync);
-        if (player != null) UpdateSelectedActorState();
+        if (_player != null) UpdateSelectedActorState();
     }
 
     private void OnSnapshotSelectionChanged(

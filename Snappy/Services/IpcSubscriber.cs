@@ -5,19 +5,19 @@ namespace Snappy.Services;
 
 public abstract class IpcSubscriber
 {
-    protected readonly string identifier;
+    protected readonly string _identifier;
     protected bool _wasAvailable;
 
     public IpcSubscriber(string identifier)
     {
-        this.identifier = identifier;
+        _identifier = identifier;
         EzIPC.Init(this, identifier, SafeWrapper.AnyException);
         _wasAvailable = IsPluginLoaded();
     }
 
     protected bool IsPluginLoaded()
     {
-        return DalamudReflector.TryGetDalamudPlugin(identifier, out _, false, true);
+        return DalamudReflector.TryGetDalamudPlugin(_identifier, out _, false, true);
     }
 
     public virtual bool IsReady()
@@ -32,13 +32,13 @@ public abstract class IpcSubscriber
     public virtual void HandlePluginListChanged(IEnumerable<string> affectedPluginNames)
     {
         // Check if our target plugin was affected
-        if (affectedPluginNames.Contains(identifier))
+        if (affectedPluginNames.Contains(_identifier))
         {
             var isAvailable = IsReady();
             if (isAvailable != _wasAvailable)
             {
                 PluginLog.Information(
-                    $"[{identifier} IPC] Plugin state changed via plugin list event: {_wasAvailable} -> {isAvailable}");
+                    $"[{_identifier} IPC] Plugin state changed via plugin list event: {_wasAvailable} -> {isAvailable}");
                 OnPluginStateChanged(isAvailable, _wasAvailable);
                 _wasAvailable = isAvailable;
             }

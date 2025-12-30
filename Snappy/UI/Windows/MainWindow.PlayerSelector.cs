@@ -10,20 +10,20 @@ public partial class MainWindow
     private bool _isActorModifiable;
     private bool _isActorSnapshottable;
     private bool _snapshotExistsForActor;
-    private string currentLabel = string.Empty;
-    private int? objIdxSelected;
-    private ICharacter? player;
-    private nint? selectedActorAddress;
+    private string _currentLabel = string.Empty;
+    private int? _objIdxSelected;
+    private ICharacter? _player;
+    private nint? _selectedActorAddress;
 
-    private string playerFilter = string.Empty;
-    private string playerFilterLower = string.Empty;
+    private string _playerFilter = string.Empty;
+    private string _playerFilterLower = string.Empty;
 
     private void ClearSelectedActorState()
     {
-        player = null;
-        currentLabel = string.Empty;
-        objIdxSelected = null;
-        selectedActorAddress = null;
+        _player = null;
+        _currentLabel = string.Empty;
+        _objIdxSelected = null;
+        _selectedActorAddress = null;
 
         _isActorSnapshottable = false;
         _snapshotExistsForActor = false;
@@ -33,14 +33,14 @@ public partial class MainWindow
 
     private void UpdateSelectedActorState()
     {
-        if (player == null || objIdxSelected == null)
+        if (_player == null || _objIdxSelected == null)
         {
             ClearSelectedActorState();
             return;
         }
 
         // Don't clear state if actor becomes temporarily invalid - this can happen during transitions
-        if (!player.IsValid()) return;
+        if (!_player.IsValid()) return;
 
         // --- Update modifiable state ---
         var inGpose = PluginUtil.IsInGpose();
@@ -50,7 +50,7 @@ public partial class MainWindow
         }
         else
         {
-            var isLocalPlayer = player.ObjectIndex == Player.Object?.ObjectIndex;
+            var isLocalPlayer = _player.ObjectIndex == Player.Object?.ObjectIndex;
             _isActorModifiable =
                 isLocalPlayer
                 && _snappy.Configuration.DisableAutomaticRevert
@@ -59,7 +59,7 @@ public partial class MainWindow
 
         // --- Update snapshottable state ---
         _snapshotExistsForActor =
-            _snapshotIndexService.FindSnapshotPathForActor(player) != null;
+            _snapshotIndexService.FindSnapshotPathForActor(_player) != null;
 
         if (inGpose)
         {
@@ -67,26 +67,26 @@ public partial class MainWindow
         }
         else
         {
-            var isSelf = Player.Object != null && player.Address == Player.Object.Address;
-            var isMarePaired = _ipcManager.IsMarePairedAddress(player.Address);
+            var isSelf = Player.Object != null && _player.Address == Player.Object.Address;
+            var isMarePaired = _ipcManager.IsMarePairedAddress(_player.Address);
             var includeTempActors = _snappy.Configuration.UseLiveSnapshotData
                                     && _snappy.Configuration.IncludeVisibleTempCollectionActors;
             var hasTempCollection = includeTempActors &&
-                                    _ipcManager.PenumbraHasTemporaryCollection(player.ObjectIndex);
+                                    _ipcManager.PenumbraHasTemporaryCollection(_player.ObjectIndex);
 
             _isActorSnapshottable = isSelf || isMarePaired || hasTempCollection;
         }
 
         // --- Update lock state ---
-        _isActorLockedBySnappy = _activeSnapshotManager.IsActorLockedBySnappy(player);
+        _isActorLockedBySnappy = _activeSnapshotManager.IsActorLockedBySnappy(_player);
     }
 
     private void DrawPlayerFilter()
     {
         var width = ImGui.GetContentRegionAvail().X;
         ImGui.SetNextItemWidth(width);
-        if (ImUtf8.InputText("##playerFilter", ref playerFilter, "Filter Players..."))
-            playerFilterLower = playerFilter.ToLowerInvariant();
+        if (ImUtf8.InputText("##playerFilter", ref _playerFilter, "Filter Players..."))
+            _playerFilterLower = _playerFilter.ToLowerInvariant();
     }
 
     private string GetActorDisplayName(ICharacter actor)
@@ -128,10 +128,10 @@ public partial class MainWindow
         if (!selectablePlayer.IsValid())
             return;
 
-        if (playerFilterLower.Any() && !label.ToLowerInvariant().Contains(playerFilterLower))
+        if (_playerFilterLower.Any() && !label.ToLowerInvariant().Contains(_playerFilterLower))
             return;
 
-        var isSelected = selectedActorAddress == selectablePlayer.Address;
+        var isSelected = _selectedActorAddress == selectablePlayer.Address;
 
         var isSnowcloak = _ipcManager.IsSnowcloakAddress(selectablePlayer.Address);
         var isLightless = !isSnowcloak && _ipcManager.IsLightlessAddress(selectablePlayer.Address);
@@ -169,19 +169,19 @@ public partial class MainWindow
             return;
         }
 
-        currentLabel = label;
-        player = selectablePlayer;
-        objIdxSelected = objIdx;
-        selectedActorAddress = selectablePlayer.Address;
+        _currentLabel = label;
+        _player = selectablePlayer;
+        _objIdxSelected = objIdx;
+        _selectedActorAddress = selectablePlayer.Address;
         UpdateSelectedActorState();
     }
 
 
     private (string Text, string Tooltip, bool IsDisabled) GetSnapshotButtonState()
     {
-        if (player == null) return ("Save Snapshot", "Select an actor to save or update its snapshot.", true);
+        if (_player == null) return ("Save Snapshot", "Select an actor to save or update its snapshot.", true);
 
-        var displayName = GetActorDisplayName(player);
+        var displayName = GetActorDisplayName(_player);
 
         if (PluginUtil.IsInGpose())
         {
@@ -216,16 +216,16 @@ public partial class MainWindow
 
     private (FontAwesomeIcon Icon, string Tooltip, bool IsDisabled) GetLockButtonState()
     {
-        if (player == null || objIdxSelected == null)
+        if (_player == null || _objIdxSelected == null)
             return (FontAwesomeIcon.Lock, "Select an actor to manage its lock state.", true);
 
         if (!_isActorLockedBySnappy) return (FontAwesomeIcon.Unlock, "This actor is not locked by Snappy.", true);
 
-        var isLocked = _activeSnapshotManager.IsActorGlamourerLocked(player);
+        var isLocked = _activeSnapshotManager.IsActorGlamourerLocked(_player);
         if (isLocked)
             return (FontAwesomeIcon.Lock,
-                $"Unlock {GetActorDisplayName(player)} (click to unlock Glamourer state only)", false);
-        return (FontAwesomeIcon.Unlock, $"Lock {GetActorDisplayName(player)} (click to lock Glamourer state)",
+                $"Unlock {GetActorDisplayName(_player)} (click to unlock Glamourer state only)", false);
+        return (FontAwesomeIcon.Unlock, $"Lock {GetActorDisplayName(_player)} (click to lock Glamourer state)",
             false);
     }
 
@@ -311,10 +311,10 @@ public partial class MainWindow
             }
         }
 
-        if (player != null && objIdxSelected != null && selectedActorAddress != null)
+        if (_player != null && _objIdxSelected != null && _selectedActorAddress != null)
         {
             // Verify the selected actor is still valid and matches our stored address
-            if (player.IsValid() && player.Address == selectedActorAddress)
+            if (_player.IsValid() && _player.Address == _selectedActorAddress)
             {
                 UpdateSelectedActorState();
             }
@@ -322,11 +322,11 @@ public partial class MainWindow
             {
                 // Try to find the actor again by address in case the reference changed
                 var selectableActorsList = GetSelectableActors();
-                var foundActor = selectableActorsList.FirstOrDefault(a => a.Address == selectedActorAddress);
+                var foundActor = selectableActorsList.FirstOrDefault(a => a.Address == _selectedActorAddress);
                 if (foundActor != null && foundActor.IsValid())
                 {
-                    player = foundActor;
-                    objIdxSelected = foundActor.ObjectIndex;
+                    _player = foundActor;
+                    _objIdxSelected = foundActor.ObjectIndex;
                     UpdateSelectedActorState();
                 }
                 else
@@ -354,13 +354,13 @@ public partial class MainWindow
             )
         )
         {
-            if (player == null)
+            if (_player == null)
             {
                 ClearSelectedActorState();
             }
             else
             {
-                var charToSnap = player;
+                var charToSnap = _player;
                 var isLocalPlayer = Player.Object != null && charToSnap.Address == Player.Object.Address;
                 Dictionary<string, HashSet<string>>? penumbraReplacements = null;
                 var useLiveData = _snappy.Configuration.UseLiveSnapshotData || isLocalPlayer;
@@ -384,14 +384,14 @@ public partial class MainWindow
         {
             using (var font = ImRaii.PushFont(UiBuilder.IconFont))
             {
-                if (ImUtf8.Button(lockIcon.ToIconString(), lockButtonSize))
-                    if (_isActorLockedBySnappy && player != null)
+        if (ImUtf8.Button(lockIcon.ToIconString(), lockButtonSize))
+                    if (_isActorLockedBySnappy && _player != null)
                     {
-                        var isCurrentlyLocked = _activeSnapshotManager.IsActorGlamourerLocked(player);
+                        var isCurrentlyLocked = _activeSnapshotManager.IsActorGlamourerLocked(_player);
                         if (isCurrentlyLocked)
-                            _activeSnapshotManager.UnlockActorGlamourer(player);
+                            _activeSnapshotManager.UnlockActorGlamourer(_player);
                         else
-                            _activeSnapshotManager.LockActorGlamourer(player);
+                            _activeSnapshotManager.LockActorGlamourer(_player);
                     }
             }
         }

@@ -533,14 +533,14 @@ public partial class MainWindow
         )
         {
             var selectedSnapshot = _selectedSnapshot;
-            if (player != null && objIdxSelected != null && selectedSnapshot != null)
+            if (_player != null && _objIdxSelected != null && selectedSnapshot != null)
             {
                 var loadComponents = entry is CustomizeHistoryEntry
                     ? SnapshotLoadComponents.CustomizePlus
                     : SnapshotLoadComponents.All;
                 _snapshotApplicationService.LoadSnapshot(
-                    player,
-                    objIdxSelected.Value,
+                    _player,
+                    _objIdxSelected.Value,
                     selectedSnapshot.FullName,
                     entry as GlamourerHistoryEntry,
                     entry as CustomizeHistoryEntry,
