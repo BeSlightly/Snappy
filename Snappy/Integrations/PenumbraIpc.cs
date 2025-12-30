@@ -158,8 +158,9 @@ public sealed class PenumbraIpc : IpcSubscriber
         {
             return _enabled.Invoke() && IsPluginLoaded();
         }
-        catch
+        catch (Exception ex)
         {
+            PluginLog.Verbose($"[Penumbra] IsReady check failed: {ex.Message}");
             return false;
         }
     }

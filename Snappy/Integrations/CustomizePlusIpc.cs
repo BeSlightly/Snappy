@@ -141,8 +141,9 @@ public sealed class CustomizePlusIpc : IpcSubscriber
             var (major, minor) = _getApiVersion.InvokeFunc();
             return major >= 6 && IsPluginLoaded();
         }
-        catch
+        catch (Exception ex)
         {
+            PluginLog.Verbose($"[CustomizePlus] IsReady check failed: {ex.Message}");
             return false;
         }
     }

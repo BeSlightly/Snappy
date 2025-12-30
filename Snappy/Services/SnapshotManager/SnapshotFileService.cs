@@ -78,9 +78,10 @@ public class SnapshotFileService : ISnapshotFileService
                         snapshotInfo.SourceWorldId = worldId;
                 }
             }
-            catch
+            catch (Exception ex)
             {
-                // HomeWorld may not be available (e.g., GPose actor or non-player)
+                PluginLog.Verbose(
+                    $"Failed to resolve HomeWorld for {character.Name.TextValue}: {ex.Message}");
             }
 
         var glamourerHistory = await JsonUtil.DeserializeAsync<GlamourerHistory>(paths.GlamourerHistoryFile) ??

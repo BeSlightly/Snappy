@@ -114,9 +114,10 @@ public partial class MainWindow
                     return $"{baseName}@{worldName}";
             }
         }
-        catch
+        catch (Exception ex)
         {
-            // HomeWorld might not be available or accessible
+            PluginLog.Verbose(
+                $"Failed to resolve HomeWorld for '{baseName}' (index {actor.ObjectIndex}): {ex.Message}");
         }
 
         return baseName;

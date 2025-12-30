@@ -114,9 +114,10 @@ public static class SnapshotMigrator
             {
                 Directory.Move(snapshotPath, snapshotPath + "_migration_failed");
             }
-            catch
+            catch (Exception moveEx)
             {
-                // ignored
+                PluginLog.Warning(
+                    $"Failed to move snapshot '{snapshotPath}' to migration_failed: {moveEx.Message}");
             }
         }
     }

@@ -102,8 +102,9 @@ public sealed class GlamourerIpc : IpcSubscriber
             var version = _version.Invoke();
             return version is { Major: 1, Minor: >= 4 } && IsPluginLoaded();
         }
-        catch
+        catch (Exception ex)
         {
+            PluginLog.Verbose($"[Glamourer] IsReady check failed: {ex.Message}");
             return false;
         }
     }
