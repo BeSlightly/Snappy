@@ -149,8 +149,9 @@ public class SnapshotFileService : ISnapshotFileService
             ? ""
             : Convert.ToBase64String(Encoding.UTF8.GetBytes(snapshotData.Customize));
         var lastCustomizeEntry = customizeHistory.Entries.LastOrDefault();
-        var customizeChanged = (lastCustomizeEntry == null || lastCustomizeEntry.CustomizeData != b64Customize) &&
-                               !string.IsNullOrEmpty(b64Customize);
+        var lastCustomizeData = lastCustomizeEntry?.CustomizeData ?? string.Empty;
+        var customizeChanged = !string.Equals(lastCustomizeData, b64Customize, StringComparison.Ordinal);
+        var hasCustomizeData = !string.IsNullOrEmpty(b64Customize);
 
         var lastGlamourerEntry = glamourerHistory.Entries.LastOrDefault();
         var hasGlamourerData = !string.IsNullOrEmpty(snapshotData.Glamourer);
@@ -196,7 +197,7 @@ public class SnapshotFileService : ISnapshotFileService
             PluginLog.Debug("Customize+ changed without Glamourer change. Added history entry to bind C+ state.");
         }
 
-        if (customizeChanged)
+        if (customizeChanged && hasCustomizeData)
         {
             var entryStamp = DateTime.UtcNow;
             var newEntry = CustomizeHistoryEntry.CreateFromBase64(b64Customize, snapshotData.Customize,

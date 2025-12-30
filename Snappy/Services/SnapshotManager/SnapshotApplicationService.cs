@@ -70,10 +70,18 @@ public class SnapshotApplicationService : ISnapshotApplicationService
         {
             if (customizeOverride != null)
                 customizeDataToApply = customizeOverride.CustomizeData;
-            else if (applyGlamourer && glamourerToApply != null && glamourerToApply.CustomizeData != null)
-                customizeDataToApply = glamourerToApply.CustomizeData;
+            else if (applyGlamourer && glamourerToApply != null)
+            {
+                if (glamourerToApply.CustomizeData != null)
+                    customizeDataToApply = glamourerToApply.CustomizeData;
+                else
+                    customizeDataToApply = FindClosestCustomizeEntry(customizeHistory.Entries, glamourerToApply)
+                        ?.CustomizeData;
+            }
             else
+            {
                 customizeDataToApply = customizeHistory.Entries.LastOrDefault()?.CustomizeData;
+            }
         }
 
         var resolvedFileMap = new Dictionary<string, string>();
@@ -152,7 +160,9 @@ public class SnapshotApplicationService : ISnapshotApplicationService
             appliedGlamourerState = true;
         }
 
-        _ipcManager.PenumbraRedraw(objIdx);
+        var shouldRedraw = applyFiles || appliedGlamourerState;
+        if (shouldRedraw)
+            _ipcManager.PenumbraRedraw(objIdx);
 
         var hasPenumbraCollection = applyFiles || existingSnapshot?.HasPenumbraCollection == true;
         var hasGlamourerState = appliedGlamourerState || existingSnapshot?.HasGlamourerState == true;
@@ -173,5 +183,38 @@ public class SnapshotApplicationService : ISnapshotApplicationService
         Notify.Success($"Loaded snapshot '{snapshotName}' onto {characterApplyTo.Name.TextValue}.");
 
         return true;
+    }
+
+    private static CustomizeHistoryEntry? FindClosestCustomizeEntry(IReadOnlyList<CustomizeHistoryEntry> entries,
+        GlamourerHistoryEntry glamourerEntry)
+    {
+        if (entries.Count == 0)
+            return null;
+
+        if (!TryParseHistoryTimestamp(glamourerEntry.Timestamp, out var glamourerTimestamp))
+            return entries.LastOrDefault();
+
+        CustomizeHistoryEntry? closest = null;
+        var closestDelta = TimeSpan.MaxValue;
+        foreach (var entry in entries)
+        {
+            if (!TryParseHistoryTimestamp(entry.Timestamp, out var entryTimestamp))
+                continue;
+
+            var delta = (entryTimestamp - glamourerTimestamp).Duration();
+            if (delta < closestDelta)
+            {
+                closestDelta = delta;
+                closest = entry;
+            }
+        }
+
+        return closest ?? entries.LastOrDefault();
+    }
+
+    private static bool TryParseHistoryTimestamp(string? timestamp, out DateTime parsedUtc)
+    {
+        return DateTime.TryParse(timestamp, CultureInfo.InvariantCulture,
+            DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out parsedUtc);
     }
 }
