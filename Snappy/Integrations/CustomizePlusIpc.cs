@@ -12,6 +12,7 @@ public sealed class CustomizePlusIpc : IpcSubscriber
         { DefaultValueHandling = DefaultValueHandling.Ignore };
 
     private readonly ICallGateSubscriber<Guid, int> _deleteTempProfileById;
+    private readonly ICallGateSubscriber<ushort, int> _deleteTempProfileOnCharacter;
     private readonly ICallGateSubscriber<ushort, (int, Guid?)> _getActiveProfileId;
     private readonly ICallGateSubscriber<(int, int)> _getApiVersion;
     private readonly ICallGateSubscriber<Guid, (int, string?)> _getProfileById;
@@ -41,6 +42,8 @@ public sealed class CustomizePlusIpc : IpcSubscriber
                 "CustomizePlus.Profile.SetTemporaryProfileOnCharacter");
         _deleteTempProfileById =
             Svc.PluginInterface.GetIpcSubscriber<Guid, int>("CustomizePlus.Profile.DeleteTemporaryProfileByUniqueId");
+        _deleteTempProfileOnCharacter =
+            Svc.PluginInterface.GetIpcSubscriber<ushort, int>("CustomizePlus.Profile.DeleteTemporaryProfileOnCharacter");
     }
 
     public string GetScaleFromCharacter(ICharacter c)
@@ -113,6 +116,21 @@ public sealed class CustomizePlusIpc : IpcSubscriber
         catch (Exception ex)
         {
             PluginLog.Error($"Exception during C+ Revert IPC.\n{ex}");
+        }
+    }
+
+    public void DeleteTemporaryProfileOnCharacter(ushort objectIndex)
+    {
+        if (!IsReady()) return;
+
+        try
+        {
+            var code = _deleteTempProfileOnCharacter.InvokeFunc(objectIndex);
+            PluginLog.Debug($"C+ DeleteTemporaryProfileOnCharacter result: Code={code}");
+        }
+        catch (Exception ex)
+        {
+            PluginLog.Error($"Exception during C+ DeleteTemporaryProfileOnCharacter IPC.\n{ex}");
         }
     }
 

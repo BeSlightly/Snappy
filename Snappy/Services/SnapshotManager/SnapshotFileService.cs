@@ -89,9 +89,6 @@ public class SnapshotFileService : ISnapshotFileService
                                new CustomizeHistory();
 
         var resolvedCurrentMap = FileMapUtil.ResolveFileMap(snapshotInfo, snapshotInfo.CurrentFileMapId);
-        if (!resolvedCurrentMap.Any() && snapshotInfo.FileReplacements.Any())
-            resolvedCurrentMap = new Dictionary<string, string>(snapshotInfo.FileReplacements,
-                StringComparer.OrdinalIgnoreCase);
 
         FileMapUtil.CreateBaseMapIfMissing(snapshotInfo, resolvedCurrentMap, now);
         if (snapshotInfo.CurrentFileMapId != null)
@@ -104,7 +101,8 @@ public class SnapshotFileService : ISnapshotFileService
         resolvedCurrentMap = FileMapUtil.ResolveFileMap(snapshotInfo, snapshotInfo.CurrentFileMapId);
 
         var incomingFileMap = new Dictionary<string, string>(snapshotData.FileReplacements, StringComparer.OrdinalIgnoreCase);
-        var mapChanges = FileMapUtil.CalculateChanges(resolvedCurrentMap, incomingFileMap);
+        var includeRemovals = !useLiveData || !_configuration.UsePenumbraIpcResourcePaths;
+        var mapChanges = FileMapUtil.CalculateChanges(resolvedCurrentMap, incomingFileMap, includeRemovals);
         var mapChanged = mapChanges.Any();
         if (mapChanged)
         {
@@ -148,19 +146,27 @@ public class SnapshotFileService : ISnapshotFileService
         snapshotInfo.ManipulationString = snapshotData.Manipulation;
 
         var lastGlamourerEntry = glamourerHistory.Entries.LastOrDefault();
-        if (lastGlamourerEntry == null || lastGlamourerEntry.GlamourerString != snapshotData.Glamourer)
+        var hasGlamourerData = !string.IsNullOrEmpty(snapshotData.Glamourer);
+        var addedGlamourerEntry = false;
+        if (hasGlamourerData &&
+            (lastGlamourerEntry == null || lastGlamourerEntry.GlamourerString != snapshotData.Glamourer))
         {
             var entryStamp = DateTime.UtcNow;
             var newEntry = GlamourerHistoryEntry.Create(snapshotData.Glamourer,
                 $"Glamourer Update - {entryStamp:yyyy-MM-dd HH:mm:ss} UTC", snapshotInfo.CurrentFileMapId);
             glamourerHistory.Entries.Add(newEntry);
             PluginLog.Debug("New Glamourer version detected. Appending to history.");
+            addedGlamourerEntry = true;
         }
-        else if (mapChanged && !string.IsNullOrEmpty(snapshotData.Glamourer))
+        if (mapChanged && !addedGlamourerEntry &&
+            !string.Equals(lastGlamourerEntry?.FileMapId, snapshotInfo.CurrentFileMapId, StringComparison.OrdinalIgnoreCase))
         {
+            var glamourerString = hasGlamourerData
+                ? snapshotData.Glamourer
+                : lastGlamourerEntry?.GlamourerString ?? string.Empty;
             // Glamourer string unchanged but files changed; record a new entry so users can pick the correct file map.
             var entryStamp = DateTime.UtcNow;
-            var newEntry = GlamourerHistoryEntry.Create(snapshotData.Glamourer,
+            var newEntry = GlamourerHistoryEntry.Create(glamourerString,
                 $"Files Update - {entryStamp:yyyy-MM-dd HH:mm:ss} UTC", snapshotInfo.CurrentFileMapId);
             glamourerHistory.Entries.Add(newEntry);
             PluginLog.Debug("File map changed without Glamourer change. Added history entry to capture file map.");

@@ -105,6 +105,14 @@ public class IpcManager : IIpcManager, IDisposable
         _customize.Revert(profileId);
     }
 
+    public void ClearCustomizePlusTemporaryProfile(int objIdx)
+    {
+        if (objIdx < 0 || objIdx > ushort.MaxValue)
+            return;
+
+        _customize.DeleteTemporaryProfileOnCharacter((ushort)objIdx);
+    }
+
     // Brio passthroughs
     public string? GetBrioActorName(IGameObject actor)
     {

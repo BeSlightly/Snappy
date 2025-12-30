@@ -11,6 +11,7 @@ public class SnapshotApplicationService : ISnapshotApplicationService
 {
     private readonly IActiveSnapshotManager _activeSnapshotManager;
     private readonly IIpcManager _ipcManager;
+    private const string EmptyCustomizePlusProfileJson = "{\"Bones\":{}}";
 
     public SnapshotApplicationService(IIpcManager ipcManager, IActiveSnapshotManager activeSnapshotManager)
     {
@@ -38,6 +39,10 @@ public class SnapshotApplicationService : ISnapshotApplicationService
             return false;
         }
 
+        var localPlayer = Player.Object;
+        var isOnLocalPlayer = (localPlayer != null && characterApplyTo.ObjectIndex == localPlayer.ObjectIndex) ||
+                              characterApplyTo.ObjectIndex == ObjectIndex.GPosePlayer.Index;
+
         var paths = SnapshotPaths.From(path);
 
         var snapshotInfo = JsonUtil.DeserializeAsync<SnapshotInfo>(paths.SnapshotFile).GetResultSafely();
@@ -58,9 +63,6 @@ public class SnapshotApplicationService : ISnapshotApplicationService
         var customizeToApply = customizeOverride ?? customizeHistory.Entries.LastOrDefault();
         var mapIdToUse = glamourerToApply?.FileMapId ?? customizeToApply?.FileMapId ?? snapshotInfo.CurrentFileMapId;
         var resolvedFileMap = FileMapUtil.ResolveFileMap(snapshotInfo, mapIdToUse);
-        if (!resolvedFileMap.Any() && snapshotInfo.FileReplacements.Any())
-            resolvedFileMap = new Dictionary<string, string>(snapshotInfo.FileReplacements,
-                StringComparer.OrdinalIgnoreCase);
 
         if (glamourerToApply == null && customizeToApply == null && !resolvedFileMap.Any())
         {
@@ -80,16 +82,20 @@ public class SnapshotApplicationService : ISnapshotApplicationService
                 else
                     PluginLog.Warning($"Missing file blob for {gamePath} (hash: {hash}). It will not be applied.");
             }
-
-            _ipcManager.PenumbraRemoveTemporaryCollection(characterApplyTo.ObjectIndex);
-            _ipcManager.PenumbraSetTempMods(characterApplyTo, objIdx, moddedPaths, snapshotInfo.ManipulationString);
         }
+
+        _ipcManager.PenumbraRemoveTemporaryCollection(characterApplyTo.ObjectIndex);
+        if (moddedPaths.Any() || !string.IsNullOrEmpty(snapshotInfo.ManipulationString))
+            _ipcManager.PenumbraSetTempMods(characterApplyTo, objIdx, moddedPaths, snapshotInfo.ManipulationString);
 
         _activeSnapshotManager.RemoveAllSnapshotsForCharacter(characterApplyTo);
         Guid? cplusProfileId = null;
+        var customizePlusAvailable = _ipcManager.IsCustomizePlusAvailable();
 
-        if (_ipcManager.IsCustomizePlusAvailable() && customizeToApply != null &&
-            !string.IsNullOrEmpty(customizeToApply.CustomizeData))
+        if (customizePlusAvailable)
+            _ipcManager.ClearCustomizePlusTemporaryProfile(characterApplyTo.ObjectIndex);
+
+        if (customizePlusAvailable && customizeToApply != null && !string.IsNullOrEmpty(customizeToApply.CustomizeData))
         {
             string cplusJson;
             try
@@ -103,19 +109,21 @@ public class SnapshotApplicationService : ISnapshotApplicationService
 
             cplusProfileId = _ipcManager.SetCustomizePlusScale(characterApplyTo.Address, cplusJson);
         }
+        else if (customizePlusAvailable && isOnLocalPlayer)
+        {
+            // Apply a temporary empty profile to neutralize local C+ when the snapshot has no C+ data.
+            cplusProfileId = _ipcManager.SetCustomizePlusScale(characterApplyTo.Address,
+                EmptyCustomizePlusProfileJson);
+        }
 
         var isGlamourerLocked = false;
-        if (glamourerToApply != null)
+        if (glamourerToApply != null && !string.IsNullOrEmpty(glamourerToApply.GlamourerString))
         {
             _ipcManager.ApplyGlamourerState(glamourerToApply.GlamourerString, characterApplyTo);
             isGlamourerLocked = true; // Glamourer is locked when we apply a state
         }
 
         _ipcManager.PenumbraRedraw(objIdx);
-
-        var localPlayer = Player.Object;
-        var isOnLocalPlayer = (localPlayer != null && characterApplyTo.ObjectIndex == localPlayer.ObjectIndex) ||
-                              characterApplyTo.ObjectIndex == ObjectIndex.GPosePlayer.Index;
 
         _activeSnapshotManager.AddSnapshot(new ActiveSnapshot(characterApplyTo.ObjectIndex, cplusProfileId,
             isOnLocalPlayer, characterApplyTo.Name.TextValue, isGlamourerLocked));

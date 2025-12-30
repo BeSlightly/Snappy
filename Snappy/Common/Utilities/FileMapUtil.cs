@@ -11,16 +11,33 @@ public static class FileMapUtil
 
     public static Dictionary<string, string> ResolveFileMap(SnapshotInfo snapshotInfo, string? fileMapId)
     {
-        var resolved = ResolveInternal(snapshotInfo, fileMapId);
-        if (resolved.Count > 0) return resolved;
+        if (TryResolveFileMap(snapshotInfo, fileMapId, out var resolved))
+            return resolved;
 
-        // Fallback to legacy field for backward compatibility
         return new Dictionary<string, string>(snapshotInfo.FileReplacements, StringComparer.OrdinalIgnoreCase);
+    }
+
+    public static bool TryResolveFileMap(
+        SnapshotInfo snapshotInfo,
+        string? fileMapId,
+        out Dictionary<string, string> resolved)
+    {
+        resolved = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        if (snapshotInfo.FileMaps == null || snapshotInfo.FileMaps.Count == 0 || string.IsNullOrEmpty(fileMapId))
+            return false;
+
+        var mapIndex = snapshotInfo.FileMaps.ToDictionary(m => m.Id, m => m, StringComparer.OrdinalIgnoreCase);
+        if (!mapIndex.TryGetValue(fileMapId, out var entry))
+            return false;
+
+        resolved = ResolveEntry(entry, mapIndex, 0);
+        return true;
     }
 
     public static Dictionary<string, string> CalculateChanges(
         IReadOnlyDictionary<string, string> currentMap,
-        IReadOnlyDictionary<string, string> incoming)
+        IReadOnlyDictionary<string, string> incoming,
+        bool includeRemovals)
     {
         var changes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
@@ -28,6 +45,11 @@ public static class FileMapUtil
             if (!currentMap.TryGetValue(gamePath, out var existing) ||
                 !string.Equals(existing, hash, StringComparison.OrdinalIgnoreCase))
                 changes[gamePath] = hash;
+
+        if (includeRemovals)
+            foreach (var gamePath in currentMap.Keys)
+                if (!incoming.ContainsKey(gamePath))
+                    changes[gamePath] = string.Empty;
 
         return changes;
     }
@@ -54,20 +76,12 @@ public static class FileMapUtil
         IReadOnlyDictionary<string, string> changes)
     {
         var result = new Dictionary<string, string>(baseMap, StringComparer.OrdinalIgnoreCase);
-        foreach (var (gamePath, hash) in changes) result[gamePath] = hash;
+        foreach (var (gamePath, hash) in changes)
+            if (string.IsNullOrEmpty(hash))
+                result.Remove(gamePath);
+            else
+                result[gamePath] = hash;
         return result;
-    }
-
-    private static Dictionary<string, string> ResolveInternal(SnapshotInfo snapshotInfo, string? fileMapId)
-    {
-        if (snapshotInfo.FileMaps == null || snapshotInfo.FileMaps.Count == 0 || string.IsNullOrEmpty(fileMapId))
-            return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-
-        var mapIndex = snapshotInfo.FileMaps.ToDictionary(m => m.Id, m => m, StringComparer.OrdinalIgnoreCase);
-        if (!mapIndex.TryGetValue(fileMapId, out var entry))
-            return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-
-        return ResolveEntry(entry, mapIndex, 0);
     }
 
     private static Dictionary<string, string> ResolveEntry(

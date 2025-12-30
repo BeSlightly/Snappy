@@ -17,6 +17,7 @@ public interface IIpcManager : IDisposable
     string GetCustomizePlusScale(ICharacter c);
     Guid? SetCustomizePlusScale(IntPtr address, string scale);
     void RevertCustomizePlusScale(Guid profileId);
+    void ClearCustomizePlusTemporaryProfile(int objIdx);
     string? GetBrioActorName(IGameObject actor);
     void SetUiOpen(bool isOpen);
     List<ICharacter> GetMarePairedPlayers();
