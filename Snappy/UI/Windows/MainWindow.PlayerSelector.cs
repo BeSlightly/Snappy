@@ -140,86 +140,40 @@ public partial class MainWindow
         if (isSnowcloak)
         {
             using var _ = ImRaii.PushColor(ImGuiCol.Text, new Vector4(0.4275f, 0.6863f, 1f, 1f));
-            if (ImUtf8.Selectable(label, isSelected))
-            {
-                if (isSelected)
-                {
-                    // Clicking the same actor again deselects it
-                    ClearSelectedActorState();
-                }
-                else
-                {
-                    // Selecting a different actor
-                    currentLabel = label;
-                    player = selectablePlayer;
-                    objIdxSelected = objIdx;
-                    selectedActorAddress = selectablePlayer.Address;
-                    UpdateSelectedActorState();
-                }
-            }
+            ApplySelectableSelection(selectablePlayer, label, objIdx, isSelected);
         }
         else if (isLightless)
         {
             using var _ = ImRaii.PushColor(ImGuiCol.Text, new Vector4(0.6784f, 0.5412f, 0.9608f, 1f));
-            if (ImUtf8.Selectable(label, isSelected))
-            {
-                if (isSelected)
-                {
-                    // Clicking the same actor again deselects it
-                    ClearSelectedActorState();
-                }
-                else
-                {
-                    // Selecting a different actor
-                    currentLabel = label;
-                    player = selectablePlayer;
-                    objIdxSelected = objIdx;
-                    selectedActorAddress = selectablePlayer.Address;
-                    UpdateSelectedActorState();
-                }
-            }
+            ApplySelectableSelection(selectablePlayer, label, objIdx, isSelected);
         }
         else if (isPlayerSync)
         {
             using var _ = ImRaii.PushColor(ImGuiCol.Text, new Vector4(0.4745f, 0.8392f, 0.7569f, 1f));
-            if (ImUtf8.Selectable(label, isSelected))
-            {
-                if (isSelected)
-                {
-                    // Clicking the same actor again deselects it
-                    ClearSelectedActorState();
-                }
-                else
-                {
-                    // Selecting a different actor
-                    currentLabel = label;
-                    player = selectablePlayer;
-                    objIdxSelected = objIdx;
-                    selectedActorAddress = selectablePlayer.Address;
-                    UpdateSelectedActorState();
-                }
-            }
+            ApplySelectableSelection(selectablePlayer, label, objIdx, isSelected);
         }
         else
         {
-            if (ImUtf8.Selectable(label, isSelected))
-            {
-                if (isSelected)
-                {
-                    // Clicking the same actor again deselects it
-                    ClearSelectedActorState();
-                }
-                else
-                {
-                    // Selecting a different actor
-                    currentLabel = label;
-                    player = selectablePlayer;
-                    objIdxSelected = objIdx;
-                    selectedActorAddress = selectablePlayer.Address;
-                    UpdateSelectedActorState();
-                }
-            }
+            ApplySelectableSelection(selectablePlayer, label, objIdx, isSelected);
         }
+    }
+
+    private void ApplySelectableSelection(ICharacter selectablePlayer, string label, int objIdx, bool isSelected)
+    {
+        if (!ImUtf8.Selectable(label, isSelected))
+            return;
+
+        if (isSelected)
+        {
+            ClearSelectedActorState();
+            return;
+        }
+
+        currentLabel = label;
+        player = selectablePlayer;
+        objIdxSelected = objIdx;
+        selectedActorAddress = selectablePlayer.Address;
+        UpdateSelectedActorState();
     }
 
 
