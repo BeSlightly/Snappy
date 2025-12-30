@@ -354,22 +354,29 @@ public partial class MainWindow
             )
         )
         {
-            var charToSnap = player!;
-            var isLocalPlayer = Player.Object != null && charToSnap.Address == Player.Object.Address;
-            Dictionary<string, HashSet<string>>? penumbraReplacements = null;
-            var useLiveData = _snappy.Configuration.UseLiveSnapshotData || isLocalPlayer;
-            var useIpcResourcePaths = useLiveData && _snappy.Configuration.UsePenumbraIpcResourcePaths;
-            if (useIpcResourcePaths)
-                penumbraReplacements = _ipcManager.PenumbraGetGameObjectResourcePaths(charToSnap.ObjectIndex);
-
-            Notify.Info($"Snapshotting {GetActorDisplayName(charToSnap)} in the background...");
-            _snappy.ExecuteBackgroundTask(async () =>
+            if (player == null)
             {
-                var updatedSnapshotPath =
-                    await _snapshotFileService.UpdateSnapshotAsync(charToSnap, isLocalPlayer, penumbraReplacements);
-                if (updatedSnapshotPath != null)
-                    _snappy.QueueAction(() => _snappy.InvokeSnapshotsUpdated());
-            });
+                ClearSelectedActorState();
+            }
+            else
+            {
+                var charToSnap = player;
+                var isLocalPlayer = Player.Object != null && charToSnap.Address == Player.Object.Address;
+                Dictionary<string, HashSet<string>>? penumbraReplacements = null;
+                var useLiveData = _snappy.Configuration.UseLiveSnapshotData || isLocalPlayer;
+                var useIpcResourcePaths = useLiveData && _snappy.Configuration.UsePenumbraIpcResourcePaths;
+                if (useIpcResourcePaths)
+                    penumbraReplacements = _ipcManager.PenumbraGetGameObjectResourcePaths(charToSnap.ObjectIndex);
+
+                Notify.Info($"Snapshotting {GetActorDisplayName(charToSnap)} in the background...");
+                _snappy.ExecuteBackgroundTask(async () =>
+                {
+                    var updatedSnapshotPath =
+                        await _snapshotFileService.UpdateSnapshotAsync(charToSnap, isLocalPlayer, penumbraReplacements);
+                    if (updatedSnapshotPath != null)
+                        _snappy.QueueAction(() => _snappy.InvokeSnapshotsUpdated());
+                });
+            }
         }
 
         ImGui.SameLine(0, spacing);

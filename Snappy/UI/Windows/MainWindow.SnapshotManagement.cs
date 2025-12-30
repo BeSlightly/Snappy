@@ -87,9 +87,12 @@ public partial class MainWindow
                 )
             )
             {
-                _isRenamingSnapshot = true;
-                _tempSnapshotName = _selectedSnapshot!.Name;
-                ImGui.SetKeyboardFocusHere(-1);
+                if (_selectedSnapshot != null)
+                {
+                    _isRenamingSnapshot = true;
+                    _tempSnapshotName = _selectedSnapshot.Name;
+                    ImGui.SetKeyboardFocusHere(-1);
+                }
             }
 
             ImGui.SameLine();
@@ -377,27 +380,35 @@ public partial class MainWindow
             "Export the selected entries to a Penumbra Character Package (.pcp). If an entry is not selected, the latest will be used.";
         if (UiHelpers.DrawStretchedIconButtonWithText(FontAwesomeIcon.FileExport, "Export Selected to PCP",
                 exportTooltip, exportDisabled, buttonWidth))
-            _snappy.FileDialogManager.SaveFileDialog(
-                "Export PCP",
-                ".pcp",
-                $"{_selectedSnapshot!.Name}.pcp",
-                ".pcp",
-                (status, path) =>
-                {
-                    if (!status || string.IsNullOrEmpty(path))
-                        return;
+        {
+            var snapshot = _selectedSnapshot;
+            if (snapshot != null)
+            {
+                var snapshotName = snapshot.Name;
+                var snapshotPath = snapshot.FullName;
+                _snappy.FileDialogManager.SaveFileDialog(
+                    "Export PCP",
+                    ".pcp",
+                    $"{snapshotName}.pcp",
+                    ".pcp",
+                    (status, path) =>
+                    {
+                        if (!status || string.IsNullOrEmpty(path))
+                            return;
 
-                    Notify.Info($"Starting PCP export for '{_selectedSnapshot!.Name}'...");
-                    var glam = _pcpSelectedGlamourerEntry;
-                    var cust = _pcpSelectedCustomizeEntry;
-                    var nameOverride = _pcpPlayerNameOverride;
-                    var worldOverride = _pcpSelectedWorldIdOverride;
-                    _snappy.ExecuteBackgroundTask(() =>
-                        _pcpManager.ExportPcp(_selectedSnapshot!.FullName, path, glam, cust, nameOverride,
-                            worldOverride));
-                },
-                _snappy.Configuration.WorkingDirectory
-            );
+                        Notify.Info($"Starting PCP export for '{snapshotName}'...");
+                        var glam = _pcpSelectedGlamourerEntry;
+                        var cust = _pcpSelectedCustomizeEntry;
+                        var nameOverride = _pcpPlayerNameOverride;
+                        var worldOverride = _pcpSelectedWorldIdOverride;
+                        _snappy.ExecuteBackgroundTask(() =>
+                            _pcpManager.ExportPcp(snapshotPath, path, glam, cust, nameOverride,
+                                worldOverride));
+                    },
+                    _snappy.Configuration.WorkingDirectory
+                );
+            }
+        }
         ImGui.Spacing();
         using (var warningColor = ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.DalamudYellow))
         {
@@ -521,17 +532,21 @@ public partial class MainWindow
             )
         )
         {
-            var loadComponents = entry is CustomizeHistoryEntry
-                ? SnapshotLoadComponents.CustomizePlus
-                : SnapshotLoadComponents.All;
-            _snapshotApplicationService.LoadSnapshot(
-                player!,
-                objIdxSelected!.Value,
-                _selectedSnapshot!.FullName,
-                entry as GlamourerHistoryEntry,
-                entry as CustomizeHistoryEntry,
-                loadComponents
-            );
+            var selectedSnapshot = _selectedSnapshot;
+            if (player != null && objIdxSelected != null && selectedSnapshot != null)
+            {
+                var loadComponents = entry is CustomizeHistoryEntry
+                    ? SnapshotLoadComponents.CustomizePlus
+                    : SnapshotLoadComponents.All;
+                _snapshotApplicationService.LoadSnapshot(
+                    player,
+                    objIdxSelected.Value,
+                    selectedSnapshot.FullName,
+                    entry as GlamourerHistoryEntry,
+                    entry as CustomizeHistoryEntry,
+                    loadComponents
+                );
+            }
         }
         ImGui.SameLine();
 
@@ -562,27 +577,32 @@ public partial class MainWindow
         var pmpTooltip = _pmpExportManager.IsExporting
             ? "An export is already in progress..."
             : "Export this entry's state to a Penumbra Mod Pack (.pmp).";
-            if (ImUtf8.IconButton(FontAwesomeIcon.BoxOpen, pmpTooltip, default, pmpDisabled))
+        if (ImUtf8.IconButton(FontAwesomeIcon.BoxOpen, pmpTooltip, default, pmpDisabled))
+        {
+            var selectedSnapshot = _selectedSnapshot;
+            if (selectedSnapshot != null)
             {
                 var defaultName =
-                    $"{_selectedSnapshot!.Name}_{SanitizeForFileName(entry.Description ?? "entry")}.pmp";
+                    $"{selectedSnapshot.Name}_{SanitizeForFileName(entry.Description ?? "entry")}.pmp";
+                var snapshotPath = selectedSnapshot.FullName;
                 _snappy.FileDialogManager.SaveFileDialog(
-                "Export PMP for Entry",
-                ".pmp",
-                defaultName,
-                ".pmp",
-                (status, path) =>
-                {
-                    if (!status || string.IsNullOrEmpty(path))
-                        return;
+                    "Export PMP for Entry",
+                    ".pmp",
+                    defaultName,
+                    ".pmp",
+                    (status, path) =>
+                    {
+                        if (!status || string.IsNullOrEmpty(path))
+                            return;
 
-                    Notify.Info($"Starting PMP export for entry '{entry.Description ?? ""}'...");
-                    var mapId = entry.FileMapId ?? _selectedSnapshotInfo?.CurrentFileMapId;
-                    _snappy.ExecuteBackgroundTask(() =>
-                        _pmpExportManager.SnapshotToPMPAsync(_selectedSnapshot!.FullName, path, mapId));
-                },
-                _snappy.Configuration.WorkingDirectory);
+                        Notify.Info($"Starting PMP export for entry '{entry.Description ?? ""}'...");
+                        var mapId = entry.FileMapId ?? _selectedSnapshotInfo?.CurrentFileMapId;
+                        _snappy.ExecuteBackgroundTask(() =>
+                            _pmpExportManager.SnapshotToPMPAsync(snapshotPath, path, mapId));
+                    },
+                    _snappy.Configuration.WorkingDirectory);
             }
+        }
 
         ImGui.SameLine();
 
