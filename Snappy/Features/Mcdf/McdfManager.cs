@@ -62,7 +62,6 @@ public class McdfManager : IMcdfManager
         {
             Notify.Error($"Failed during MCDF extraction for file: {Path.GetFileName(filePath)}\n{ex.Message}");
             PluginLog.Error($"Failed during MCDF extraction for file: {Path.GetFileName(filePath)}: {ex}");
-            throw;
         }
     }
 

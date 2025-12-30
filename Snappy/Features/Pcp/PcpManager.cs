@@ -89,7 +89,6 @@ public class PcpManager : IPcpManager
         {
             Notify.Error($"Failed during PCP import for file: {Path.GetFileName(filePath)}\n{ex.Message}");
             PluginLog.Error($"Failed during PCP import for file: {Path.GetFileName(filePath)}: {ex}");
-            throw;
         }
     }
 
