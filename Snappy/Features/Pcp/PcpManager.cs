@@ -68,15 +68,16 @@ public class PcpManager : IPcpManager
             // Create snapshot info
             var snapshotInfo = CreateSnapshotInfo(metadata, characterData, snapshotPath, gamePathToHashMap, modData);
 
-            // Create Glamourer history
-            var glamourerHistory = new GlamourerHistory();
-            if (characterData.Glamourer != null)
-                glamourerHistory = CreateGlamourerHistory(characterData, snapshotInfo.CurrentFileMapId);
-
             // Create Customize+ history
             var customizeHistory = new CustomizeHistory();
             if (characterData.CustomizePlus != null)
                 customizeHistory = CreateCustomizeHistory(characterData, snapshotInfo.CurrentFileMapId);
+            var customizeData = customizeHistory.Entries.LastOrDefault()?.CustomizeData ?? string.Empty;
+
+            // Create Glamourer history
+            var glamourerHistory = new GlamourerHistory();
+            if (characterData.Glamourer != null)
+                glamourerHistory = CreateGlamourerHistory(characterData, snapshotInfo.CurrentFileMapId, customizeData);
 
             // Save all data to disk
             _snapshotFileService.SaveSnapshotToDisk(paths.RootPath, snapshotInfo, glamourerHistory, customizeHistory);
@@ -411,7 +412,8 @@ public class PcpManager : IPcpManager
         }
     }
 
-    private static GlamourerHistory CreateGlamourerHistory(PcpCharacterData characterData, string? fileMapId)
+    private static GlamourerHistory CreateGlamourerHistory(PcpCharacterData characterData, string? fileMapId,
+        string? customizeData)
     {
         var history = new GlamourerHistory();
         if (characterData.Glamourer != null)
@@ -426,7 +428,8 @@ public class PcpManager : IPcpManager
                     // This is the new Glamourer PCP format - convert the Design to Base64
                     var designJson = JsonConvert.SerializeObject(glamourerObj["Design"], Formatting.None);
                     var designBase64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(designJson));
-                    history.Entries.Add(GlamourerHistoryEntry.Create(designBase64, "Imported from PCP", fileMapId));
+                    history.Entries.Add(GlamourerHistoryEntry.Create(designBase64, "Imported from PCP", fileMapId,
+                        customizeData));
                 }
                 else
                 {
@@ -435,7 +438,7 @@ public class PcpManager : IPcpManager
                     var designJson = JsonConvert.SerializeObject(glamourerObj, Formatting.None);
                     var designBase64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(designJson));
                     history.Entries.Add(GlamourerHistoryEntry.Create(designBase64,
-                        "Imported from PCP (Legacy Format)", fileMapId));
+                        "Imported from PCP (Legacy Format)", fileMapId, customizeData));
                 }
             }
             catch (Exception ex)

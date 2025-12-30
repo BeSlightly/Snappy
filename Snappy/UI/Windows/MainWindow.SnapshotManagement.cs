@@ -4,6 +4,7 @@ using Dalamud.Interface.Colors;
 using System;
 using System.IO;
 using System.Numerics;
+using Snappy.Services.SnapshotManager;
 
 namespace Snappy.UI.Windows;
 
@@ -521,13 +522,19 @@ public partial class MainWindow
                 !_isActorModifiable
             )
         )
+        {
+            var loadComponents = entry is CustomizeHistoryEntry
+                ? SnapshotLoadComponents.CustomizePlus
+                : SnapshotLoadComponents.All;
             _snapshotApplicationService.LoadSnapshot(
                 player!,
                 objIdxSelected!.Value,
                 _selectedSnapshot!.FullName,
                 entry as GlamourerHistoryEntry,
-                entry as CustomizeHistoryEntry
+                entry as CustomizeHistoryEntry,
+                loadComponents
             );
+        }
         ImGui.SameLine();
 
         if (

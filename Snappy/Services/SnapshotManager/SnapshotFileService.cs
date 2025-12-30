@@ -145,6 +145,13 @@ public class SnapshotFileService : ISnapshotFileService
 
         snapshotInfo.ManipulationString = snapshotData.Manipulation;
 
+        var b64Customize = string.IsNullOrEmpty(snapshotData.Customize)
+            ? ""
+            : Convert.ToBase64String(Encoding.UTF8.GetBytes(snapshotData.Customize));
+        var lastCustomizeEntry = customizeHistory.Entries.LastOrDefault();
+        var customizeChanged = (lastCustomizeEntry == null || lastCustomizeEntry.CustomizeData != b64Customize) &&
+                               !string.IsNullOrEmpty(b64Customize);
+
         var lastGlamourerEntry = glamourerHistory.Entries.LastOrDefault();
         var hasGlamourerData = !string.IsNullOrEmpty(snapshotData.Glamourer);
         var addedGlamourerEntry = false;
@@ -153,7 +160,8 @@ public class SnapshotFileService : ISnapshotFileService
         {
             var entryStamp = DateTime.UtcNow;
             var newEntry = GlamourerHistoryEntry.Create(snapshotData.Glamourer,
-                $"Glamourer Update - {entryStamp:yyyy-MM-dd HH:mm:ss} UTC", snapshotInfo.CurrentFileMapId);
+                $"Glamourer Update - {entryStamp:yyyy-MM-dd HH:mm:ss} UTC", snapshotInfo.CurrentFileMapId,
+                b64Customize);
             glamourerHistory.Entries.Add(newEntry);
             PluginLog.Debug("New Glamourer version detected. Appending to history.");
             addedGlamourerEntry = true;
@@ -167,17 +175,28 @@ public class SnapshotFileService : ISnapshotFileService
             // Glamourer string unchanged but files changed; record a new entry so users can pick the correct file map.
             var entryStamp = DateTime.UtcNow;
             var newEntry = GlamourerHistoryEntry.Create(glamourerString,
-                $"Files Update - {entryStamp:yyyy-MM-dd HH:mm:ss} UTC", snapshotInfo.CurrentFileMapId);
+                $"Files Update - {entryStamp:yyyy-MM-dd HH:mm:ss} UTC", snapshotInfo.CurrentFileMapId,
+                b64Customize);
             glamourerHistory.Entries.Add(newEntry);
             PluginLog.Debug("File map changed without Glamourer change. Added history entry to capture file map.");
+            addedGlamourerEntry = true;
         }
 
-        var b64Customize = string.IsNullOrEmpty(snapshotData.Customize)
-            ? ""
-            : Convert.ToBase64String(Encoding.UTF8.GetBytes(snapshotData.Customize));
-        var lastCustomizeEntry = customizeHistory.Entries.LastOrDefault();
-        if ((lastCustomizeEntry == null || lastCustomizeEntry.CustomizeData != b64Customize) &&
-            !string.IsNullOrEmpty(b64Customize))
+        if (customizeChanged && !addedGlamourerEntry &&
+            (!string.IsNullOrEmpty(snapshotData.Glamourer) || !string.IsNullOrEmpty(lastGlamourerEntry?.GlamourerString)))
+        {
+            var glamourerString = hasGlamourerData
+                ? snapshotData.Glamourer
+                : lastGlamourerEntry?.GlamourerString ?? string.Empty;
+            var entryStamp = DateTime.UtcNow;
+            var newEntry = GlamourerHistoryEntry.Create(glamourerString,
+                $"Customize+ Update - {entryStamp:yyyy-MM-dd HH:mm:ss} UTC", snapshotInfo.CurrentFileMapId,
+                b64Customize);
+            glamourerHistory.Entries.Add(newEntry);
+            PluginLog.Debug("Customize+ changed without Glamourer change. Added history entry to bind C+ state.");
+        }
+
+        if (customizeChanged)
         {
             var entryStamp = DateTime.UtcNow;
             var newEntry = CustomizeHistoryEntry.CreateFromBase64(b64Customize, snapshotData.Customize,

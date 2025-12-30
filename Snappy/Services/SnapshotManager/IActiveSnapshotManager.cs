@@ -5,6 +5,7 @@ public interface IActiveSnapshotManager
     IReadOnlyList<ActiveSnapshot> ActiveSnapshots { get; }
     bool HasActiveSnapshots { get; }
     void AddSnapshot(ActiveSnapshot snapshot);
+    ActiveSnapshot? GetSnapshotForCharacter(ICharacter character);
     void RemoveAllSnapshotsForCharacter(ICharacter character);
     void RevertAllSnapshots();
     void RevertAllSnapshotsOnGposeExit();

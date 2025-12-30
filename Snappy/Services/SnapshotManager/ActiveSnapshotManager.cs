@@ -25,6 +25,11 @@ public class ActiveSnapshotManager : IActiveSnapshotManager
         _activeSnapshots.Add(snapshot);
     }
 
+    public ActiveSnapshot? GetSnapshotForCharacter(ICharacter character)
+    {
+        return _activeSnapshots.FirstOrDefault(s => IsSnapshotForCharacter(s, character));
+    }
+
     public void RemoveAllSnapshotsForCharacter(ICharacter character)
     {
         _activeSnapshots.RemoveAll(s => IsSnapshotForCharacter(s, character));
@@ -66,13 +71,17 @@ public class ActiveSnapshotManager : IActiveSnapshotManager
                 PluginLog.Information(
                     $"Reverting state for actor '{target.Name}' at index {target.ObjectIndex} (original index: {snapshot.ObjectIndex}).");
 
-                _ipcManager.PenumbraRemoveTemporaryCollection(snapshot.ObjectIndex);
+                if (snapshot.HasPenumbraCollection)
+                    _ipcManager.PenumbraRemoveTemporaryCollection(snapshot.ObjectIndex);
 
                 if (snapshot.CustomizePlusProfileId.HasValue)
                     _ipcManager.RevertCustomizePlusScale(snapshot.CustomizePlusProfileId.Value);
 
-                _ipcManager.UnlockGlamourerState(target);
-                _ipcManager.RevertGlamourerToAutomation(target);
+                if (snapshot.HasGlamourerState)
+                {
+                    _ipcManager.UnlockGlamourerState(target);
+                    _ipcManager.RevertGlamourerToAutomation(target);
+                }
 
                 indicesToRedraw.Add(target.ObjectIndex);
             }
@@ -80,7 +89,8 @@ public class ActiveSnapshotManager : IActiveSnapshotManager
             {
                 PluginLog.Warning(
                     $"Could not find a live actor at index {snapshot.ObjectIndex} to revert. Attempting to clear resources regardless.");
-                _ipcManager.PenumbraRemoveTemporaryCollection(snapshot.ObjectIndex);
+                if (snapshot.HasPenumbraCollection)
+                    _ipcManager.PenumbraRemoveTemporaryCollection(snapshot.ObjectIndex);
 
                 if (snapshot.CustomizePlusProfileId.HasValue)
                     _ipcManager.RevertCustomizePlusScale(snapshot.CustomizePlusProfileId.Value);
@@ -125,7 +135,7 @@ public class ActiveSnapshotManager : IActiveSnapshotManager
         var currentState = _ipcManager.GetGlamourerState(character);
         _ipcManager.ApplyGlamourerState(currentState, character);
 
-        var updatedSnapshot = snapshot with { IsGlamourerLocked = true };
+        var updatedSnapshot = snapshot with { IsGlamourerLocked = true, HasGlamourerState = true };
         var index = _activeSnapshots.IndexOf(snapshot);
         _activeSnapshots[index] = updatedSnapshot;
 
@@ -169,7 +179,9 @@ public class ActiveSnapshotManager : IActiveSnapshotManager
                 localPlayerSnapshot.CustomizePlusProfileId,
                 localPlayerSnapshot.IsOnLocalPlayer,
                 localPlayerSnapshot.CharacterName,
-                localPlayerSnapshot.IsGlamourerLocked
+                localPlayerSnapshot.IsGlamourerLocked,
+                localPlayerSnapshot.HasPenumbraCollection,
+                localPlayerSnapshot.HasGlamourerState
             );
             _activeSnapshots.Add(gposeSnapshot);
 
@@ -192,7 +204,9 @@ public class ActiveSnapshotManager : IActiveSnapshotManager
                 gposeSnapshot.CustomizePlusProfileId,
                 gposeSnapshot.IsOnLocalPlayer,
                 gposeSnapshot.CharacterName,
-                gposeSnapshot.IsGlamourerLocked
+                gposeSnapshot.IsGlamourerLocked,
+                gposeSnapshot.HasPenumbraCollection,
+                gposeSnapshot.HasGlamourerState
             );
             _activeSnapshots.Add(regularSnapshot);
 
@@ -281,13 +295,17 @@ public class ActiveSnapshotManager : IActiveSnapshotManager
                 PluginLog.Information(
                     $"Reverting state for actor '{target.Name}' at index {target.ObjectIndex} (original index: {snapshot.ObjectIndex}).");
 
-                _ipcManager.PenumbraRemoveTemporaryCollection(snapshot.ObjectIndex);
+                if (snapshot.HasPenumbraCollection)
+                    _ipcManager.PenumbraRemoveTemporaryCollection(snapshot.ObjectIndex);
 
                 if (snapshot.CustomizePlusProfileId.HasValue)
                     _ipcManager.RevertCustomizePlusScale(snapshot.CustomizePlusProfileId.Value);
 
-                _ipcManager.UnlockGlamourerState(target);
-                _ipcManager.RevertGlamourerToAutomation(target);
+                if (snapshot.HasGlamourerState)
+                {
+                    _ipcManager.UnlockGlamourerState(target);
+                    _ipcManager.RevertGlamourerToAutomation(target);
+                }
 
                 indicesToRedraw.Add(target.ObjectIndex);
             }
@@ -295,7 +313,8 @@ public class ActiveSnapshotManager : IActiveSnapshotManager
             {
                 PluginLog.Warning(
                     $"Could not find a live actor at index {snapshot.ObjectIndex} to revert. Attempting to clear resources regardless.");
-                _ipcManager.PenumbraRemoveTemporaryCollection(snapshot.ObjectIndex);
+                if (snapshot.HasPenumbraCollection)
+                    _ipcManager.PenumbraRemoveTemporaryCollection(snapshot.ObjectIndex);
 
                 if (snapshot.CustomizePlusProfileId.HasValue)
                     _ipcManager.RevertCustomizePlusScale(snapshot.CustomizePlusProfileId.Value);
@@ -321,5 +340,7 @@ public record ActiveSnapshot(
     Guid? CustomizePlusProfileId,
     bool IsOnLocalPlayer,
     string CharacterName,
-    bool IsGlamourerLocked
+    bool IsGlamourerLocked,
+    bool HasPenumbraCollection,
+    bool HasGlamourerState
 );

@@ -73,7 +73,7 @@ public static class SnapshotMigrator
 
             var glamourerHistory = new GlamourerHistory();
             glamourerHistory.Entries.Add(GlamourerHistoryEntry.Create(oldInfo.GlamourerString,
-                "Migrated from old format", newInfo.CurrentFileMapId));
+                "Migrated from old format", newInfo.CurrentFileMapId, oldInfo.CustomizeData));
 
             var customizeHistory = new CustomizeHistory();
             if (!string.IsNullOrEmpty(oldInfo.CustomizeData) && ipcManager.IsCustomizePlusAvailable())

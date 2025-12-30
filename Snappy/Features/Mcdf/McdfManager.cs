@@ -47,8 +47,9 @@ public class McdfManager : IMcdfManager
             var gamePathToHashMap = ExtractAndHashMapFiles(charaFile, reader, paths.FilesDirectory);
 
             var snapshotInfo = CreateSnapshotInfo(charaFile, snapshotDirName, gamePathToHashMap);
-            var glamourerHistory = CreateGlamourerHistory(charaFile, snapshotInfo.CurrentFileMapId);
             var customizeHistory = CreateCustomizeHistory(charaFile, snapshotInfo.CurrentFileMapId);
+            var customizeData = customizeHistory.Entries.LastOrDefault()?.CustomizeData ?? string.Empty;
+            var glamourerHistory = CreateGlamourerHistory(charaFile, snapshotInfo.CurrentFileMapId, customizeData);
 
             _snapshotFileService
                 .SaveSnapshotToDisk(paths.RootPath, snapshotInfo, glamourerHistory, customizeHistory);
@@ -112,11 +113,13 @@ public class McdfManager : IMcdfManager
         return snapshotInfo;
     }
 
-    private static GlamourerHistory CreateGlamourerHistory(McdfHeader charaFile, string? fileMapId)
+    private static GlamourerHistory CreateGlamourerHistory(McdfHeader charaFile, string? fileMapId,
+        string? customizeData)
     {
         var history = new GlamourerHistory();
         history.Entries.Add(
-            GlamourerHistoryEntry.Create(charaFile.CharaFileData.GlamourerData, "Imported from MCDF", fileMapId));
+            GlamourerHistoryEntry.Create(charaFile.CharaFileData.GlamourerData, "Imported from MCDF", fileMapId,
+                customizeData));
         return history;
     }
 

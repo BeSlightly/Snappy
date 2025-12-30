@@ -24,7 +24,8 @@ public class SnapshotApplicationService : ISnapshotApplicationService
         int objIdx,
         string path,
         GlamourerHistoryEntry? glamourerOverride = null,
-        CustomizeHistoryEntry? customizeOverride = null
+        CustomizeHistoryEntry? customizeOverride = null,
+        SnapshotLoadComponents loadComponents = SnapshotLoadComponents.All
     )
     {
         // This method is called from the UI thread, but file I/O should be async.
@@ -59,19 +60,43 @@ public class SnapshotApplicationService : ISnapshotApplicationService
             JsonUtil.DeserializeAsync<CustomizeHistory>(paths.CustomizeHistoryFile).GetResultSafely() ??
             new CustomizeHistory();
 
-        var glamourerToApply = glamourerOverride ?? glamourerHistory.Entries.LastOrDefault();
-        var customizeToApply = customizeOverride ?? customizeHistory.Entries.LastOrDefault();
-        var mapIdToUse = glamourerToApply?.FileMapId ?? customizeToApply?.FileMapId ?? snapshotInfo.CurrentFileMapId;
-        var resolvedFileMap = FileMapUtil.ResolveFileMap(snapshotInfo, mapIdToUse);
+        var applyFiles = loadComponents.HasFlag(SnapshotLoadComponents.Files);
+        var applyGlamourer = loadComponents.HasFlag(SnapshotLoadComponents.Glamourer);
+        var applyCustomize = loadComponents.HasFlag(SnapshotLoadComponents.CustomizePlus);
 
-        if (glamourerToApply == null && customizeToApply == null && !resolvedFileMap.Any())
+        var glamourerToApply = applyGlamourer ? glamourerOverride ?? glamourerHistory.Entries.LastOrDefault() : null;
+        string? customizeDataToApply = null;
+        if (applyCustomize)
+        {
+            if (customizeOverride != null)
+                customizeDataToApply = customizeOverride.CustomizeData;
+            else if (applyGlamourer && glamourerToApply != null && glamourerToApply.CustomizeData != null)
+                customizeDataToApply = glamourerToApply.CustomizeData;
+            else
+                customizeDataToApply = customizeHistory.Entries.LastOrDefault()?.CustomizeData;
+        }
+
+        var resolvedFileMap = new Dictionary<string, string>();
+        if (applyFiles)
+        {
+            var mapIdToUse = glamourerToApply?.FileMapId ?? customizeOverride?.FileMapId ??
+                             snapshotInfo.CurrentFileMapId;
+            resolvedFileMap = FileMapUtil.ResolveFileMap(snapshotInfo, mapIdToUse);
+        }
+
+        var customizePlusAvailable = applyCustomize && _ipcManager.IsCustomizePlusAvailable();
+        var hasAnyData = applyFiles
+                         || (applyGlamourer && glamourerToApply != null &&
+                             !string.IsNullOrEmpty(glamourerToApply.GlamourerString))
+                         || customizePlusAvailable;
+        if (!hasAnyData)
         {
             Notify.Error("Could not load snapshot: No data (files, glamour, C+) to apply.");
             return false;
         }
 
         var moddedPaths = new Dictionary<string, string>();
-        if (resolvedFileMap.Any())
+        if (applyFiles && resolvedFileMap.Any())
         {
             foreach (var (gamePath, hash) in resolvedFileMap)
             {
@@ -84,49 +109,63 @@ public class SnapshotApplicationService : ISnapshotApplicationService
             }
         }
 
-        _ipcManager.PenumbraRemoveTemporaryCollection(characterApplyTo.ObjectIndex);
-        if (moddedPaths.Any() || !string.IsNullOrEmpty(snapshotInfo.ManipulationString))
-            _ipcManager.PenumbraSetTempMods(characterApplyTo, objIdx, moddedPaths, snapshotInfo.ManipulationString);
+        if (applyFiles)
+        {
+            _ipcManager.PenumbraRemoveTemporaryCollection(characterApplyTo.ObjectIndex);
+            if (moddedPaths.Any() || !string.IsNullOrEmpty(snapshotInfo.ManipulationString))
+                _ipcManager.PenumbraSetTempMods(characterApplyTo, objIdx, moddedPaths, snapshotInfo.ManipulationString);
+        }
 
+        var existingSnapshot = _activeSnapshotManager.GetSnapshotForCharacter(characterApplyTo);
         _activeSnapshotManager.RemoveAllSnapshotsForCharacter(characterApplyTo);
         Guid? cplusProfileId = null;
-        var customizePlusAvailable = _ipcManager.IsCustomizePlusAvailable();
-
         if (customizePlusAvailable)
+        {
             _ipcManager.ClearCustomizePlusTemporaryProfile(characterApplyTo.ObjectIndex);
 
-        if (customizePlusAvailable && customizeToApply != null && !string.IsNullOrEmpty(customizeToApply.CustomizeData))
-        {
-            string cplusJson;
-            try
+            if (!string.IsNullOrEmpty(customizeDataToApply))
             {
-                cplusJson = Encoding.UTF8.GetString(Convert.FromBase64String(customizeToApply.CustomizeData));
+                string cplusJson;
+                try
+                {
+                    cplusJson = Encoding.UTF8.GetString(Convert.FromBase64String(customizeDataToApply));
+                }
+                catch
+                {
+                    cplusJson = customizeDataToApply;
+                }
+
+                cplusProfileId = _ipcManager.SetCustomizePlusScale(characterApplyTo.Address, cplusJson);
             }
-            catch
+            else if (isOnLocalPlayer)
             {
-                cplusJson = customizeToApply.CustomizeData;
+                // Apply a temporary empty profile to neutralize local C+ when the snapshot has no C+ data.
+                cplusProfileId = _ipcManager.SetCustomizePlusScale(characterApplyTo.Address,
+                    EmptyCustomizePlusProfileJson);
             }
-
-            cplusProfileId = _ipcManager.SetCustomizePlusScale(characterApplyTo.Address, cplusJson);
-        }
-        else if (customizePlusAvailable && isOnLocalPlayer)
-        {
-            // Apply a temporary empty profile to neutralize local C+ when the snapshot has no C+ data.
-            cplusProfileId = _ipcManager.SetCustomizePlusScale(characterApplyTo.Address,
-                EmptyCustomizePlusProfileJson);
         }
 
-        var isGlamourerLocked = false;
-        if (glamourerToApply != null && !string.IsNullOrEmpty(glamourerToApply.GlamourerString))
+        var appliedGlamourerState = false;
+        if (applyGlamourer && glamourerToApply != null && !string.IsNullOrEmpty(glamourerToApply.GlamourerString))
         {
             _ipcManager.ApplyGlamourerState(glamourerToApply.GlamourerString, characterApplyTo);
-            isGlamourerLocked = true; // Glamourer is locked when we apply a state
+            appliedGlamourerState = true;
         }
 
         _ipcManager.PenumbraRedraw(objIdx);
 
-        _activeSnapshotManager.AddSnapshot(new ActiveSnapshot(characterApplyTo.ObjectIndex, cplusProfileId,
-            isOnLocalPlayer, characterApplyTo.Name.TextValue, isGlamourerLocked));
+        var hasPenumbraCollection = applyFiles || existingSnapshot?.HasPenumbraCollection == true;
+        var hasGlamourerState = appliedGlamourerState || existingSnapshot?.HasGlamourerState == true;
+        var isGlamourerLocked = appliedGlamourerState
+            ? true
+            : existingSnapshot?.IsGlamourerLocked ?? false;
+        var finalCplusProfileId = customizePlusAvailable
+            ? cplusProfileId
+            : existingSnapshot?.CustomizePlusProfileId;
+
+        _activeSnapshotManager.AddSnapshot(new ActiveSnapshot(characterApplyTo.ObjectIndex, finalCplusProfileId,
+            isOnLocalPlayer, characterApplyTo.Name.TextValue, isGlamourerLocked, hasPenumbraCollection,
+            hasGlamourerState));
         PluginLog.Debug(
             $"Snapshot loaded for index {characterApplyTo.ObjectIndex}. 'IsOnLocalPlayer' flag set to: {isOnLocalPlayer}.");
 
