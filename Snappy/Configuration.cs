@@ -2,7 +2,7 @@ using ECommons.Configuration;
 
 namespace Snappy;
 
-public record Configuration
+public class Configuration
 {
     public string WorkingDirectory { get; set; } = string.Empty;
     public bool DisableAutomaticRevert { get; set; }
