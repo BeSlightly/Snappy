@@ -248,8 +248,6 @@ public partial class MainWindow
         {
             ImGui.TableSetupColumn("Left", ImGuiTableColumnFlags.WidthStretch, 0.5f);
             ImGui.TableSetupColumn("Right", ImGuiTableColumnFlags.WidthStretch, 0.5f);
-            ImGui.TableSetupColumn("Left", ImGuiTableColumnFlags.WidthStretch, 0.5f);
-            ImGui.TableSetupColumn("Right", ImGuiTableColumnFlags.WidthStretch, 0.5f);
 
             // Glamourer selector
             ImGui.TableNextColumn();
