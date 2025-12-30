@@ -8,6 +8,8 @@ namespace Snappy.Services;
 
 public class ActorService : IActorService
 {
+    private const int GPoseActorCount = 42;
+
     private readonly IIpcManager _ipcManager;
     private readonly Configuration _configuration;
 
@@ -23,7 +25,7 @@ public class ActorService : IActorService
         {
             var gposeActors = new List<ICharacter>();
             for (var i = ObjectIndex.GPosePlayer.Index;
-                 i < ObjectIndex.GPosePlayer.Index + 42;
+                 i < ObjectIndex.GPosePlayer.Index + GPoseActorCount;
                  ++i)
             {
                 var p = CharacterFactory.Convert(Svc.Objects[i]);

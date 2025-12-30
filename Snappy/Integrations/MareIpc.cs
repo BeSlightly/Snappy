@@ -8,16 +8,22 @@ namespace Snappy.Integrations;
 
 public sealed class MareIpc : IpcSubscriber
 {
-    private const string PluginName = "LightlessSync";
+    private const string LightlessSyncPluginKey = "LightlessSync";
+    private const string SnowcloakPluginKey = "Snowcloak";
+    private const string MareSempiternePluginKey = "MareSempiterne";
+    private const string PlayerSyncDisplayName = "Player Sync";
+    private const string MareSynchronosNamespacePrefix = "MareSynchronos";
+    private const string LightlessHandledAddressesIpc = "LightlessSync.GetHandledAddresses";
+    private const string SnowcloakHandledAddressesIpc = "Snowcloak.GetHandledAddresses";
 
     private bool _isUiOpen;
 
     // Multi-Mare support
     private readonly Dictionary<string, MarePluginInfo> _marePlugins = new()
     {
-        { "LightlessSync", new MarePluginInfo("LightlessSync", "LightlessSync") },
-        { "Snowcloak", new MarePluginInfo("Snowcloak", "Snowcloak") },
-        { "MareSempiterne", new MarePluginInfo("Player Sync", "MareSynchronos") }
+        { LightlessSyncPluginKey, new MarePluginInfo(LightlessSyncPluginKey, LightlessSyncPluginKey) },
+        { SnowcloakPluginKey, new MarePluginInfo(SnowcloakPluginKey, SnowcloakPluginKey) },
+        { MareSempiternePluginKey, new MarePluginInfo(PlayerSyncDisplayName, MareSynchronosNamespacePrefix) }
     };
 
     private class MarePluginInfo
@@ -38,13 +44,13 @@ public sealed class MareIpc : IpcSubscriber
         }
     }
 
-    public MareIpc() : base(PluginName)
+    public MareIpc() : base(LightlessSyncPluginKey)
     {
         // Initialize manual IPC subscribers
         _lightlessSyncHandledAddresses =
-            Svc.PluginInterface.GetIpcSubscriber<List<nint>>("LightlessSync.GetHandledAddresses");
+            Svc.PluginInterface.GetIpcSubscriber<List<nint>>(LightlessHandledAddressesIpc);
         _snowcloakSyncHandledAddresses =
-            Svc.PluginInterface.GetIpcSubscriber<List<nint>>("Snowcloak.GetHandledAddresses");
+            Svc.PluginInterface.GetIpcSubscriber<List<nint>>(SnowcloakHandledAddressesIpc);
     }
 
     // Manual IPC subscribers for different plugins
@@ -130,11 +136,11 @@ public sealed class MareIpc : IpcSubscriber
                 PluginLog.Debug($"Failed to get SnowcloakSync handled addresses: {ex.Message}");
             }
 
-        if (IsPluginActive("MareSempiterne"))
+        if (IsPluginActive(MareSempiternePluginKey))
         {
             try
             {
-                var pluginInfo = _marePlugins["MareSempiterne"];
+                var pluginInfo = _marePlugins[MareSempiternePluginKey];
                 foreach (var addr in GetPlayerSyncAddressesViaPairs(pluginInfo))
                     pairedAddresses.Add(addr);
             }
@@ -167,7 +173,7 @@ public sealed class MareIpc : IpcSubscriber
 
     public bool IsAddressHandledBySnowcloak(nint address)
     {
-        if (!IsPluginActive("Snowcloak")) return false;
+        if (!IsPluginActive(SnowcloakPluginKey)) return false;
 
         try
         {
@@ -191,11 +197,11 @@ public sealed class MareIpc : IpcSubscriber
 
     public bool IsAddressHandledByPlayerSync(nint address)
     {
-        if (!IsPluginActive("MareSempiterne")) return false;
+        if (!IsPluginActive(MareSempiternePluginKey)) return false;
 
         try
         {
-            var pluginInfo = _marePlugins["MareSempiterne"];
+            var pluginInfo = _marePlugins[MareSempiternePluginKey];
             var viaPairs = GetPlayerSyncAddressesViaPairs(pluginInfo);
             if (viaPairs.Contains(address)) return true;
 
