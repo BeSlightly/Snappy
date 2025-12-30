@@ -234,6 +234,12 @@ public partial class MainWindow
         ImGui.BeginGroup();
         DrawPlayerFilter();
 
+        List<ICharacter>? selectableActors = null;
+        List<ICharacter> GetSelectableActors()
+        {
+            return selectableActors ??= _actorService.GetSelectableActors();
+        }
+
         var buttonHeight = ImGui.GetFrameHeight() + ImGui.GetStyle().ItemSpacing.Y;
         var listHeight = ImGui.GetContentRegionAvail().Y - buttonHeight;
 
@@ -247,7 +253,7 @@ public partial class MainWindow
         {
             if (child)
             {
-                var selectableActors = _actorService.GetSelectableActors();
+                var selectableActorsList = GetSelectableActors();
                 var inGpose = PluginUtil.IsInGpose();
 
                 // Create a dictionary to track duplicate names and make them unique
@@ -255,7 +261,7 @@ public partial class MainWindow
                 var nameCount = new Dictionary<string, int>();
 
                 // First pass: count duplicate base names (without GPose suffix)
-                foreach (var actor in selectableActors)
+                foreach (var actor in selectableActorsList)
                 {
                     var baseName = GetActorDisplayName(actor);
                     if (!string.IsNullOrEmpty(baseName))
@@ -263,7 +269,7 @@ public partial class MainWindow
                 }
 
                 // Second pass: create unique labels
-                foreach (var actor in selectableActors)
+                foreach (var actor in selectableActorsList)
                 {
                     var baseName = GetActorDisplayName(actor);
                     if (!string.IsNullOrEmpty(baseName))
@@ -299,7 +305,7 @@ public partial class MainWindow
                 }
 
                 // Draw the actors with unique labels
-                foreach (var actor in selectableActors)
+                foreach (var actor in selectableActorsList)
                     if (actorLabels.TryGetValue(actor, out var label))
                         DrawSelectable(actor, label, actor.ObjectIndex);
             }
@@ -315,8 +321,8 @@ public partial class MainWindow
             else
             {
                 // Try to find the actor again by address in case the reference changed
-                var selectableActors = _actorService.GetSelectableActors();
-                var foundActor = selectableActors.FirstOrDefault(a => a.Address == selectedActorAddress);
+                var selectableActorsList = GetSelectableActors();
+                var foundActor = selectableActorsList.FirstOrDefault(a => a.Address == selectedActorAddress);
                 if (foundActor != null && foundActor.IsValid())
                 {
                     player = foundActor;
