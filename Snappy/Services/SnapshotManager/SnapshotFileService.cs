@@ -98,6 +98,13 @@ public class SnapshotFileService : ISnapshotFileService
 
         var snapshotInfo = await JsonUtil.DeserializeAsync<SnapshotInfo>(paths.SnapshotFile) ??
                            new SnapshotInfo { SourceActor = charaName };
+        snapshotInfo.FileMaps ??= new List<FileMapEntry>();
+
+        // Backfill missing per-map manipulation data for older snapshots.
+        if (snapshotInfo.FileMaps != null && snapshotInfo.FileMaps.Count > 0)
+            foreach (var entry in snapshotInfo.FileMaps)
+                if (entry.ManipulationString == null)
+                    entry.ManipulationString = snapshotInfo.ManipulationString;
 
         // Try to populate SourceWorldId from the live actor if available
         if (resolvedWorldId is > 0)
@@ -131,15 +138,20 @@ public class SnapshotFileService : ISnapshotFileService
         var includeRemovals = !useLiveData || !_configuration.UsePenumbraIpcResourcePaths;
         var mapChanges = FileMapUtil.CalculateChanges(resolvedCurrentMap, incomingFileMap, includeRemovals);
         var fileMapChanged = mapChanges.Any();
-        var currentMapEntry = snapshotInfo.FileMaps.FirstOrDefault(m =>
+        var fileMaps = snapshotInfo.FileMaps ?? new List<FileMapEntry>();
+        snapshotInfo.FileMaps = fileMaps;
+        var currentMapEntry = fileMaps.FirstOrDefault(m =>
             string.Equals(m.Id, snapshotInfo.CurrentFileMapId, StringComparison.OrdinalIgnoreCase));
         var currentManipulation = currentMapEntry?.ManipulationString ?? snapshotInfo.ManipulationString;
         var manipChanged = !string.Equals(currentManipulation, snapshotData.Manipulation, StringComparison.Ordinal);
         var mapChanged = fileMapChanged || manipChanged;
         if (mapChanged)
         {
+            if (currentMapEntry != null && currentMapEntry.ManipulationString == null)
+                currentMapEntry.ManipulationString = currentManipulation;
+
             var newMapId = Guid.NewGuid().ToString("N");
-            snapshotInfo.FileMaps.Add(new FileMapEntry
+            fileMaps.Add(new FileMapEntry
             {
                 Id = newMapId,
                 BaseId = snapshotInfo.CurrentFileMapId,
