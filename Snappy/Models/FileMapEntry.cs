@@ -9,4 +9,5 @@ public record FileMapEntry
     public string? BaseId { get; set; }
     public Dictionary<string, string> Changes { get; set; } = new(StringComparer.OrdinalIgnoreCase);
     public string Timestamp { get; set; } = string.Empty;
+    public string? ManipulationString { get; set; }
 }

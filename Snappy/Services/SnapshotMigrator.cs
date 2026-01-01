@@ -66,7 +66,8 @@ public static class SnapshotMigrator
                     BaseId = null,
                     Changes = new Dictionary<string, string>(newInfo.FileReplacements,
                         StringComparer.OrdinalIgnoreCase),
-                    Timestamp = DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture)
+                    Timestamp = DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture),
+                    ManipulationString = newInfo.ManipulationString
                 });
                 newInfo.CurrentFileMapId = baseId;
             }

@@ -85,11 +85,13 @@ public class SnapshotApplicationService : ISnapshotApplicationService
         }
 
         var resolvedFileMap = new Dictionary<string, string>();
+        var resolvedManipulations = string.Empty;
         if (applyFiles)
         {
             var mapIdToUse = glamourerToApply?.FileMapId ?? customizeOverride?.FileMapId ??
                              snapshotInfo.CurrentFileMapId;
             resolvedFileMap = FileMapUtil.ResolveFileMap(snapshotInfo, mapIdToUse);
+            resolvedManipulations = FileMapUtil.ResolveManipulation(snapshotInfo, mapIdToUse);
         }
 
         var customizePlusAvailable = applyCustomize && _ipcManager.IsCustomizePlusAvailable();
@@ -120,8 +122,8 @@ public class SnapshotApplicationService : ISnapshotApplicationService
         if (applyFiles)
         {
             _ipcManager.PenumbraRemoveTemporaryCollection(characterApplyTo.ObjectIndex);
-            if (moddedPaths.Any() || !string.IsNullOrEmpty(snapshotInfo.ManipulationString))
-                _ipcManager.PenumbraSetTempMods(characterApplyTo, objIdx, moddedPaths, snapshotInfo.ManipulationString);
+            if (moddedPaths.Any() || !string.IsNullOrEmpty(resolvedManipulations))
+                _ipcManager.PenumbraSetTempMods(characterApplyTo, objIdx, moddedPaths, resolvedManipulations);
         }
 
         var existingSnapshot = _activeSnapshotManager.GetSnapshotForCharacter(characterApplyTo);

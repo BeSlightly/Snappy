@@ -17,6 +17,19 @@ public static class FileMapUtil
         return new Dictionary<string, string>(snapshotInfo.FileReplacements, StringComparer.OrdinalIgnoreCase);
     }
 
+    public static string ResolveManipulation(SnapshotInfo snapshotInfo, string? fileMapId)
+    {
+        if (snapshotInfo.FileMaps == null || snapshotInfo.FileMaps.Count == 0 || string.IsNullOrEmpty(fileMapId))
+            return snapshotInfo.ManipulationString ?? string.Empty;
+
+        var entry = snapshotInfo.FileMaps.FirstOrDefault(m =>
+            string.Equals(m.Id, fileMapId, StringComparison.OrdinalIgnoreCase));
+        if (entry?.ManipulationString != null)
+            return entry.ManipulationString;
+
+        return snapshotInfo.ManipulationString ?? string.Empty;
+    }
+
     public static bool TryResolveFileMap(
         SnapshotInfo snapshotInfo,
         string? fileMapId,
@@ -65,7 +78,8 @@ public static class FileMapUtil
             Id = baseId,
             BaseId = null,
             Changes = new Dictionary<string, string>(baseMap, StringComparer.OrdinalIgnoreCase),
-            Timestamp = now.ToString("o", CultureInfo.InvariantCulture)
+            Timestamp = now.ToString("o", CultureInfo.InvariantCulture),
+            ManipulationString = snapshotInfo.ManipulationString
         });
         snapshotInfo.CurrentFileMapId = baseId;
         return baseId;

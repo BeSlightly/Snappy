@@ -130,7 +130,12 @@ public class SnapshotFileService : ISnapshotFileService
         var incomingFileMap = new Dictionary<string, string>(snapshotData.FileReplacements, StringComparer.OrdinalIgnoreCase);
         var includeRemovals = !useLiveData || !_configuration.UsePenumbraIpcResourcePaths;
         var mapChanges = FileMapUtil.CalculateChanges(resolvedCurrentMap, incomingFileMap, includeRemovals);
-        var mapChanged = mapChanges.Any();
+        var fileMapChanged = mapChanges.Any();
+        var currentMapEntry = snapshotInfo.FileMaps.FirstOrDefault(m =>
+            string.Equals(m.Id, snapshotInfo.CurrentFileMapId, StringComparison.OrdinalIgnoreCase));
+        var currentManipulation = currentMapEntry?.ManipulationString ?? snapshotInfo.ManipulationString;
+        var manipChanged = !string.Equals(currentManipulation, snapshotData.Manipulation, StringComparison.Ordinal);
+        var mapChanged = fileMapChanged || manipChanged;
         if (mapChanged)
         {
             var newMapId = Guid.NewGuid().ToString("N");
@@ -139,9 +144,14 @@ public class SnapshotFileService : ISnapshotFileService
                 Id = newMapId,
                 BaseId = snapshotInfo.CurrentFileMapId,
                 Changes = mapChanges,
-                Timestamp = now.ToString("o", CultureInfo.InvariantCulture)
+                Timestamp = now.ToString("o", CultureInfo.InvariantCulture),
+                ManipulationString = snapshotData.Manipulation
             });
             snapshotInfo.CurrentFileMapId = newMapId;
+        }
+        else if (currentMapEntry != null && currentMapEntry.ManipulationString == null)
+        {
+            currentMapEntry.ManipulationString = snapshotData.Manipulation;
         }
 
         resolvedCurrentMap = FileMapUtil.ResolveFileMap(snapshotInfo, snapshotInfo.CurrentFileMapId);

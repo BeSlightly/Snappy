@@ -157,7 +157,8 @@ internal sealed class PcpImportService
                 BaseId = null,
                 Changes = new Dictionary<string, string>(snapshotInfo.FileReplacements,
                     StringComparer.OrdinalIgnoreCase),
-                Timestamp = DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture)
+                Timestamp = DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture),
+                ManipulationString = snapshotInfo.ManipulationString
             });
             snapshotInfo.CurrentFileMapId = baseId;
         }

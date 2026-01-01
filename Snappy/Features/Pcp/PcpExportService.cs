@@ -49,6 +49,7 @@ internal sealed class PcpExportService
             if (!resolvedFileMap.Any())
                 resolvedFileMap = new Dictionary<string, string>(snapshotInfo.FileReplacements,
                     StringComparer.OrdinalIgnoreCase);
+            var resolvedManipulations = FileMapUtil.ResolveManipulation(snapshotInfo, fileMapId);
 
             using var archive = ZipFile.Open(outputPath, ZipArchiveMode.Create);
 
@@ -185,7 +186,7 @@ internal sealed class PcpExportService
 
             // Create mod data and add files
             var modData = new PcpModData();
-            modData.Manipulations = ModPackageBuilder.BuildManipulations(snapshotInfo.ManipulationString);
+            modData.Manipulations = ModPackageBuilder.BuildManipulations(resolvedManipulations);
             ModPackageBuilder.AddSnapshotFiles(archive, snapshotInfo, paths.FilesDirectory, modData.Files,
                 resolvedFileMap);
 

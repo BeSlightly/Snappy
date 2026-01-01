@@ -51,6 +51,8 @@ public class PmpExportManager : IPmpExportManager
             if (!resolvedFileMap.Any())
                 resolvedFileMap = new Dictionary<string, string>(snapshotInfo.FileReplacements,
                     StringComparer.OrdinalIgnoreCase);
+            var resolvedManipulations =
+                FileMapUtil.ResolveManipulation(snapshotInfo, fileMapId ?? snapshotInfo.CurrentFileMapId);
 
             using var fileStream = new FileStream(pmpOutputPath, FileMode.Create, FileAccess.Write, FileShare.None);
             using var archive = new ZipArchive(fileStream, ZipArchiveMode.Create);
@@ -60,7 +62,7 @@ public class PmpExportManager : IPmpExportManager
 
             // Create default_mod.json entry
             var modData = new PmpDefaultMod();
-            modData.Manipulations = ModPackageBuilder.BuildManipulations(snapshotInfo.ManipulationString);
+            modData.Manipulations = ModPackageBuilder.BuildManipulations(resolvedManipulations);
             ModPackageBuilder.AddSnapshotFiles(archive, snapshotInfo, paths.FilesDirectory, modData.Files,
                 resolvedFileMap);
 
