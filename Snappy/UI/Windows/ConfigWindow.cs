@@ -148,6 +148,7 @@ public sealed class ConfigWindow : Window
 
             var icon = isAvailable ? FontAwesomeIcon.Check : FontAwesomeIcon.Times;
             var iconColor = isAvailable ? ImGuiColors.HealerGreen : ImGuiColors.DalamudRed;
+            var hasForkColor = TryGetMareForkColor(pluginName, out var forkColor);
 
             using (ImRaii.PushFont(UiBuilder.IconFont))
             {
@@ -157,11 +158,34 @@ public sealed class ConfigWindow : Window
 
             ImGui.SameLine();
 
-            using var textColor = ImRaii.PushColor(ImGuiCol.Text,
-                isAvailable ? ImGui.GetColorU32(ImGuiCol.Text) : ImGui.GetColorU32(ImGuiCol.TextDisabled));
+            var fallbackColor = ImGui.ColorConvertU32ToFloat4(
+                ImGui.GetColorU32(isAvailable ? ImGuiCol.Text : ImGuiCol.TextDisabled));
+            var textColor = hasForkColor
+                ? new Vector4(forkColor.X, forkColor.Y, forkColor.Z, isAvailable ? forkColor.W : 0.4f)
+                : fallbackColor;
+            using var textColorScope = ImRaii.PushColor(ImGuiCol.Text, textColor);
             ImUtf8.Text(displayName);
         }
 
         ImGui.Unindent();
+    }
+
+    private static bool TryGetMareForkColor(string pluginName, out Vector4 color)
+    {
+        switch (pluginName)
+        {
+            case "Snowcloak":
+                color = new Vector4(0.4275f, 0.6863f, 1f, 1f);
+                return true;
+            case "LightlessSync":
+                color = new Vector4(0.6784f, 0.5412f, 0.9608f, 1f);
+                return true;
+            case "MareSempiterne":
+                color = new Vector4(0.4745f, 0.8392f, 0.7569f, 1f);
+                return true;
+            default:
+                color = default;
+                return false;
+        }
     }
 }
