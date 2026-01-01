@@ -28,6 +28,16 @@ public class SnapshotFileService : ISnapshotFileService
         _snapshotIndexService = snapshotIndexService;
     }
 
+    private static string BuildDefaultSnapshotPath(string workingDirectory, string charaName, int? worldId,
+        string? worldName)
+    {
+        if (!string.IsNullOrWhiteSpace(worldName))
+            return Path.Combine(workingDirectory, $"{charaName}@{worldName}");
+        if (worldId is > 0)
+            return Path.Combine(workingDirectory, $"{charaName}@{worldId}");
+        return Path.Combine(workingDirectory, charaName);
+    }
+
     public async Task<string?> UpdateSnapshotAsync(ICharacter character, bool isLocalPlayer,
         Dictionary<string, HashSet<string>>? penumbraReplacements)
     {
@@ -55,8 +65,30 @@ public class SnapshotFileService : ISnapshotFileService
         if (snapshotData == null) return null;
 
         var charaName = character.Name.TextValue;
+        int? resolvedWorldId = null;
+        string? resolvedWorldName = null;
+        try
+        {
+            if (character is Dalamud.Game.ClientState.Objects.SubKinds.IPlayerCharacter pc)
+            {
+                var worldId = (int)pc.HomeWorld.RowId;
+                if (worldId > 0)
+                {
+                    resolvedWorldId = worldId;
+                    if (Snappy.WorldNames.TryGetValue((uint)worldId, out var worldName))
+                        resolvedWorldName = worldName;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            PluginLog.Verbose(
+                $"Failed to resolve HomeWorld for {charaName}: {ex.Message}");
+        }
+
         var snapshotPath = _snapshotIndexService.FindSnapshotPathForActor(character) ??
-                           Path.Combine(_configuration.WorkingDirectory, charaName);
+                           BuildDefaultSnapshotPath(_configuration.WorkingDirectory, charaName, resolvedWorldId,
+                               resolvedWorldName);
 
         var paths = SnapshotPaths.From(snapshotPath);
         Directory.CreateDirectory(paths.RootPath);
@@ -68,21 +100,15 @@ public class SnapshotFileService : ISnapshotFileService
                            new SnapshotInfo { SourceActor = charaName };
 
         // Try to populate SourceWorldId from the live actor if available
-        if (snapshotInfo.SourceWorldId == null || snapshotInfo.SourceWorldId <= 0)
-            try
-            {
-                if (character is Dalamud.Game.ClientState.Objects.SubKinds.IPlayerCharacter pc)
-                {
-                    var worldId = (int)pc.HomeWorld.RowId;
-                    if (worldId > 0)
-                        snapshotInfo.SourceWorldId = worldId;
-                }
-            }
-            catch (Exception ex)
-            {
-                PluginLog.Verbose(
-                    $"Failed to resolve HomeWorld for {character.Name.TextValue}: {ex.Message}");
-            }
+        if (resolvedWorldId is > 0)
+        {
+            if (snapshotInfo.SourceWorldId == null || snapshotInfo.SourceWorldId <= 0
+                                                    || snapshotInfo.SourceWorldId != resolvedWorldId)
+                snapshotInfo.SourceWorldId = resolvedWorldId;
+            if (!string.IsNullOrWhiteSpace(resolvedWorldName)
+                && !string.Equals(snapshotInfo.SourceWorldName, resolvedWorldName, StringComparison.Ordinal))
+                snapshotInfo.SourceWorldName = resolvedWorldName;
+        }
 
         var glamourerHistory = await JsonUtil.DeserializeAsync<GlamourerHistory>(paths.GlamourerHistoryFile) ??
                                new GlamourerHistory();
