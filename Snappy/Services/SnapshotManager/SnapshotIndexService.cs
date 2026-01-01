@@ -7,7 +7,10 @@ namespace Snappy.Services.SnapshotManager;
 public class SnapshotIndexService : ISnapshotIndexService
 {
     private readonly Configuration _configuration;
-    private readonly Dictionary<string, string> _snapshotIndex = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, List<SnapshotIndexEntry>> _snapshotIndex =
+        new(StringComparer.OrdinalIgnoreCase);
+
+    private sealed record SnapshotIndexEntry(string Path, int? WorldId, string? WorldName, string SourceActor);
 
     public SnapshotIndexService(Configuration configuration)
     {
@@ -96,15 +99,14 @@ public class SnapshotIndexService : ISnapshotIndexService
                                  && int.TryParse(sourceWorldIdToken.Value<string>(), out var parsedWorldId))
                             worldId = parsedWorldId;
 
-                        string key;
-                        if (worldId is > 0)
-                            key = BuildWorldIdKey(baseName, worldId.Value);
-                        else if (!string.IsNullOrWhiteSpace(worldName))
-                            key = BuildWorldNameKey(baseName, worldName);
-                        else
-                            key = actorName;
+                        var entry = new SnapshotIndexEntry(dir, worldId, worldName, actorName);
+                        if (!_snapshotIndex.TryGetValue(baseName, out var entries))
+                        {
+                            entries = new List<SnapshotIndexEntry>();
+                            _snapshotIndex[baseName] = entries;
+                        }
 
-                        _snapshotIndex[key] = dir;
+                        entries.Add(entry);
                     }
                 }
                 catch (Exception ex)
@@ -119,7 +121,9 @@ public class SnapshotIndexService : ISnapshotIndexService
             PluginLog.Error($"An error occurred while building snapshot index: {ex.Message}");
         }
 
-        PluginLog.Debug($"Snapshot index refreshed. Found {_snapshotIndex.Count} entries.");
+        var totalEntries = _snapshotIndex.Values.Sum(list => list.Count);
+        PluginLog.Debug(
+            $"Snapshot index refreshed. Found {totalEntries} snapshots across {_snapshotIndex.Count} actor keys.");
     }
 
     public string? FindSnapshotPathForActor(ICharacter character)
@@ -128,21 +132,25 @@ public class SnapshotIndexService : ISnapshotIndexService
             return null;
 
         var actorName = character.Name.TextValue;
+        var (baseName, _) = SplitActorName(actorName);
+        if (!_snapshotIndex.TryGetValue(baseName, out var entries) || entries.Count == 0)
+            return null;
+
         if (TryGetWorldId(character, out var worldId))
         {
-            var worldIdKey = BuildWorldIdKey(actorName, worldId);
-            if (_snapshotIndex.TryGetValue(worldIdKey, out var path))
-                return path;
+            var byWorldId = entries.FirstOrDefault(e => e.WorldId == worldId);
+            if (byWorldId != null)
+                return byWorldId.Path;
 
             if (Snappy.WorldNames.TryGetValue((uint)worldId, out var worldName))
             {
-                var worldNameKey = BuildWorldNameKey(actorName, worldName);
-                if (_snapshotIndex.TryGetValue(worldNameKey, out path))
-                    return path;
+                var byWorldName = entries.FirstOrDefault(e =>
+                    string.Equals(e.WorldName, worldName, StringComparison.OrdinalIgnoreCase));
+                if (byWorldName != null)
+                    return byWorldName.Path;
             }
         }
 
-        _snapshotIndex.TryGetValue(actorName, out var fallbackPath);
-        return fallbackPath;
+        return entries.Count == 1 ? entries[0].Path : null;
     }
 }
