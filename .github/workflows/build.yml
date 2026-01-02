@@ -14,6 +14,14 @@ on:
         required: false
         type: boolean
         default: false
+      dalamud_branch:
+        description: "Dalamud Branch to build against"
+        required: true
+        type: choice
+        default: 'stg'
+        options:
+          - stg
+          - stable
 
 permissions:
   contents: write
@@ -29,13 +37,24 @@ jobs:
           submodules: recursive
           fetch-depth: 0
 
-      - name: Setup .NET SDK 10
+      - name: Setup .NET SDK
         uses: actions/setup-dotnet@v5
         with:
           dotnet-version: "10.0.x"
 
       - name: Download Dalamud Stubs
-        run: Invoke-WebRequest -Uri https://goatcorp.github.io/dalamud-distrib/stg/latest.zip -OutFile latest.zip; Expand-Archive -Force latest.zip "$env:AppData\XIVLauncher\addon\Hooks\dev"
+        run: |
+          $branch = "${{ github.event.inputs.dalamud_branch }}"
+          $url = "https://goatcorp.github.io/dalamud-distrib/latest.zip"
+          
+          if ($branch -eq "stg") {
+            $url = "https://goatcorp.github.io/dalamud-distrib/stg/latest.zip"
+          }
+          
+          Write-Host "Downloading Dalamud stubs ($branch) from: $url"
+          
+          Invoke-WebRequest -Uri $url -OutFile latest.zip
+          Expand-Archive -Force latest.zip "$env:AppData\XIVLauncher\addon\Hooks\dev"
         shell: pwsh
 
       - name: Build Plugin and Package
@@ -44,19 +63,53 @@ jobs:
 
       - name: Update repo.json
         id: prep
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $releaseTag = "${{ github.event.inputs.tag }}"
           $isPrerelease = "${{ github.event.inputs.prerelease }}" -eq "true"
           echo "Processing release for tag: $releaseTag (Pre-release: $isPrerelease)"
           
+          # 1. Get Version
           $version = (Select-Xml -Path Snappy/Snappy.csproj -XPath "/Project/PropertyGroup/Version").Node.InnerText
           echo "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
           
+          # 2. Load repo.json
           $repoJsonPath = "./repo.json"
           $repoJson = Get-Content -Path $repoJsonPath -Raw | ConvertFrom-Json
           if ($repoJson -isnot [System.Array]) { $repoJson = @($repoJson) }
           
+          # 3. Calculate Total Downloads from GitHub API
+          $totalDownloads = 0
+          $page = 1
+          $repoName = "${{ github.repository }}"
+          $headers = @{ "Authorization" = "token $env:GITHUB_TOKEN" }
+          
+          Write-Host "Fetching download counts from GitHub API..."
+          do {
+              $uri = "https://api.github.com/repos/$repoName/releases?per_page=100&page=$page"
+              try {
+                  $releases = Invoke-RestMethod -Uri $uri -Headers $headers -Method Get
+                  if ($null -eq $releases -or $releases.Count -eq 0) { break }
+                  
+                  foreach ($release in $releases) {
+                      foreach ($asset in $release.assets) {
+                          $totalDownloads += $asset.download_count
+                      }
+                  }
+                  $count = $releases.Count
+              } catch {
+                  Write-Host "Error fetching releases: $_"
+                  $count = 0
+              }
+              $page++
+          } while ($count -eq 100)
+          
+          Write-Host "Total Downloads Calculated: $totalDownloads"
+
+          # 4. Update JSON Data
           $repoJson[0].LastUpdate = [int64](([datetimeoffset](Get-Date)).ToUnixTimeSeconds())
+          $repoJson[0].DownloadCount = $totalDownloads
           $downloadLink = "https://github.com/${{ github.repository }}/releases/download/$releaseTag/latest.zip"
 
           if ($isPrerelease) {
@@ -68,6 +121,7 @@ jobs:
             $repoJson[0].DownloadLinkUpdate = $downloadLink
           }
           
+          # 5. Save JSON
           $jsonOutput = ConvertTo-Json $repoJson -Depth 5 -Compress:$false
           $jsonOutput | Set-Content -Path $repoJsonPath -Encoding UTF8
         shell: pwsh
@@ -92,10 +146,11 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.event.inputs.tag }}
-          name: Release ${{ github.event.inputs.tag }}
+          name: ${{ github.event.repository.name }} ${{ github.event.inputs.tag }}
           body: ${{ steps.changelog.outputs.logs }}
           prerelease: ${{ github.event.inputs.prerelease }}
           files: Snappy/bin/Release/Snappy/latest.zip
+          make_latest: ${{ github.event.inputs.prerelease == 'false' }}
 
       - name: Commit and Push Updated repo.json
         run: |
