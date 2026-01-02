@@ -1,4 +1,5 @@
 using ECommons.GameHelpers;
+using Snappy.Common.Utilities;
 
 namespace Snappy.UI.Windows;
 
@@ -114,28 +115,32 @@ public partial class MainWindow
                     {
                         string displayName;
 
+                        var isLocalPlayer = Player.Object != null && actor.Address == Player.Object.Address;
+                        var isOwnedPet = ActorOwnershipUtil.IsSelfOwnedPet(actor);
+                        var youSuffix = (isLocalPlayer || isOwnedPet) ? " (You)" : string.Empty;
+
                         if (nameCount[baseName] > 1)
                         {
                             if (inGpose)
                             {
                                 // GPose actors: use ObjectIndex for disambiguation
-                                displayName = $"{baseName} (GPose {actor.ObjectIndex})";
+                                displayName = $"{baseName} (GPose {actor.ObjectIndex}){youSuffix}";
                             }
                             else
                             {
                                 // Regular players: try to use HomeWorld, fallback to ObjectIndex
                                 var nameWithWorld = GetActorDisplayNameWithWorld(actor);
                                 if (nameWithWorld != baseName)
-                                    displayName = nameWithWorld;
+                                    displayName = $"{nameWithWorld}{youSuffix}";
                                 else
                                     // HomeWorld not available, use ObjectIndex
-                                    displayName = $"{baseName} ({actor.ObjectIndex})";
+                                    displayName = $"{baseName} ({actor.ObjectIndex}){youSuffix}";
                             }
                         }
                         else
                         {
                             // Unique name - use simple format
-                            displayName = inGpose ? $"{baseName} (GPose)" : baseName;
+                            displayName = inGpose ? $"{baseName} (GPose){youSuffix}" : $"{baseName}{youSuffix}";
                         }
 
                         actorLabels[actor] = displayName;

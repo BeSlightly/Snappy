@@ -1,5 +1,6 @@
 using Dalamud.Game.ClientState.Objects.SubKinds;
 using ECommons.GameHelpers;
+using Snappy.Common.Utilities;
 
 namespace Snappy.UI.Windows;
 
@@ -50,10 +51,12 @@ public partial class MainWindow
         else
         {
             var isLocalPlayer = _player.ObjectIndex == Player.Object?.ObjectIndex;
+            var allowOutside = _snappy.Configuration.AllowOutsideGpose;
+            var allowOwnedPets = allowOutside && _snappy.Configuration.AllowOutsideGposeOwnedPets;
+            var isOwnedPet = allowOwnedPets && ActorOwnershipUtil.IsSelfOwnedPet(_player);
             _isActorModifiable =
-                isLocalPlayer
-                && _snappy.Configuration.DisableAutomaticRevert
-                && _snappy.Configuration.AllowOutsideGpose;
+                _snappy.Configuration.DisableAutomaticRevert
+                && ((isLocalPlayer && allowOutside) || isOwnedPet);
         }
 
         // --- Update snapshottable state ---

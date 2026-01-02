@@ -2,6 +2,7 @@ using Dalamud.Game.ClientState.Objects.SubKinds;
 using ECommons.GameHelpers;
 using ECommons.Reflection;
 using Snappy.Common;
+using Snappy.Common.Utilities;
 using Penumbra.GameData.Structs;
 
 namespace Snappy.Services;
@@ -42,7 +43,9 @@ public class ActorService : IActorService
             .OfType<IPlayerCharacter>()
             .Where(p => p.IsValid());
 
-        IEnumerable<IPlayerCharacter> selectableActors = localPlayer.UnionBy(marePlayers, p => p.Address);
+        IEnumerable<ICharacter> selectableActors = localPlayer
+            .Cast<ICharacter>()
+            .UnionBy(marePlayers.Cast<ICharacter>(), p => p.Address);
 
         if (_configuration.UseLiveSnapshotData && _configuration.IncludeVisibleTempCollectionActors)
         {
@@ -54,8 +57,20 @@ public class ActorService : IActorService
             selectableActors = selectableActors.UnionBy(tempCollectionActors, p => p.Address);
         }
 
+        if (_configuration.AllowOutsideGpose && _configuration.AllowOutsideGposeOwnedPets)
+        {
+            var ownedPets = Svc.Objects
+                .OfType<ICharacter>()
+                .Where(c => c.IsValid() && ActorOwnershipUtil.IsSelfOwnedPet(c));
+
+            selectableActors = selectableActors.UnionBy(ownedPets, p => p.Address);
+        }
+
+        var localAddress = Player.Object?.Address ?? IntPtr.Zero;
+        var allowOwnedPets = _configuration.AllowOutsideGpose && _configuration.AllowOutsideGposeOwnedPets;
+
         return selectableActors
-            .OrderBy(p => p.Address != (Player.Object?.Address ?? IntPtr.Zero))
+            .OrderBy(p => GetActorSortKey(p, localAddress, allowOwnedPets))
             .ThenBy(p => p.Name.ToString(), StringComparer.OrdinalIgnoreCase)
             .Select(p => (ICharacter)p)
             .ToList();
@@ -70,5 +85,14 @@ public class ActorService : IActorService
         if (targetableObj is bool isTargetable) return isTargetable;
 
         return true;
+    }
+
+    private static int GetActorSortKey(ICharacter actor, IntPtr localAddress, bool allowOwnedPets)
+    {
+        if (actor.Address == localAddress)
+            return 0;
+        if (allowOwnedPets && ActorOwnershipUtil.IsSelfOwnedPet(actor))
+            return 1;
+        return 2;
     }
 }

@@ -23,7 +23,7 @@ public sealed class ConfigWindow : Window
     {
         SizeConstraints = new WindowSizeConstraints
         {
-            MinimumSize = new Vector2(380, 260) * ImGuiHelpers.GlobalScale,
+            MinimumSize = new Vector2(380, 290) * ImGuiHelpers.GlobalScale,
             MaximumSize = new Vector2(float.MaxValue, float.MaxValue)
         };
 
@@ -60,6 +60,19 @@ public sealed class ConfigWindow : Window
                 _configuration.AllowOutsideGpose = allowOutside;
                 _configuration.Save();
             }
+
+            ImGui.Indent();
+            using (var d2 = ImRaii.Disabled(!allowOutside))
+            {
+                var allowOwnedPets = _configuration.AllowOutsideGposeOwnedPets;
+                if (ImUtf8.Checkbox("Allow loading to your own pets outside of GPose", ref allowOwnedPets))
+                {
+                    _configuration.AllowOutsideGposeOwnedPets = allowOwnedPets;
+                    _configuration.Save();
+                }
+                ImUtf8.HoverTooltip("Also shows your pets in the actor list.");
+            }
+            ImGui.Unindent();
         }
 
         ImGui.Unindent();
