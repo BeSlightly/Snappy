@@ -78,6 +78,7 @@ public sealed partial class Snappy : IDalamudPlugin
         Svc.PluginInterface.UiBuilder.OpenConfigUi += DrawConfigUI;
         Svc.PluginInterface.UiBuilder.DisableGposeUiHide = true;
         Svc.PluginInterface.UiBuilder.OpenMainUi += ToggleMainUI;
+        Svc.ClientState.Logout += OnLogout;
     }
 
     public string Name => "Snappy";
@@ -113,9 +114,17 @@ public sealed partial class Snappy : IDalamudPlugin
         MainWindow.Dispose();
         GPoseService.Dispose();
         IpcManager.Dispose(); // Dispose IpcManager to clean up plugin tracking
+        Svc.ClientState.Logout -= OnLogout;
         Svc.PluginInterface.UiBuilder.Draw -= DrawUI;
         Svc.PluginInterface.UiBuilder.OpenConfigUi -= DrawConfigUI;
         Svc.PluginInterface.UiBuilder.OpenMainUi -= ToggleMainUI;
         ECommonsMain.Dispose();
+    }
+
+    private void OnLogout(int type, int code)
+    {
+        if (ActiveSnapshotManager.HasActiveSnapshots)
+            ActiveSnapshotManager.RevertAllSnapshots();
+        MainWindow.ClearActorSelection();
     }
 }
