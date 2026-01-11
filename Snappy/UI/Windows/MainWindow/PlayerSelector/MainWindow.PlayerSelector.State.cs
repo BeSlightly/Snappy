@@ -12,15 +12,46 @@ public partial class MainWindow
     private bool _snapshotExistsForActor;
     private string _currentLabel = string.Empty;
     private int? _objIdxSelected;
-    private ICharacter? _player;
     private nint? _selectedActorAddress;
 
     private string _playerFilter = string.Empty;
     private string _playerFilterLower = string.Empty;
 
+    private bool TryGetSelectedActor(out ICharacter actor)
+    {
+        actor = null!;
+        if (_objIdxSelected == null && _selectedActorAddress == null)
+            return false;
+
+        if (_selectedActorAddress != null)
+        {
+            var byAddress = Svc.Objects.FirstOrDefault(obj => obj.Address == _selectedActorAddress.Value);
+            if (byAddress is ICharacter addressCharacter && addressCharacter.IsValid())
+            {
+                _objIdxSelected = addressCharacter.ObjectIndex;
+                _selectedActorAddress = addressCharacter.Address;
+                actor = addressCharacter;
+                return true;
+            }
+        }
+
+        if (_objIdxSelected != null)
+        {
+            var byIndex = Svc.Objects[_objIdxSelected.Value];
+            if (byIndex is ICharacter indexCharacter && indexCharacter.IsValid())
+            {
+                _objIdxSelected = indexCharacter.ObjectIndex;
+                _selectedActorAddress = indexCharacter.Address;
+                actor = indexCharacter;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private void ClearSelectedActorState()
     {
-        _player = null;
         _currentLabel = string.Empty;
         _objIdxSelected = null;
         _selectedActorAddress = null;
@@ -33,14 +64,14 @@ public partial class MainWindow
 
     private void UpdateSelectedActorState()
     {
-        if (_player == null || _objIdxSelected == null)
+        if (!TryGetSelectedActor(out var actor))
         {
             ClearSelectedActorState();
             return;
         }
 
         // Don't clear state if actor becomes temporarily invalid - this can happen during transitions
-        if (!_player.IsValid()) return;
+        if (!actor.IsValid()) return;
 
         // --- Update modifiable state ---
         var inGpose = PluginUtil.IsInGpose();
@@ -50,10 +81,10 @@ public partial class MainWindow
         }
         else
         {
-            var isLocalPlayer = _player.ObjectIndex == Player.Object?.ObjectIndex;
+            var isLocalPlayer = actor.ObjectIndex == Player.Object?.ObjectIndex;
             var allowOutside = _snappy.Configuration.AllowOutsideGpose;
             var allowOwnedPets = allowOutside && _snappy.Configuration.AllowOutsideGposeOwnedPets;
-            var isOwnedPet = allowOwnedPets && ActorOwnershipUtil.IsSelfOwnedPet(_player);
+            var isOwnedPet = allowOwnedPets && ActorOwnershipUtil.IsSelfOwnedPet(actor);
             _isActorModifiable =
                 _snappy.Configuration.DisableAutomaticRevert
                 && ((isLocalPlayer && allowOutside) || isOwnedPet);
@@ -61,7 +92,7 @@ public partial class MainWindow
 
         // --- Update snapshottable state ---
         _snapshotExistsForActor =
-            _snapshotIndexService.FindSnapshotPathForActor(_player) != null;
+            _snapshotIndexService.FindSnapshotPathForActor(actor) != null;
 
         if (inGpose)
         {
@@ -69,18 +100,18 @@ public partial class MainWindow
         }
         else
         {
-            var isSelf = Player.Object != null && _player.Address == Player.Object.Address;
-            var isMarePaired = _ipcManager.IsMarePairedAddress(_player.Address);
+            var isSelf = Player.Object != null && actor.Address == Player.Object.Address;
+            var isMarePaired = _ipcManager.IsMarePairedAddress(actor.Address);
             var includeTempActors = _snappy.Configuration.UseLiveSnapshotData
                                     && _snappy.Configuration.IncludeVisibleTempCollectionActors;
             var hasTempCollection = includeTempActors &&
-                                    _ipcManager.PenumbraHasTemporaryCollection(_player.ObjectIndex);
+                                    _ipcManager.PenumbraHasTemporaryCollection(actor.ObjectIndex);
 
             _isActorSnapshottable = isSelf || isMarePaired || hasTempCollection;
         }
 
         // --- Update lock state ---
-        _isActorLockedBySnappy = _activeSnapshotManager.IsActorLockedBySnappy(_player);
+        _isActorLockedBySnappy = _activeSnapshotManager.IsActorLockedBySnappy(actor);
     }
 
     private string GetActorDisplayName(ICharacter actor)
@@ -119,9 +150,10 @@ public partial class MainWindow
 
     private (string Text, string Tooltip, bool IsDisabled) GetSnapshotButtonState()
     {
-        if (_player == null) return ("Save Snapshot", "Select an actor to save or update its snapshot.", true);
+        if (!TryGetSelectedActor(out var actor))
+            return ("Save Snapshot", "Select an actor to save or update its snapshot.", true);
 
-        var displayName = GetActorDisplayName(_player);
+        var displayName = GetActorDisplayName(actor);
 
         if (PluginUtil.IsInGpose())
         {
@@ -156,16 +188,16 @@ public partial class MainWindow
 
     private (FontAwesomeIcon Icon, string Tooltip, bool IsDisabled) GetLockButtonState()
     {
-        if (_player == null || _objIdxSelected == null)
+        if (!TryGetSelectedActor(out var actor) || _objIdxSelected == null)
             return (FontAwesomeIcon.Lock, "Select an actor to manage its lock state.", true);
 
         if (!_isActorLockedBySnappy) return (FontAwesomeIcon.Unlock, "This actor is not locked by Snappy.", true);
 
-        var isLocked = _activeSnapshotManager.IsActorGlamourerLocked(_player);
+        var isLocked = _activeSnapshotManager.IsActorGlamourerLocked(actor);
         if (isLocked)
             return (FontAwesomeIcon.Lock,
-                $"Unlock {GetActorDisplayName(_player)} (click to unlock Glamourer state only)", false);
-        return (FontAwesomeIcon.Unlock, $"Lock {GetActorDisplayName(_player)} (click to lock Glamourer state)",
+                $"Unlock {GetActorDisplayName(actor)} (click to unlock Glamourer state only)", false);
+        return (FontAwesomeIcon.Unlock, $"Lock {GetActorDisplayName(actor)} (click to lock Glamourer state)",
             false);
     }
 }

@@ -10,7 +10,8 @@ public partial class MainWindow
         LoadSnapshots();
         if (_selectedSnapshot != null && Directory.Exists(_selectedSnapshot.FullName))
             _snappy.ExecuteBackgroundTask(LoadHistoryForSelectedSnapshotAsync);
-        if (_player != null) UpdateSelectedActorState();
+        if (_objIdxSelected != null || _selectedActorAddress != null)
+            UpdateSelectedActorState();
     }
 
     private void OnSnapshotSelectionChanged(

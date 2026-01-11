@@ -102,13 +102,13 @@ public partial class MainWindow
         )
         {
             var selectedSnapshot = _selectedSnapshot;
-            if (_player != null && _objIdxSelected != null && selectedSnapshot != null)
+            if (TryGetSelectedActor(out var selectedActor) && _objIdxSelected != null && selectedSnapshot != null)
             {
                 var loadComponents = entry is CustomizeHistoryEntry
                     ? SnapshotLoadComponents.CustomizePlus
                     : SnapshotLoadComponents.All;
                 _snapshotApplicationService.LoadSnapshot(
-                    _player,
+                    selectedActor,
                     _objIdxSelected.Value,
                     selectedSnapshot.FullName,
                     entry as GlamourerHistoryEntry,

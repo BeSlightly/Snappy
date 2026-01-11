@@ -61,7 +61,6 @@ public partial class MainWindow
         }
 
         _currentLabel = label;
-        _player = selectablePlayer;
         _objIdxSelected = objIdx;
         _selectedActorAddress = selectablePlayer.Address;
         UpdateSelectedActorState();
@@ -154,31 +153,8 @@ public partial class MainWindow
             }
         }
 
-        if (_player != null && _objIdxSelected != null && _selectedActorAddress != null)
-        {
-            // Verify the selected actor is still valid and matches our stored address
-            if (_player.IsValid() && _player.Address == _selectedActorAddress)
-            {
-                UpdateSelectedActorState();
-            }
-            else
-            {
-                // Try to find the actor again by address in case the reference changed
-                var selectableActorsList = GetSelectableActors();
-                var foundActor = selectableActorsList.FirstOrDefault(a => a.Address == _selectedActorAddress);
-                if (foundActor != null && foundActor.IsValid())
-                {
-                    _player = foundActor;
-                    _objIdxSelected = foundActor.ObjectIndex;
-                    UpdateSelectedActorState();
-                }
-                else
-                {
-                    // Actor no longer exists, clear selection
-                    ClearSelectedActorState();
-                }
-            }
-        }
+        if (_objIdxSelected != null || _selectedActorAddress != null)
+            UpdateSelectedActorState();
 
         var (buttonText, tooltipText, isButtonDisabled) = GetSnapshotButtonState();
         var (lockIcon, lockTooltip, isLockDisabled) = GetLockButtonState();
@@ -197,13 +173,13 @@ public partial class MainWindow
             )
         )
         {
-            if (_player == null)
+            if (!TryGetSelectedActor(out var selectedActor))
             {
                 ClearSelectedActorState();
             }
             else
             {
-                var charToSnap = _player;
+                var charToSnap = selectedActor;
                 var isLocalPlayer = Player.Object != null && charToSnap.Address == Player.Object.Address;
                 Dictionary<string, HashSet<string>>? penumbraReplacements = null;
                 var useLiveData = _snappy.Configuration.UseLiveSnapshotData || isLocalPlayer;
@@ -228,13 +204,13 @@ public partial class MainWindow
             using (var font = ImRaii.PushFont(UiBuilder.IconFont))
             {
         if (ImUtf8.Button(lockIcon.ToIconString(), lockButtonSize))
-                    if (_isActorLockedBySnappy && _player != null)
+                    if (_isActorLockedBySnappy && TryGetSelectedActor(out var selectedActor))
                     {
-                        var isCurrentlyLocked = _activeSnapshotManager.IsActorGlamourerLocked(_player);
+                        var isCurrentlyLocked = _activeSnapshotManager.IsActorGlamourerLocked(selectedActor);
                         if (isCurrentlyLocked)
-                            _activeSnapshotManager.UnlockActorGlamourer(_player);
+                            _activeSnapshotManager.UnlockActorGlamourer(selectedActor);
                         else
-                            _activeSnapshotManager.LockActorGlamourer(_player);
+                            _activeSnapshotManager.LockActorGlamourer(selectedActor);
                     }
             }
         }
