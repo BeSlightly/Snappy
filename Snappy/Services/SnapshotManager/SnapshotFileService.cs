@@ -49,21 +49,6 @@ public class SnapshotFileService : ISnapshotFileService
             return null;
         }
 
-        var useLiveData = _configuration.UseLiveSnapshotData || isLocalPlayer;
-        SnapshotData? snapshotData;
-        if (useLiveData)
-        {
-            snapshotData = _configuration.UsePenumbraIpcResourcePaths
-                ? await _liveSnapshotDataBuilder.BuildAsync(character, penumbraReplacements)
-                : await _collectionSnapshotDataBuilder.BuildAsync(character);
-        }
-        else
-        {
-            snapshotData = _mareSnapshotDataBuilder.BuildFromMare(character);
-        }
-
-        if (snapshotData == null) return null;
-
         var charaName = character.Name.TextValue;
         int? resolvedWorldId = null;
         string? resolvedWorldName = null;
@@ -89,6 +74,21 @@ public class SnapshotFileService : ISnapshotFileService
         var snapshotPath = _snapshotIndexService.FindSnapshotPathForActor(character) ??
                            BuildDefaultSnapshotPath(_configuration.WorkingDirectory, charaName, resolvedWorldId,
                                resolvedWorldName);
+
+        var useLiveData = _configuration.UseLiveSnapshotData || isLocalPlayer;
+        SnapshotData? snapshotData;
+        if (useLiveData)
+        {
+            snapshotData = _configuration.UsePenumbraIpcResourcePaths
+                ? await _liveSnapshotDataBuilder.BuildAsync(character, penumbraReplacements)
+                : await _collectionSnapshotDataBuilder.BuildAsync(character);
+        }
+        else
+        {
+            snapshotData = _mareSnapshotDataBuilder.BuildFromMare(character);
+        }
+
+        if (snapshotData == null) return null;
 
         var paths = SnapshotPaths.From(snapshotPath);
         Directory.CreateDirectory(paths.RootPath);
