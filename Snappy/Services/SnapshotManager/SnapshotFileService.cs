@@ -90,6 +90,11 @@ public class SnapshotFileService : ISnapshotFileService
 
         if (snapshotData == null) return null;
 
+        if (!useLiveData)
+        {
+            BackfillSnapshotDataFromPenumbra(character, snapshotData);
+        }
+
         var paths = SnapshotPaths.From(snapshotPath);
         Directory.CreateDirectory(paths.RootPath);
         Directory.CreateDirectory(paths.FilesDirectory);
@@ -265,6 +270,72 @@ public class SnapshotFileService : ISnapshotFileService
             Notify.Success($"Snapshot for '{charaName}' updated successfully.");
 
         return snapshotPath;
+    }
+
+    private void BackfillSnapshotDataFromPenumbra(ICharacter character, SnapshotData snapshotData)
+    {
+        if (snapshotData.FileReplacements.Count == 0)
+            return;
+
+        var resolvedByGamePath = _ipcManager.PenumbraGetCollectionResolvedFiles(character.ObjectIndex);
+        if (resolvedByGamePath.Count == 0)
+        {
+            var resourcePaths = _ipcManager.PenumbraGetGameObjectResourcePaths(character.ObjectIndex);
+            if (resourcePaths.Count > 0)
+            {
+                resolvedByGamePath = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var (resolvedPath, gamePaths) in resourcePaths)
+                {
+                    foreach (var gamePath in gamePaths)
+                    {
+                        if (!resolvedByGamePath.ContainsKey(gamePath))
+                            resolvedByGamePath[gamePath] = resolvedPath;
+                    }
+                }
+            }
+        }
+
+        if (resolvedByGamePath.Count == 0)
+            return;
+
+        var hashCache = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        int backfilled = 0;
+        int mismatched = 0;
+
+        foreach (var (gamePath, expectedHash) in snapshotData.FileReplacements.ToList())
+        {
+            if (snapshotData.ResolvedPaths.ContainsKey(expectedHash))
+                continue;
+
+            if (!resolvedByGamePath.TryGetValue(gamePath, out var filePath))
+                continue;
+
+            if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath))
+                continue;
+
+            if (!hashCache.TryGetValue(filePath, out var actualHash))
+            {
+                actualHash = PluginUtil.GetFileHash(filePath);
+                if (string.IsNullOrEmpty(actualHash))
+                    continue;
+                hashCache[filePath] = actualHash;
+            }
+
+            if (!string.Equals(actualHash, expectedHash, StringComparison.OrdinalIgnoreCase))
+                mismatched++;
+
+            snapshotData.FileReplacements[gamePath] = actualHash;
+            if (!snapshotData.ResolvedPaths.ContainsKey(actualHash))
+                snapshotData.ResolvedPaths[actualHash] = filePath;
+
+            backfilled++;
+        }
+
+        if (backfilled > 0)
+        {
+            PluginLog.Debug(
+                $"[Snappy] Backfilled {backfilled} file(s) from Penumbra for snapshot; hash mismatches: {mismatched}.");
+        }
     }
 
     public void RenameSnapshot(string oldPath, string newName)
