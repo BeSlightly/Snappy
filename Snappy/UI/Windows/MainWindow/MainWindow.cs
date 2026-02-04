@@ -6,6 +6,7 @@ using Snappy.Features.Pmp;
 using Snappy.Features.Pmp.ChangedItems;
 using Snappy.Services;
 using Snappy.Services.SnapshotManager;
+using Dalamud.Plugin.Services;
 
 namespace Snappy.UI.Windows;
 
@@ -96,6 +97,8 @@ public partial class MainWindow : Window, IDisposable
         // Load snapshots immediately when the window is created
         LoadSnapshots();
 
+        Svc.Framework.Update += OnFrameworkUpdate;
+
         TitleBarButtons.Add(
             new TitleBarButton
             {
@@ -112,6 +115,7 @@ public partial class MainWindow : Window, IDisposable
 
     public void Dispose()
     {
+        Svc.Framework.Update -= OnFrameworkUpdate;
         _snappy.GPoseService.GPoseExited -= ClearActorSelection;
         _snappy.SnapshotsUpdated -= OnSnapshotsChanged;
     }
@@ -122,9 +126,27 @@ public partial class MainWindow : Window, IDisposable
         {
             _lastIsOpenState = IsOpen;
             _ipcManager.SetUiOpen(IsOpen);
+            if (IsOpen)
+            {
+                _actorCacheDirty = true;
+                _actorFilterDirty = true;
+                _selectedActorStateDirty = true;
+                _nextActorCacheRefreshTick = 0;
+                _nextSelectedActorRefreshTick = 0;
+            }
         }
 
         base.Update();
+    }
+
+    private void OnFrameworkUpdate(IFramework framework)
+    {
+        if (!IsOpen)
+            return;
+
+        RefreshSelectableActorsCacheIfNeeded();
+        RebuildFilteredActorRowsIfNeeded();
+        UpdateSelectedActorStateIfNeeded();
     }
 
     public override void Draw()

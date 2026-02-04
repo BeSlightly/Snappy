@@ -7,6 +7,24 @@ namespace Snappy.UI.Windows;
 
 public partial class MainWindow
 {
+    private readonly record struct ActorRow(
+        ICharacter Actor,
+        string Label,
+        bool IsSnowcloak,
+        bool IsLightless,
+        bool IsPlayerSync);
+
+    private const int ActorCacheRefreshIntervalMs = 250;
+    private const int SelectedActorStateRefreshIntervalMs = 250;
+    private readonly List<ActorRow> _cachedActorRows = new();
+    private readonly List<ActorRow> _filteredActorRows = new();
+    private bool _useFilteredActorRows;
+    private bool _actorFilterDirty = true;
+    private long _nextActorCacheRefreshTick;
+    private bool _actorCacheDirty = true;
+    private long _nextSelectedActorRefreshTick;
+    private bool _selectedActorStateDirty = true;
+
     private bool _isActorLockedBySnappy;
     private bool _isActorModifiable;
     private bool _isActorSnapshottable;
@@ -61,6 +79,117 @@ public partial class MainWindow
         _snapshotExistsForActor = false;
         _isActorModifiable = false;
         _isActorLockedBySnappy = false;
+        _selectedActorStateDirty = false;
+    }
+
+    private void RefreshSelectableActorsCacheIfNeeded(bool force = false)
+    {
+        if (!IsOpen)
+            return;
+
+        var now = Environment.TickCount64;
+        if (!force && !_actorCacheDirty && now < _nextActorCacheRefreshTick)
+            return;
+
+        _actorCacheDirty = false;
+        _nextActorCacheRefreshTick = now + ActorCacheRefreshIntervalMs;
+
+        _cachedActorRows.Clear();
+        _actorFilterDirty = true;
+        var selectableActors = _actorService.GetSelectableActors();
+        if (selectableActors.Count == 0)
+            return;
+
+        var inGpose = PluginUtil.IsInGpose();
+        var nameCount = new Dictionary<string, int>(StringComparer.Ordinal);
+        foreach (var actor in selectableActors)
+        {
+            if (!actor.IsValid())
+                continue;
+
+            var baseName = GetActorDisplayName(actor);
+            if (!string.IsNullOrEmpty(baseName))
+                nameCount[baseName] = nameCount.GetValueOrDefault(baseName, 0) + 1;
+        }
+
+        foreach (var actor in selectableActors)
+        {
+            if (!actor.IsValid())
+                continue;
+
+            var baseName = GetActorDisplayName(actor);
+            if (string.IsNullOrEmpty(baseName))
+                continue;
+
+            var isLocalPlayer = Player.Object != null && actor.Address == Player.Object.Address;
+            var isOwnedPet = ActorOwnershipUtil.IsSelfOwnedPet(actor);
+            var youSuffix = (isLocalPlayer || isOwnedPet) ? " (You)" : string.Empty;
+
+            string displayName;
+            if (nameCount.GetValueOrDefault(baseName) > 1)
+            {
+                if (inGpose)
+                {
+                    displayName = $"{baseName} (GPose {actor.ObjectIndex}){youSuffix}";
+                }
+                else
+                {
+                    var nameWithWorld = GetActorDisplayNameWithWorld(actor);
+                    displayName = nameWithWorld != baseName
+                        ? $"{nameWithWorld}{youSuffix}"
+                        : $"{baseName} ({actor.ObjectIndex}){youSuffix}";
+                }
+            }
+            else
+            {
+                displayName = inGpose ? $"{baseName} (GPose){youSuffix}" : $"{baseName}{youSuffix}";
+            }
+
+            var isSnowcloak = _ipcManager.IsSnowcloakAddress(actor.Address);
+            var isLightless = !isSnowcloak && _ipcManager.IsLightlessAddress(actor.Address);
+            var isPlayerSync = !isSnowcloak && !isLightless && _ipcManager.IsPlayerSyncAddress(actor.Address);
+
+            _cachedActorRows.Add(new ActorRow(actor, displayName, isSnowcloak, isLightless, isPlayerSync));
+        }
+    }
+
+    private void RebuildFilteredActorRowsIfNeeded()
+    {
+        if (!_actorFilterDirty)
+            return;
+
+        _actorFilterDirty = false;
+        if (string.IsNullOrEmpty(_playerFilterLower))
+        {
+            _useFilteredActorRows = false;
+            _filteredActorRows.Clear();
+            return;
+        }
+
+        _useFilteredActorRows = true;
+        _filteredActorRows.Clear();
+        foreach (var row in _cachedActorRows)
+        {
+            if (row.Label.Contains(_playerFilterLower, StringComparison.OrdinalIgnoreCase))
+                _filteredActorRows.Add(row);
+        }
+    }
+
+    private IReadOnlyList<ActorRow> GetVisibleActorRows()
+        => _useFilteredActorRows ? _filteredActorRows : _cachedActorRows;
+
+    private void UpdateSelectedActorStateIfNeeded(bool force = false)
+    {
+        if (_objIdxSelected == null && _selectedActorAddress == null)
+            return;
+
+        var now = Environment.TickCount64;
+        if (!force && !_selectedActorStateDirty && now < _nextSelectedActorRefreshTick)
+            return;
+
+        _selectedActorStateDirty = false;
+        _nextSelectedActorRefreshTick = now + SelectedActorStateRefreshIntervalMs;
+        UpdateSelectedActorState();
     }
 
     private void UpdateSelectedActorState()

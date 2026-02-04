@@ -41,37 +41,45 @@ public partial class MainWindow
         );
 
         var rowHeight = ImGui.GetFrameHeight() + 20f * ImGuiHelpers.GlobalScale;
-
-        for (var i = entries.Count - 1; i >= 0; i--)
+        var totalEntries = entries.Count;
+        var clipper = new ImGuiListClipper();
+        clipper.Begin(totalEntries, rowHeight);
+        while (clipper.Step())
         {
-            ImGui.TableNextRow(ImGuiTableRowFlags.None, rowHeight);
-            ImGui.TableNextColumn();
-            var entry = entries[i];
-
-            var initialY = ImGui.GetCursorPosY();
-            var frameHeight = ImGui.GetFrameHeight();
-            ImGui.SetCursorPosY(initialY + (rowHeight - frameHeight) / 2f);
-
-            if (_historyEntryToRename == entry)
+            for (var row = clipper.DisplayStart; row < clipper.DisplayEnd; row++)
             {
-                var onCommit = () => SetHistoryEntryDescription(entry, _tempHistoryEntryName);
-                Action onCancel = () => _historyEntryToRename = null;
-                UiHelpers.DrawInlineRename($"rename_{i}", ref _tempHistoryEntryName, onCommit, onCancel);
-            }
-            else
-            {
-                var description = entry.Description;
-                if (string.IsNullOrEmpty(description))
-                    description = "Unnamed Entry";
-                ImUtf8.Text(description);
-            }
+                var i = totalEntries - 1 - row;
+                var entry = entries[i];
+                ImGui.TableNextRow(ImGuiTableRowFlags.None, rowHeight);
+                ImGui.TableNextColumn();
 
-            ImGui.TableNextColumn();
+                var initialY = ImGui.GetCursorPosY();
+                var frameHeight = ImGui.GetFrameHeight();
+                ImGui.SetCursorPosY(initialY + (rowHeight - frameHeight) / 2f);
 
-            var buttonHeight = ImGui.GetFrameHeight();
-            ImGui.SetCursorPosY(ImGui.GetCursorPosY() + (rowHeight - buttonHeight) / 2f);
-            DrawHistoryEntryControls(type, entry);
+                if (_historyEntryToRename == entry)
+                {
+                    var onCommit = () => SetHistoryEntryDescription(entry, _tempHistoryEntryName);
+                    Action onCancel = () => _historyEntryToRename = null;
+                    UiHelpers.DrawInlineRename($"rename_{i}", ref _tempHistoryEntryName, onCommit, onCancel);
+                }
+                else
+                {
+                    var description = entry.Description;
+                    if (string.IsNullOrEmpty(description))
+                        description = "Unnamed Entry";
+                    ImUtf8.Text(description);
+                }
+
+                ImGui.TableNextColumn();
+
+                var buttonHeight = ImGui.GetFrameHeight();
+                ImGui.SetCursorPosY(ImGui.GetCursorPosY() + (rowHeight - buttonHeight) / 2f);
+                DrawHistoryEntryControls(type, entry);
+            }
         }
+
+        clipper.End();
     }
 
     private void DrawHistoryEntryControls<T>(string type, T entry)

@@ -17,6 +17,10 @@ public class WorldSelector
 {
     private string _worldFilter = string.Empty;
     private bool _worldFilterActive;
+    private const int WorldCacheRefreshIntervalMs = 250;
+    private long _nextWorldCacheRefreshTick;
+    private string _cachedWorldFilter = string.Empty;
+    private Dictionary<ExcelWorldHelper.Region, Dictionary<uint, List<uint>>>? _cachedRegions;
 
     public string? EmptyName { get; set; } = "Use snapshot's world";
     public bool DisplayCurrent { get; set; } = false;
@@ -56,27 +60,7 @@ public class WorldSelector
         if (ImGui.IsWindowAppearing())
             ImGui.SetKeyboardFocusHere();
         ImGui.InputTextWithHint("##worldfilter", "Search...", ref _worldFilter, 50);
-
-        Dictionary<ExcelWorldHelper.Region, Dictionary<uint, List<uint>>> regions = new();
-        foreach (var region in Enum.GetValues<ExcelWorldHelper.Region>())
-        {
-            regions[region] = new Dictionary<uint, List<uint>>();
-            foreach (var dc in Svc.Data.GetExcelSheet<WorldDCGroupType>()!)
-                if (dc.Region == (byte)region)
-                {
-                    regions[region][dc.RowId] = new List<uint>();
-                    foreach (var world in ExcelWorldHelper.GetPublicWorlds(dc.RowId))
-                        if (_worldFilter == string.Empty
-                            || world.Name.ToString().Contains(_worldFilter, StringComparison.OrdinalIgnoreCase)
-                            || world.RowId.ToString().Contains(_worldFilter, StringComparison.OrdinalIgnoreCase))
-                            if (ShouldHideWorld == null || !ShouldHideWorld(world.RowId))
-                                regions[region][dc.RowId].Add(world.RowId);
-
-                    regions[region][dc.RowId] = regions[region][dc.RowId]
-                        .OrderBy(ExcelWorldHelper.GetName)
-                        .ToList();
-                }
-        }
+        var regions = GetCachedRegions();
 
         ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, new Vector2(0, 1));
 
@@ -191,5 +175,45 @@ public class WorldSelector
 
         ImGui.PopStyleVar();
         _worldFilterActive = _worldFilter != string.Empty;
+    }
+
+    private Dictionary<ExcelWorldHelper.Region, Dictionary<uint, List<uint>>> GetCachedRegions()
+    {
+        var now = Environment.TickCount64;
+        if (_cachedRegions != null
+            && _cachedWorldFilter == _worldFilter
+            && now < _nextWorldCacheRefreshTick)
+            return _cachedRegions;
+
+        _cachedWorldFilter = _worldFilter;
+        _nextWorldCacheRefreshTick = now + WorldCacheRefreshIntervalMs;
+        _cachedRegions = BuildRegionMap();
+        return _cachedRegions;
+    }
+
+    private Dictionary<ExcelWorldHelper.Region, Dictionary<uint, List<uint>>> BuildRegionMap()
+    {
+        Dictionary<ExcelWorldHelper.Region, Dictionary<uint, List<uint>>> regions = new();
+        foreach (var region in Enum.GetValues<ExcelWorldHelper.Region>())
+        {
+            regions[region] = new Dictionary<uint, List<uint>>();
+            foreach (var dc in Svc.Data.GetExcelSheet<WorldDCGroupType>()!)
+                if (dc.Region == (byte)region)
+                {
+                    regions[region][dc.RowId] = new List<uint>();
+                    foreach (var world in ExcelWorldHelper.GetPublicWorlds(dc.RowId))
+                        if (_worldFilter == string.Empty
+                            || world.Name.ToString().Contains(_worldFilter, StringComparison.OrdinalIgnoreCase)
+                            || world.RowId.ToString().Contains(_worldFilter, StringComparison.OrdinalIgnoreCase))
+                            if (ShouldHideWorld == null || !ShouldHideWorld(world.RowId))
+                                regions[region][dc.RowId].Add(world.RowId);
+
+                    regions[region][dc.RowId] = regions[region][dc.RowId]
+                        .OrderBy(ExcelWorldHelper.GetName)
+                        .ToList();
+                }
+        }
+
+        return regions;
     }
 }

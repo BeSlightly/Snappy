@@ -11,7 +11,7 @@ public partial class MainWindow
         if (_selectedSnapshot != null && Directory.Exists(_selectedSnapshot.FullName))
             _snappy.ExecuteBackgroundTask(LoadHistoryForSelectedSnapshotAsync);
         if (_objIdxSelected != null || _selectedActorAddress != null)
-            UpdateSelectedActorState();
+            UpdateSelectedActorStateIfNeeded(true);
     }
 
     private void OnSnapshotSelectionChanged(

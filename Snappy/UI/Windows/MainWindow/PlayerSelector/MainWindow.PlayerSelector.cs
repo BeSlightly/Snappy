@@ -10,42 +10,39 @@ public partial class MainWindow
         var width = ImGui.GetContentRegionAvail().X;
         ImGui.SetNextItemWidth(width);
         if (ImUtf8.InputText("##playerFilter", ref _playerFilter, "Filter Players..."))
+        {
             _playerFilterLower = _playerFilter.ToLowerInvariant();
+            _actorFilterDirty = true;
+        }
     }
 
 
-    private void DrawSelectable(ICharacter selectablePlayer, string label, int objIdx)
+    private void DrawSelectable(ActorRow row)
     {
+        var selectablePlayer = row.Actor;
         if (!selectablePlayer.IsValid())
-            return;
-
-        if (_playerFilterLower.Any() && !label.ToLowerInvariant().Contains(_playerFilterLower))
             return;
 
         var isSelected = _selectedActorAddress == selectablePlayer.Address;
 
-        var isSnowcloak = _ipcManager.IsSnowcloakAddress(selectablePlayer.Address);
-        var isLightless = !isSnowcloak && _ipcManager.IsLightlessAddress(selectablePlayer.Address);
-        var isPlayerSync = !isSnowcloak && !isLightless && _ipcManager.IsPlayerSyncAddress(selectablePlayer.Address);
-
-        if (isSnowcloak)
+        if (row.IsSnowcloak)
         {
             using var _ = ImRaii.PushColor(ImGuiCol.Text, new Vector4(0.4275f, 0.6863f, 1f, 1f));
-            ApplySelectableSelection(selectablePlayer, label, objIdx, isSelected);
+            ApplySelectableSelection(selectablePlayer, row.Label, selectablePlayer.ObjectIndex, isSelected);
         }
-        else if (isLightless)
+        else if (row.IsLightless)
         {
             using var _ = ImRaii.PushColor(ImGuiCol.Text, new Vector4(0.6784f, 0.5412f, 0.9608f, 1f));
-            ApplySelectableSelection(selectablePlayer, label, objIdx, isSelected);
+            ApplySelectableSelection(selectablePlayer, row.Label, selectablePlayer.ObjectIndex, isSelected);
         }
-        else if (isPlayerSync)
+        else if (row.IsPlayerSync)
         {
             using var _ = ImRaii.PushColor(ImGuiCol.Text, new Vector4(0.4745f, 0.8392f, 0.7569f, 1f));
-            ApplySelectableSelection(selectablePlayer, label, objIdx, isSelected);
+            ApplySelectableSelection(selectablePlayer, row.Label, selectablePlayer.ObjectIndex, isSelected);
         }
         else
         {
-            ApplySelectableSelection(selectablePlayer, label, objIdx, isSelected);
+            ApplySelectableSelection(selectablePlayer, row.Label, selectablePlayer.ObjectIndex, isSelected);
         }
     }
 
@@ -63,7 +60,7 @@ public partial class MainWindow
         _currentLabel = label;
         _objIdxSelected = objIdx;
         _selectedActorAddress = selectablePlayer.Address;
-        UpdateSelectedActorState();
+        UpdateSelectedActorStateIfNeeded(true);
     }
 
 
@@ -71,12 +68,7 @@ public partial class MainWindow
     {
         ImGui.BeginGroup();
         DrawPlayerFilter();
-
-        List<ICharacter>? selectableActors = null;
-        List<ICharacter> GetSelectableActors()
-        {
-            return selectableActors ??= _actorService.GetSelectableActors();
-        }
+        var rows = GetVisibleActorRows();
 
         var buttonHeight = ImGui.GetFrameHeight() + ImGui.GetStyle().ItemSpacing.Y;
         var listHeight = ImGui.GetContentRegionAvail().Y - buttonHeight;
@@ -91,70 +83,21 @@ public partial class MainWindow
         {
             if (child)
             {
-                var selectableActorsList = GetSelectableActors();
-                var inGpose = PluginUtil.IsInGpose();
-
-                // Create a dictionary to track duplicate names and make them unique
-                var actorLabels = new Dictionary<ICharacter, string>();
-                var nameCount = new Dictionary<string, int>();
-
-                // First pass: count duplicate base names (without GPose suffix)
-                foreach (var actor in selectableActorsList)
+                if (rows.Count > 0)
                 {
-                    var baseName = GetActorDisplayName(actor);
-                    if (!string.IsNullOrEmpty(baseName))
-                        nameCount[baseName] = nameCount.GetValueOrDefault(baseName, 0) + 1;
-                }
-
-                // Second pass: create unique labels
-                foreach (var actor in selectableActorsList)
-                {
-                    var baseName = GetActorDisplayName(actor);
-                    if (!string.IsNullOrEmpty(baseName))
+                    var lineHeight = ImGui.GetTextLineHeightWithSpacing();
+                    var clipper = new ImGuiListClipper();
+                    clipper.Begin(rows.Count, lineHeight);
+                    while (clipper.Step())
                     {
-                        string displayName;
-
-                        var isLocalPlayer = Player.Object != null && actor.Address == Player.Object.Address;
-                        var isOwnedPet = ActorOwnershipUtil.IsSelfOwnedPet(actor);
-                        var youSuffix = (isLocalPlayer || isOwnedPet) ? " (You)" : string.Empty;
-
-                        if (nameCount[baseName] > 1)
-                        {
-                            if (inGpose)
-                            {
-                                // GPose actors: use ObjectIndex for disambiguation
-                                displayName = $"{baseName} (GPose {actor.ObjectIndex}){youSuffix}";
-                            }
-                            else
-                            {
-                                // Regular players: try to use HomeWorld, fallback to ObjectIndex
-                                var nameWithWorld = GetActorDisplayNameWithWorld(actor);
-                                if (nameWithWorld != baseName)
-                                    displayName = $"{nameWithWorld}{youSuffix}";
-                                else
-                                    // HomeWorld not available, use ObjectIndex
-                                    displayName = $"{baseName} ({actor.ObjectIndex}){youSuffix}";
-                            }
-                        }
-                        else
-                        {
-                            // Unique name - use simple format
-                            displayName = inGpose ? $"{baseName} (GPose){youSuffix}" : $"{baseName}{youSuffix}";
-                        }
-
-                        actorLabels[actor] = displayName;
+                        for (var i = clipper.DisplayStart; i < clipper.DisplayEnd; i++)
+                            DrawSelectable(rows[i]);
                     }
-                }
 
-                // Draw the actors with unique labels
-                foreach (var actor in selectableActorsList)
-                    if (actorLabels.TryGetValue(actor, out var label))
-                        DrawSelectable(actor, label, actor.ObjectIndex);
+                    clipper.End();
+                }
             }
         }
-
-        if (_objIdxSelected != null || _selectedActorAddress != null)
-            UpdateSelectedActorState();
 
         var (buttonText, tooltipText, isButtonDisabled) = GetSnapshotButtonState();
         var (lockIcon, lockTooltip, isLockDisabled) = GetLockButtonState();
@@ -203,7 +146,7 @@ public partial class MainWindow
         {
             using (var font = ImRaii.PushFont(UiBuilder.IconFont))
             {
-        if (ImUtf8.Button(lockIcon.ToIconString(), lockButtonSize))
+                if (ImUtf8.Button(lockIcon.ToIconString(), lockButtonSize))
                     if (_isActorLockedBySnappy && TryGetSelectedActor(out var selectedActor))
                     {
                         var isCurrentlyLocked = _activeSnapshotManager.IsActorGlamourerLocked(selectedActor);
