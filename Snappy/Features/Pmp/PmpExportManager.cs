@@ -20,7 +20,11 @@ public class PmpExportManager : IPmpExportManager
 
     public bool IsExporting { get; private set; }
 
-    public async Task SnapshotToPMPAsync(string snapshotPath, string? outputPath = null, string? fileMapId = null)
+    public Task SnapshotToPMPAsync(string snapshotPath, string? outputPath = null, string? fileMapId = null)
+        => SnapshotToPMPAsync(snapshotPath, outputPath, fileMapId, null, null);
+
+    public async Task SnapshotToPMPAsync(string snapshotPath, string? outputPath, string? fileMapId,
+        IReadOnlyDictionary<string, string>? fileMapOverride, string? manipulationOverride)
     {
         if (IsExporting)
         {
@@ -47,12 +51,16 @@ public class PmpExportManager : IPmpExportManager
                 pmpOutputPath = Path.Combine(_configuration.WorkingDirectory, $"{snapshotName}.pmp");
             else
                 pmpOutputPath = Path.ChangeExtension(pmpOutputPath, ".pmp");
-            var resolvedFileMap = FileMapUtil.ResolveFileMap(snapshotInfo, fileMapId ?? snapshotInfo.CurrentFileMapId);
-            if (!resolvedFileMap.Any())
+
+            var resolvedFileMap = fileMapOverride ??
+                                  FileMapUtil.ResolveFileMap(snapshotInfo, fileMapId ?? snapshotInfo.CurrentFileMapId);
+            if (fileMapOverride == null && !resolvedFileMap.Any())
                 resolvedFileMap = new Dictionary<string, string>(snapshotInfo.FileReplacements,
                     StringComparer.OrdinalIgnoreCase);
-            var resolvedManipulations =
-                FileMapUtil.ResolveManipulation(snapshotInfo, fileMapId ?? snapshotInfo.CurrentFileMapId);
+
+            var resolvedManipulations = manipulationOverride ??
+                                        FileMapUtil.ResolveManipulation(snapshotInfo,
+                                            fileMapId ?? snapshotInfo.CurrentFileMapId);
 
             using var fileStream = new FileStream(pmpOutputPath, FileMode.Create, FileAccess.Write, FileShare.None);
             using var archive = new ZipArchive(fileStream, ZipArchiveMode.Create);

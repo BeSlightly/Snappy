@@ -11,6 +11,7 @@ using OtterGui.Log;
 using Snappy.Features.Mcdf;
 using Snappy.Features.Pcp;
 using Snappy.Features.Pmp;
+using Snappy.Features.Pmp.ChangedItems;
 using Snappy.Services;
 using Snappy.Services.SnapshotManager;
 using Snappy.UI.Windows;
@@ -57,6 +58,7 @@ public sealed partial class Snappy : IDalamudPlugin
         McdfManager = new McdfManager(Configuration, SnapshotFileService, InvokeSnapshotsUpdated);
         PcpManager = new PcpManager(Configuration, SnapshotFileService, InvokeSnapshotsUpdated);
         PmpManager = new PmpExportManager(Configuration);
+        SnapshotChangedItemService = new SnapshotChangedItemService(Log);
         SnapshotFS = new FileSystem<Snapshot>();
 
         SnapshotIndexService.RefreshSnapshotIndex();
@@ -64,8 +66,8 @@ public sealed partial class Snappy : IDalamudPlugin
 
         ConfigWindow = new ConfigWindow(this, Configuration, ActiveSnapshotManager, IpcManager);
         MainWindow = new MainWindow(this, ActorService, ActiveSnapshotManager, McdfManager, PcpManager, PmpManager,
-            SnapshotApplicationService,
-            SnapshotFileService, SnapshotIndexService, IpcManager);
+            SnapshotChangedItemService, SnapshotApplicationService, SnapshotFileService, SnapshotIndexService,
+            IpcManager);
         WindowSystem.AddWindow(ConfigWindow);
         WindowSystem.AddWindow(MainWindow);
 
@@ -99,6 +101,7 @@ public sealed partial class Snappy : IDalamudPlugin
     public IMcdfManager McdfManager { get; }
     public IPcpManager PcpManager { get; }
     public IPmpExportManager PmpManager { get; }
+    public ISnapshotChangedItemService SnapshotChangedItemService { get; }
     public FileSystem<Snapshot> SnapshotFS { get; }
 
     public string Version =>
@@ -113,6 +116,7 @@ public sealed partial class Snappy : IDalamudPlugin
         Svc.Commands.RemoveHandler(CommandName);
         MainWindow.Dispose();
         GPoseService.Dispose();
+        (SnapshotChangedItemService as IDisposable)?.Dispose();
         IpcManager.Dispose(); // Dispose IpcManager to clean up plugin tracking
         Svc.ClientState.Logout -= OnLogout;
         Svc.PluginInterface.UiBuilder.Draw -= DrawUI;

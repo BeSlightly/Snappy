@@ -39,6 +39,12 @@ public partial class MainWindow
                 DrawHistoryList("Customize+", _customizeHistory.Entries);
         }
 
+        using (var tab = ImUtf8.TabItem("PMP Export"u8))
+        {
+            if (tab)
+                DrawPmpExportTab();
+        }
+
         using (var tab = ImUtf8.TabItem("PCP Export"u8))
         {
             if (tab)

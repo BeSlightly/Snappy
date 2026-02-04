@@ -3,6 +3,7 @@ using OtterGui.Filesystem;
 using Snappy.Features.Mcdf;
 using Snappy.Features.Pcp;
 using Snappy.Features.Pmp;
+using Snappy.Features.Pmp.ChangedItems;
 using Snappy.Services;
 using Snappy.Services.SnapshotManager;
 
@@ -16,6 +17,7 @@ public partial class MainWindow : Window, IDisposable
     private readonly IMcdfManager _mcdfManager;
     private readonly IPcpManager _pcpManager;
     private readonly IPmpExportManager _pmpExportManager;
+    private readonly ISnapshotChangedItemService _snapshotChangedItemService;
     private readonly Snappy _snappy;
     private readonly ISnapshotApplicationService _snapshotApplicationService;
     private readonly SnapshotCombo _snapshotCombo;
@@ -34,6 +36,16 @@ public partial class MainWindow : Window, IDisposable
     private string _pcpPlayerNameOverride = string.Empty;
     private int? _pcpSelectedWorldIdOverride;
     private string _pcpWorldSearch = string.Empty;
+    private SnapshotChangedItemSet? _pmpChangedItems;
+    private readonly Dictionary<string, bool> _pmpItemSelection = new(StringComparer.OrdinalIgnoreCase);
+    private string? _pmpSelectedFileMapId;
+    private string? _pmpSelectedHistoryLabel;
+    private int? _pmpSelectedHistoryIndex;
+    private string? _pmpSelectedGlamourerBase64;
+    private bool _pmpIsBuilding;
+    private int _pmpBuildToken;
+    private bool _pmpNeedsRebuild;
+    private string? _pmpBuildError;
     private bool _isRenamingSnapshot;
     private bool _lastIsOpenState;
     private bool _openDeleteSnapshotPopup;
@@ -49,9 +61,9 @@ public partial class MainWindow : Window, IDisposable
 
     public MainWindow(Snappy snappy, IActorService actorService, IActiveSnapshotManager activeSnapshotManager,
         IMcdfManager mcdfManager, IPcpManager pcpManager,
-        IPmpExportManager pmpExportManager, ISnapshotApplicationService snapshotApplicationService,
-        ISnapshotFileService snapshotFileService, ISnapshotIndexService snapshotIndexService,
-        IIpcManager ipcManager)
+        IPmpExportManager pmpExportManager, ISnapshotChangedItemService snapshotChangedItemService,
+        ISnapshotApplicationService snapshotApplicationService, ISnapshotFileService snapshotFileService,
+        ISnapshotIndexService snapshotIndexService, IIpcManager ipcManager)
         : base(
             $"Snappy v{snappy.Version}",
             ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoScrollWithMouse
@@ -69,6 +81,7 @@ public partial class MainWindow : Window, IDisposable
         _mcdfManager = mcdfManager;
         _pcpManager = pcpManager;
         _pmpExportManager = pmpExportManager;
+        _snapshotChangedItemService = snapshotChangedItemService;
         _snapshotApplicationService = snapshotApplicationService;
         _snapshotFileService = snapshotFileService;
         _snapshotIndexService = snapshotIndexService;

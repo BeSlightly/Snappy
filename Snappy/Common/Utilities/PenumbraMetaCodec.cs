@@ -1,22 +1,19 @@
-using System.Diagnostics.CodeAnalysis;
 using System.IO.Compression;
-using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 using System.Text;
-using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using Newtonsoft.Json;
 using Penumbra.GameData.Files.AtchStructs;
 using Penumbra.GameData.Structs;
 using Penumbra.Meta.Manipulations;
 
 namespace Snappy.Common.Utilities;
 
-public static class PenumbraMetaUtil
+public static partial class PenumbraMetaCodec
 {
-    public static List<JObject> ConvertPenumbraMetaToJObjects(string base64)
+    public static List<JObject> ConvertToJObjects(string base64)
     {
         var list = new List<JObject>();
-        if (string.IsNullOrEmpty(base64) || !ConvertManips(base64, out var manips) || manips == null)
+        if (string.IsNullOrEmpty(base64) || !TryParse(base64, out var manips) || manips == null)
             return list;
 
         void AddManips<TId, TEntry>(IReadOnlyDictionary<TId, TEntry> dict)
@@ -25,7 +22,6 @@ public static class PenumbraMetaUtil
         {
             foreach (var (id, entry) in dict)
             {
-                // CORRECTED: Get the entire manipulation object, not just the inner part.
                 var manipulationObject = MetaDictionary.Serialize(id, entry);
                 if (manipulationObject != null)
                     list.Add(manipulationObject);
@@ -44,7 +40,6 @@ public static class PenumbraMetaUtil
 
         foreach (var identifier in manips.GlobalEqp)
         {
-            // CORRECTED: Get the entire manipulation object.
             var manipulationObject = MetaDictionary.Serialize(identifier);
             if (manipulationObject != null)
                 list.Add(manipulationObject);
@@ -53,9 +48,9 @@ public static class PenumbraMetaUtil
         return list;
     }
 
-    private static bool ConvertManips(string manipString, [NotNullWhen(true)] out MetaDictionary? manips)
+    public static bool TryParse(string base64, out MetaDictionary? manips)
     {
-        if (manipString.Length == 0)
+        if (string.IsNullOrEmpty(base64))
         {
             manips = new MetaDictionary();
             return true;
@@ -63,48 +58,43 @@ public static class PenumbraMetaUtil
 
         try
         {
-            var bytes = Convert.FromBase64String(manipString);
+            var bytes = Convert.FromBase64String(base64);
             using var compressedStream = new MemoryStream(bytes);
             using var zipStream = new GZipStream(compressedStream, CompressionMode.Decompress);
             using var resultStream = new MemoryStream();
             zipStream.CopyTo(resultStream);
             resultStream.Flush();
             resultStream.Position = 0;
+
             var data = resultStream.GetBuffer().AsSpan(0, (int)resultStream.Length);
             var version = data[0];
             data = data[1..];
-            switch (version)
+            return version switch
             {
-                case 0:
-                    return ConvertManipsV0(data, out manips);
-                case 1:
-                    return ConvertManipsV1(data, out manips);
-                default:
-                    PluginLog.Warning($"Invalid version for manipulations: {version}.");
-                    manips = null;
-                    return false;
-            }
+                0 => ConvertManipsV0(data, out manips),
+                1 => ConvertManipsV1(data, out manips),
+                2 => ConvertManipsV2(data, out manips),
+                _ => Fail(out manips),
+            };
         }
         catch
         {
-            PluginLog.Error("Error decompressing manipulations");
             manips = null;
             return false;
         }
     }
 
-    private static bool ConvertManipsV0(ReadOnlySpan<byte> data, [NotNullWhen(true)] out MetaDictionary? manips)
+    private static bool ConvertManipsV0(ReadOnlySpan<byte> data, out MetaDictionary? manips)
     {
         var json = Encoding.UTF8.GetString(data);
         manips = JsonConvert.DeserializeObject<MetaDictionary>(json);
         return manips != null;
     }
 
-    private static bool ConvertManipsV1(ReadOnlySpan<byte> data, [NotNullWhen(true)] out MetaDictionary? manips)
+    private static bool ConvertManipsV1(ReadOnlySpan<byte> data, out MetaDictionary? manips)
     {
         if (!data.StartsWith("META0001"u8))
         {
-            PluginLog.Warning("Invalid manipulations of version 1, does not start with valid prefix.");
             manips = null;
             return false;
         }
@@ -162,8 +152,8 @@ public static class PenumbraMetaUtil
         var globalEqpCount = r.ReadInt32();
         for (var i = 0; i < globalEqpCount; ++i)
         {
-            var m = r.Read<GlobalEqpManipulation>();
-            if (!m.Validate() || !manips.TryAdd(m)) return false;
+            var geqp = r.Read<GlobalEqpManipulation>();
+            if (!geqp.Validate() || !manips.TryAdd(geqp)) return false;
         }
 
         if (r.Position < data.Length - 8)
@@ -186,10 +176,7 @@ public static class PenumbraMetaUtil
                 var v = r.Read<ShpEntry>();
                 if (!id.Validate() || !manips.TryAdd(id, v)) return false;
             }
-        }
 
-        if (r.Position < data.Length - 8)
-        {
             var atrCount = r.ReadInt32();
             for (var i = 0; i < atrCount; ++i)
             {
@@ -202,30 +189,10 @@ public static class PenumbraMetaUtil
         return true;
     }
 
-    private ref struct SpanBinaryReader
+    private static bool Fail(out MetaDictionary? manips)
     {
-        private readonly ReadOnlySpan<byte> _span;
-        public int Position { get; private set; }
-
-        public SpanBinaryReader(ReadOnlySpan<byte> span)
-        {
-            _span = span;
-            Position = 0;
-        }
-
-        public T Read<T>() where T : unmanaged
-        {
-            var size = Unsafe.SizeOf<T>();
-            if (size > _span.Length - Position) throw new EndOfStreamException();
-
-            var value = MemoryMarshal.Read<T>(_span.Slice(Position));
-            Position += size;
-            return value;
-        }
-
-        public int ReadInt32()
-        {
-            return Read<int>();
-        }
+        manips = null;
+        return false;
     }
+
 }

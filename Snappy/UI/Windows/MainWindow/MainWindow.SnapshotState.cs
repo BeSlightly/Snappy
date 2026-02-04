@@ -79,6 +79,16 @@ public partial class MainWindow
         _pcpPlayerNameOverride = string.Empty;
         _pcpSelectedWorldIdOverride = null;
         _pcpWorldSearch = string.Empty;
+        _pmpChangedItems = null;
+        _pmpItemSelection.Clear();
+        _pmpSelectedFileMapId = null;
+        _pmpSelectedHistoryLabel = null;
+        _pmpSelectedHistoryIndex = null;
+        _pmpSelectedGlamourerBase64 = null;
+        _pmpIsBuilding = false;
+        _pmpBuildError = null;
+        _pmpNeedsRebuild = true;
+        _pmpBuildToken++;
 
         if (_selectedSnapshot == null)
             return;

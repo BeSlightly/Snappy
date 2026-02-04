@@ -87,32 +87,9 @@ internal sealed class PcpExportService
             if (glamourerEntry != null)
                 try
                 {
-                    var dataBytes = Convert.FromBase64String(glamourerEntry.GlamourerString);
-                    string designJson;
-
-                    // Find Gzip header, accounting for a potential version byte prefix.
-                    var gzipStartIndex = -1;
-                    if (dataBytes.Length > 2 && dataBytes[0] == 0x1F && dataBytes[1] == 0x8B)
-                        gzipStartIndex = 0;
-                    else if (dataBytes.Length > 3 && dataBytes[1] == 0x1F && dataBytes[2] == 0x8B)
-                        gzipStartIndex = 1;
-
-                    if (gzipStartIndex != -1)
+                    if (GlamourerDesignUtil.TryDecodeDesignJson(glamourerEntry.GlamourerString, out var designObj)
+                        && designObj != null)
                     {
-                        using var compressedStream =
-                            new MemoryStream(dataBytes, gzipStartIndex, dataBytes.Length - gzipStartIndex);
-                        using var gzipStream = new GZipStream(compressedStream, CompressionMode.Decompress);
-                        using var reader = new StreamReader(gzipStream, Encoding.UTF8);
-                        designJson = reader.ReadToEnd();
-                    }
-                    else
-                    {
-                        designJson = Encoding.UTF8.GetString(dataBytes);
-                    }
-
-                    if (!string.IsNullOrWhiteSpace(designJson))
-                    {
-                        var designObj = JObject.Parse(designJson);
                         characterData.Glamourer = new JObject
                         {
                             ["Version"] = 1,

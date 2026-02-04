@@ -9,7 +9,7 @@ namespace Snappy.Features.Packaging;
 public static class ModPackageBuilder
 {
     public static List<JObject> BuildManipulations(string base64Manipulations)
-        => PenumbraMetaUtil.ConvertPenumbraMetaToJObjects(base64Manipulations);
+        => PenumbraMetaCodec.ConvertToJObjects(base64Manipulations);
 
     public static void AddSnapshotFiles(
         ZipArchive archive,
