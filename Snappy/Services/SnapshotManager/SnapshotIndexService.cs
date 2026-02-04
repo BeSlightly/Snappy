@@ -1,5 +1,5 @@
 using Dalamud.Game.ClientState.Objects.SubKinds;
-using Newtonsoft.Json.Linq;
+using ECommons.ExcelServices;
 using Snappy.Common;
 
 namespace Snappy.Services.SnapshotManager;
@@ -11,6 +11,15 @@ public class SnapshotIndexService : ISnapshotIndexService
         new(StringComparer.OrdinalIgnoreCase);
 
     private sealed record SnapshotIndexEntry(string Path, int? WorldId, string? WorldName, string SourceActor);
+
+    private static readonly JsonSerializerSettings SnapshotIndexSettings = new()
+    {
+        Error = (_, args) =>
+        {
+            // Ignore per-property errors so legacy snapshot formats can still be indexed.
+            args.ErrorContext.Handled = true;
+        }
+    };
 
     public SnapshotIndexService(Configuration configuration)
     {
@@ -26,16 +35,6 @@ public class SnapshotIndexService : ISnapshotIndexService
         var baseName = actorName[..atIndex];
         var worldName = actorName[(atIndex + 1)..];
         return (baseName, string.IsNullOrWhiteSpace(worldName) ? null : worldName);
-    }
-
-    private static string BuildWorldIdKey(string baseName, int worldId)
-    {
-        return $"{baseName}@{worldId}";
-    }
-
-    private static string BuildWorldNameKey(string baseName, string worldName)
-    {
-        return $"{baseName}@{worldName}";
     }
 
     private static bool TryGetWorldId(ICharacter character, out int worldId)
@@ -73,41 +72,31 @@ public class SnapshotIndexService : ISnapshotIndexService
 
                 try
                 {
-                    var jsonContent = File.ReadAllText(snapshotJsonPath);
-                    var jObject = JObject.Parse(jsonContent);
-                    var sourceActorToken = jObject["SourceActor"];
-                    var sourceWorldIdToken = jObject["SourceWorldId"];
-                    var sourceWorldNameToken = jObject["SourceWorldName"];
+                    var snapshotInfo = JsonUtil
+                        .DeserializeAsync<SnapshotInfo>(snapshotJsonPath, SnapshotIndexSettings)
+                        .GetAwaiter()
+                        .GetResult();
+                    if (snapshotInfo == null)
+                        continue;
 
-                    if (sourceActorToken is { Type: JTokenType.String })
+                    var actorName = snapshotInfo.SourceActor;
+                    if (string.IsNullOrWhiteSpace(actorName))
+                        continue;
+
+                    var (baseName, actorWorldName) = SplitActorName(actorName);
+                    var worldName = string.IsNullOrWhiteSpace(snapshotInfo.SourceWorldName)
+                        ? actorWorldName
+                        : snapshotInfo.SourceWorldName;
+                    var worldId = snapshotInfo.SourceWorldId;
+
+                    var entry = new SnapshotIndexEntry(dir, worldId, worldName, actorName);
+                    if (!_snapshotIndex.TryGetValue(baseName, out var entries))
                     {
-                        var actorName = sourceActorToken.Value<string>();
-                        if (string.IsNullOrWhiteSpace(actorName))
-                            continue;
-
-                        var (baseName, actorWorldName) = SplitActorName(actorName);
-                        var worldName = sourceWorldNameToken is { Type: JTokenType.String }
-                            ? sourceWorldNameToken.Value<string>()
-                            : null;
-                        if (string.IsNullOrWhiteSpace(worldName))
-                            worldName = actorWorldName;
-
-                        int? worldId = null;
-                        if (sourceWorldIdToken is { Type: JTokenType.Integer })
-                            worldId = sourceWorldIdToken.Value<int>();
-                        else if (sourceWorldIdToken is { Type: JTokenType.String }
-                                 && int.TryParse(sourceWorldIdToken.Value<string>(), out var parsedWorldId))
-                            worldId = parsedWorldId;
-
-                        var entry = new SnapshotIndexEntry(dir, worldId, worldName, actorName);
-                        if (!_snapshotIndex.TryGetValue(baseName, out var entries))
-                        {
-                            entries = new List<SnapshotIndexEntry>();
-                            _snapshotIndex[baseName] = entries;
-                        }
-
-                        entries.Add(entry);
+                        entries = new List<SnapshotIndexEntry>();
+                        _snapshotIndex[baseName] = entries;
                     }
+
+                    entries.Add(entry);
                 }
                 catch (Exception ex)
                 {
@@ -142,7 +131,8 @@ public class SnapshotIndexService : ISnapshotIndexService
             if (byWorldId != null)
                 return byWorldId.Path;
 
-            if (Snappy.WorldNames.TryGetValue((uint)worldId, out var worldName))
+            var worldName = ExcelWorldHelper.GetName((uint)worldId);
+            if (!string.IsNullOrWhiteSpace(worldName))
             {
                 var byWorldName = entries.FirstOrDefault(e =>
                     string.Equals(e.WorldName, worldName, StringComparison.OrdinalIgnoreCase));

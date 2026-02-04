@@ -30,9 +30,6 @@ public sealed partial class Snappy : IDalamudPlugin
 
         Log = new Logger();
 
-        // Initialize WorldNames dictionary (similar to WhoList approach)
-        InitializeWorldNames();
-
         EzConfig.Migrate<Configuration>();
         Configuration = EzConfig.Init<Configuration>();
 

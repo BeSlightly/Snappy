@@ -1,5 +1,6 @@
 using System.Globalization;
 using Dalamud.Interface.Colors;
+using ECommons.ExcelServices;
 
 namespace Snappy.UI.Windows;
 
@@ -127,8 +128,10 @@ public partial class MainWindow
 
             // Use Lifestream-style WorldSelector grouped by Region/Data Center
             var tmpWorldId = _pcpSelectedWorldIdOverride ?? 0; // 0 means 'use snapshot'
-            _pcpWorldSelector.EmptyName = _selectedSnapshotInfo?.SourceWorldId is { } swid2
-                                          && Snappy.WorldNames.TryGetValue((uint)swid2, out var snapWorldName)
+            var snapWorldName = _selectedSnapshotInfo?.SourceWorldId is { } swid2
+                ? ExcelWorldHelper.GetName((uint)swid2)
+                : null;
+            _pcpWorldSelector.EmptyName = !string.IsNullOrWhiteSpace(snapWorldName)
                 ? $"Use snapshot's world ({snapWorldName})"
                 : "Use snapshot's world";
             ImGui.SetNextItemWidth(-1);

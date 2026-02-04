@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using ECommons.ExcelServices;
 using Snappy.Common;
 using Snappy.Common.Utilities;
 using Snappy.Models;
@@ -60,7 +61,8 @@ public class SnapshotFileService : ISnapshotFileService
                 if (worldId > 0)
                 {
                     resolvedWorldId = worldId;
-                    if (Snappy.WorldNames.TryGetValue((uint)worldId, out var worldName))
+                    var worldName = ExcelWorldHelper.GetName((uint)worldId);
+                    if (!string.IsNullOrWhiteSpace(worldName))
                         resolvedWorldName = worldName;
                 }
             }

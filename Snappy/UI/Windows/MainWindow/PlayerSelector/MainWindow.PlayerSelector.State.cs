@@ -1,4 +1,5 @@
 using Dalamud.Game.ClientState.Objects.SubKinds;
+using ECommons.ExcelServices;
 using ECommons.GameHelpers;
 using Snappy.Common.Utilities;
 
@@ -135,8 +136,12 @@ public partial class MainWindow
             if (actor is IPlayerCharacter playerCharacter)
             {
                 var homeWorldId = playerCharacter.HomeWorld.RowId;
-                if (homeWorldId > 0 && Snappy.WorldNames.TryGetValue(homeWorldId, out var worldName))
-                    return $"{baseName}@{worldName}";
+                if (homeWorldId > 0)
+                {
+                    var worldName = ExcelWorldHelper.GetName(homeWorldId);
+                    if (!string.IsNullOrWhiteSpace(worldName))
+                        return $"{baseName}@{worldName}";
+                }
             }
         }
         catch (Exception ex)

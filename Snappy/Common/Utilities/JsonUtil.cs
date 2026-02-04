@@ -36,4 +36,21 @@ public static class JsonUtil
             return null;
         }
     }
+
+    public static async Task<T?> DeserializeAsync<T>(string filePath, JsonSerializerSettings settings)
+        where T : class
+    {
+        if (!File.Exists(filePath)) return null;
+
+        try
+        {
+            var json = await File.ReadAllTextAsync(filePath);
+            return JsonConvert.DeserializeObject<T>(json, settings);
+        }
+        catch (Exception ex)
+        {
+            PluginLog.Error($"Failed to deserialize {typeof(T).Name} from {filePath}: {ex}");
+            return null;
+        }
+    }
 }

@@ -136,53 +136,6 @@ public sealed partial class MareIpc
         return false;
     }
 
-    private HashSet<nint> GetHandledAddressesViaReflection(MarePluginInfo pluginInfo)
-    {
-        var results = new HashSet<nint>();
-        try
-        {
-            if (!pluginInfo.IsAvailable)
-                return results;
-
-            // Re-acquire the service provider each time in case plugin reloaded
-            if (!DalamudReflector.TryGetDalamudPlugin(pluginInfo.PluginName, out var marePlugin, true, true))
-                return results;
-
-            var host = marePlugin.GetFoP("_host");
-            if (host?.GetFoP("Services") is not IServiceProvider serviceProvider)
-                return results;
-
-            var assembly = marePlugin.GetType().Assembly;
-            var ipcProviderType = assembly.GetType($"{pluginInfo.NamespacePrefix}.Interop.Ipc.IpcProvider");
-            if (ipcProviderType == null)
-                return results;
-
-            var ipcProvider = serviceProvider.GetService(ipcProviderType);
-            if (ipcProvider == null)
-                return results;
-
-            var activeHandlersField =
-                ipcProviderType.GetField("_activeGameObjectHandlers", BindingFlags.Instance | BindingFlags.NonPublic);
-            if (activeHandlersField?.GetValue(ipcProvider) is not IEnumerable handlers)
-                return results;
-
-            foreach (var handler in handlers)
-            {
-                var addrObj = handler.GetFoP("Address");
-                if (addrObj is IntPtr ip && ip != IntPtr.Zero)
-                    results.Add((nint)ip);
-                else if (addrObj is nint np && np != nint.Zero)
-                    results.Add(np);
-            }
-        }
-        catch (Exception e)
-        {
-            PluginLog.Debug($"[Mare IPC] Reflection for handled addresses failed in {pluginInfo.PluginName}: {e.Message}");
-        }
-
-        return results;
-    }
-
     private HashSet<nint> GetPlayerSyncAddressesViaPairs(MarePluginInfo pluginInfo)
     {
         var results = new HashSet<nint>();
