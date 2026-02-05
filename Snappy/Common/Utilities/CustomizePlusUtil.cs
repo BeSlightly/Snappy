@@ -16,6 +16,37 @@ public record ProfileSanitizer
 
 public static class CustomizePlusUtil
 {
+    public static string DecompressTemplateBase64(string base64Template)
+    {
+        try
+        {
+            var compressedBytes = Convert.FromBase64String(base64Template);
+
+            using var compressedStream = new MemoryStream(compressedBytes);
+            using var gzipStream = new GZipStream(compressedStream, CompressionMode.Decompress);
+            using var resultStream = new MemoryStream();
+
+            gzipStream.CopyTo(resultStream);
+            var decompressedBytes = resultStream.ToArray();
+
+            // Skip the version byte (first byte)
+            if (decompressedBytes.Length > 1)
+            {
+                var versionByte = decompressedBytes[0];
+                PluginLog.Debug($"Decompressing C+ template version: {versionByte}");
+                var jsonBytes = decompressedBytes[1..];
+                return Encoding.UTF8.GetString(jsonBytes);
+            }
+
+            return string.Empty;
+        }
+        catch (Exception ex)
+        {
+            PluginLog.Warning($"Failed to decompress Customize+ template: {ex.Message}");
+            return string.Empty;
+        }
+    }
+
     public static string CreateCustomizePlusTemplate(string profileJson)
     {
         const byte templateVersionByte = 4;

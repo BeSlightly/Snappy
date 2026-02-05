@@ -6,6 +6,27 @@ namespace Snappy.Common.Utilities;
 
 public static class GlamourerDesignUtil
 {
+    public static bool TryEncodeDesignJson(JObject design, out string base64)
+    {
+        base64 = string.Empty;
+        if (design == null)
+            return false;
+
+        try
+        {
+            var designJson = JsonConvert.SerializeObject(design, Formatting.None);
+            if (string.IsNullOrWhiteSpace(designJson))
+                return false;
+
+            base64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(designJson));
+            return !string.IsNullOrWhiteSpace(base64);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     public static bool TryDecodeDesignJson(string base64, out JObject? design)
     {
         design = null;

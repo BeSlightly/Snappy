@@ -140,22 +140,24 @@ internal sealed class PcpImportService
                 var glamourerObj = JObject.FromObject(characterData.Glamourer);
 
                 // Check if this is the new Glamourer PCP format with Version and Design
-                if (glamourerObj["Version"]?.ToObject<int>() == 1 && glamourerObj["Design"] != null)
+                if (glamourerObj["Version"]?.ToObject<int>() == 1 && glamourerObj["Design"] is JObject designObj)
                 {
                     // This is the new Glamourer PCP format - convert the Design to Base64
-                    var designJson = JsonConvert.SerializeObject(glamourerObj["Design"], Formatting.None);
-                    var designBase64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(designJson));
-                    history.Entries.Add(GlamourerHistoryEntry.Create(designBase64, "Imported from PCP", fileMapId,
-                        customizeData));
+                    if (GlamourerDesignUtil.TryEncodeDesignJson(designObj, out var designBase64))
+                        history.Entries.Add(GlamourerHistoryEntry.Create(designBase64, "Imported from PCP", fileMapId,
+                            customizeData));
+                    else
+                        PluginLog.Warning("Failed to encode Glamourer Design data from PCP.");
                 }
                 else
                 {
                     // This might be an older format or different structure, attempt to import as legacy data.
                     PluginLog.Debug("PCP Glamourer data is not in V1 format, attempting to import as legacy data.");
-                    var designJson = JsonConvert.SerializeObject(glamourerObj, Formatting.None);
-                    var designBase64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(designJson));
-                    history.Entries.Add(GlamourerHistoryEntry.Create(designBase64,
-                        "Imported from PCP (Legacy Format)", fileMapId, customizeData));
+                    if (GlamourerDesignUtil.TryEncodeDesignJson(glamourerObj, out var designBase64))
+                        history.Entries.Add(GlamourerHistoryEntry.Create(designBase64,
+                            "Imported from PCP (Legacy Format)", fileMapId, customizeData));
+                    else
+                        PluginLog.Warning("Failed to encode Glamourer legacy data from PCP.");
                 }
             }
             catch (Exception ex)
