@@ -63,38 +63,9 @@ public class ActiveSnapshotManager : IActiveSnapshotManager
 
         foreach (var snapshot in snapshotsToRevert)
         {
-            var target = Svc.Objects[snapshot.ObjectIndex];
-            if (target == null && snapshot.IsOnLocalPlayer) target = localPlayer;
-
-            if (target != null)
-            {
-                PluginLog.Information(
-                    $"Reverting state for actor '{target.Name}' at index {target.ObjectIndex} (original index: {snapshot.ObjectIndex}).");
-
-                if (snapshot.HasPenumbraCollection)
-                    _ipcManager.PenumbraRemoveTemporaryCollection(snapshot.ObjectIndex);
-
-                if (snapshot.CustomizePlusProfileId.HasValue)
-                    _ipcManager.RevertCustomizePlusScale(snapshot.CustomizePlusProfileId.Value);
-
-                if (snapshot.HasGlamourerState)
-                {
-                    _ipcManager.UnlockGlamourerState(target);
-                    _ipcManager.RevertGlamourerToAutomation(target);
-                }
-
-                indicesToRedraw.Add(target.ObjectIndex);
-            }
-            else
-            {
-                PluginLog.Warning(
-                    $"Could not find a live actor at index {snapshot.ObjectIndex} to revert. Attempting to clear resources regardless.");
-                if (snapshot.HasPenumbraCollection)
-                    _ipcManager.PenumbraRemoveTemporaryCollection(snapshot.ObjectIndex);
-
-                if (snapshot.CustomizePlusProfileId.HasValue)
-                    _ipcManager.RevertCustomizePlusScale(snapshot.CustomizePlusProfileId.Value);
-            }
+            var redrawIndex = RevertSnapshot(snapshot, localPlayer, logOnRetarget: false);
+            if (redrawIndex.HasValue)
+                indicesToRedraw.Add(redrawIndex.Value);
         }
 
         _activeSnapshots.RemoveAll(s => snapshotsToRevert.Contains(s));
@@ -281,44 +252,9 @@ public class ActiveSnapshotManager : IActiveSnapshotManager
 
         foreach (var snapshot in snapshotsToRevert)
         {
-            var target = Svc.Objects[snapshot.ObjectIndex];
-
-            if (target == null && snapshot.IsOnLocalPlayer)
-            {
-                PluginLog.Information(
-                    $"Stale snapshot for local player (original index {snapshot.ObjectIndex}) detected. Retargeting to current player character.");
-                target = localPlayer;
-            }
-
-            if (target != null)
-            {
-                PluginLog.Information(
-                    $"Reverting state for actor '{target.Name}' at index {target.ObjectIndex} (original index: {snapshot.ObjectIndex}).");
-
-                if (snapshot.HasPenumbraCollection)
-                    _ipcManager.PenumbraRemoveTemporaryCollection(snapshot.ObjectIndex);
-
-                if (snapshot.CustomizePlusProfileId.HasValue)
-                    _ipcManager.RevertCustomizePlusScale(snapshot.CustomizePlusProfileId.Value);
-
-                if (snapshot.HasGlamourerState)
-                {
-                    _ipcManager.UnlockGlamourerState(target);
-                    _ipcManager.RevertGlamourerToAutomation(target);
-                }
-
-                indicesToRedraw.Add(target.ObjectIndex);
-            }
-            else
-            {
-                PluginLog.Warning(
-                    $"Could not find a live actor at index {snapshot.ObjectIndex} to revert. Attempting to clear resources regardless.");
-                if (snapshot.HasPenumbraCollection)
-                    _ipcManager.PenumbraRemoveTemporaryCollection(snapshot.ObjectIndex);
-
-                if (snapshot.CustomizePlusProfileId.HasValue)
-                    _ipcManager.RevertCustomizePlusScale(snapshot.CustomizePlusProfileId.Value);
-            }
+            var redrawIndex = RevertSnapshot(snapshot, localPlayer, logOnRetarget: true);
+            if (redrawIndex.HasValue)
+                indicesToRedraw.Add(redrawIndex.Value);
         }
 
         _activeSnapshots.Clear();
@@ -332,6 +268,57 @@ public class ActiveSnapshotManager : IActiveSnapshotManager
             }
 
         return snapshotsToRevert.Count;
+    }
+
+    private int? RevertSnapshot(ActiveSnapshot snapshot, IGameObject? localPlayer, bool logOnRetarget)
+    {
+        var target = ResolveSnapshotTarget(snapshot, localPlayer, logOnRetarget);
+
+        if (target != null)
+        {
+            PluginLog.Information(
+                $"Reverting state for actor '{target.Name}' at index {target.ObjectIndex} (original index: {snapshot.ObjectIndex}).");
+
+            if (snapshot.HasPenumbraCollection)
+                _ipcManager.PenumbraRemoveTemporaryCollection(snapshot.ObjectIndex);
+
+            if (snapshot.CustomizePlusProfileId.HasValue)
+                _ipcManager.RevertCustomizePlusScale(snapshot.CustomizePlusProfileId.Value);
+
+            if (snapshot.HasGlamourerState)
+            {
+                _ipcManager.UnlockGlamourerState(target);
+                _ipcManager.RevertGlamourerToAutomation(target);
+            }
+
+            return target.ObjectIndex;
+        }
+
+        PluginLog.Warning(
+            $"Could not find a live actor at index {snapshot.ObjectIndex} to revert. Attempting to clear resources regardless.");
+        if (snapshot.HasPenumbraCollection)
+            _ipcManager.PenumbraRemoveTemporaryCollection(snapshot.ObjectIndex);
+
+        if (snapshot.CustomizePlusProfileId.HasValue)
+            _ipcManager.RevertCustomizePlusScale(snapshot.CustomizePlusProfileId.Value);
+
+        return null;
+    }
+
+    private static IGameObject? ResolveSnapshotTarget(ActiveSnapshot snapshot, IGameObject? localPlayer,
+        bool logOnRetarget)
+    {
+        var target = Svc.Objects[snapshot.ObjectIndex];
+
+        if (target == null && snapshot.IsOnLocalPlayer)
+        {
+            if (logOnRetarget)
+                PluginLog.Information(
+                    $"Stale snapshot for local player (original index {snapshot.ObjectIndex}) detected. Retargeting to current player character.");
+            target = localPlayer;
+        }
+
+        return target;
     }
 }
 

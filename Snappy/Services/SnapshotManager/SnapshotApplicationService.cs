@@ -44,12 +44,103 @@ public class SnapshotApplicationService : ISnapshotApplicationService
         var isOnLocalPlayer = (localPlayer != null && characterApplyTo.ObjectIndex == localPlayer.ObjectIndex) ||
                               characterApplyTo.ObjectIndex == ObjectIndex.GPosePlayer.Index;
 
-        var paths = SnapshotPaths.From(path);
+        if (!TryBuildLoadPlan(path, glamourerOverride, customizeOverride, loadComponents, out var plan,
+                out var errorMessage))
+        {
+            Notify.Error(errorMessage);
+            return false;
+        }
 
+        ApplyLoadPlan(characterApplyTo, objIdx, isOnLocalPlayer, plan);
+
+        var snapshotName = Path.GetFileName(path);
+        Notify.Success($"Loaded snapshot '{snapshotName}' onto {characterApplyTo.Name.TextValue}.");
+
+        return true;
+    }
+
+    private void ApplyLoadPlan(ICharacter characterApplyTo, int objIdx, bool isOnLocalPlayer, SnapshotLoadPlan plan)
+    {
+        if (plan.ApplyFiles)
+        {
+            _ipcManager.PenumbraRemoveTemporaryCollection(characterApplyTo.ObjectIndex);
+            if (plan.ModdedPaths.Any() || !string.IsNullOrEmpty(plan.ResolvedManipulations))
+                _ipcManager.PenumbraSetTempMods(characterApplyTo, objIdx, plan.ModdedPaths, plan.ResolvedManipulations);
+        }
+
+        var existingSnapshot = _activeSnapshotManager.GetSnapshotForCharacter(characterApplyTo);
+        _activeSnapshotManager.RemoveAllSnapshotsForCharacter(characterApplyTo);
+        Guid? cplusProfileId = null;
+        if (plan.CustomizePlusAvailable)
+        {
+            _ipcManager.ClearCustomizePlusTemporaryProfile(characterApplyTo.ObjectIndex);
+
+            if (!string.IsNullOrEmpty(plan.CustomizeDataToApply))
+            {
+                string cplusJson;
+                try
+                {
+                    cplusJson = Encoding.UTF8.GetString(Convert.FromBase64String(plan.CustomizeDataToApply));
+                }
+                catch
+                {
+                    cplusJson = plan.CustomizeDataToApply;
+                }
+
+                cplusProfileId = _ipcManager.SetCustomizePlusScale(characterApplyTo.Address, cplusJson);
+            }
+            else if (isOnLocalPlayer)
+            {
+                // Apply a temporary empty profile to neutralize local C+ when the snapshot has no C+ data.
+                cplusProfileId = _ipcManager.SetCustomizePlusScale(characterApplyTo.Address,
+                    EmptyCustomizePlusProfileJson);
+            }
+        }
+
+        var appliedGlamourerState = false;
+        if (plan.ApplyGlamourer && plan.GlamourerToApply != null
+                                && !string.IsNullOrEmpty(plan.GlamourerToApply.GlamourerString))
+        {
+            _ipcManager.ApplyGlamourerState(plan.GlamourerToApply.GlamourerString, characterApplyTo);
+            appliedGlamourerState = true;
+        }
+
+        var shouldRedraw = plan.ApplyFiles || appliedGlamourerState;
+        if (shouldRedraw)
+            _ipcManager.PenumbraRedraw(objIdx);
+
+        var hasPenumbraCollection = plan.ApplyFiles || existingSnapshot?.HasPenumbraCollection == true;
+        var hasGlamourerState = appliedGlamourerState || existingSnapshot?.HasGlamourerState == true;
+        var isGlamourerLocked = appliedGlamourerState
+            ? true
+            : existingSnapshot?.IsGlamourerLocked ?? false;
+        var finalCplusProfileId = plan.CustomizePlusAvailable
+            ? cplusProfileId
+            : existingSnapshot?.CustomizePlusProfileId;
+
+        _activeSnapshotManager.AddSnapshot(new ActiveSnapshot(characterApplyTo.ObjectIndex, finalCplusProfileId,
+            isOnLocalPlayer, characterApplyTo.Name.TextValue, isGlamourerLocked, hasPenumbraCollection,
+            hasGlamourerState));
+        PluginLog.Debug(
+            $"Snapshot loaded for index {characterApplyTo.ObjectIndex}. 'IsOnLocalPlayer' flag set to: {isOnLocalPlayer}.");
+    }
+
+    private bool TryBuildLoadPlan(
+        string path,
+        GlamourerHistoryEntry? glamourerOverride,
+        CustomizeHistoryEntry? customizeOverride,
+        SnapshotLoadComponents loadComponents,
+        out SnapshotLoadPlan plan,
+        out string errorMessage)
+    {
+        plan = null!;
+        errorMessage = string.Empty;
+
+        var paths = SnapshotPaths.From(path);
         var snapshotInfo = JsonUtil.DeserializeAsync<SnapshotInfo>(paths.SnapshotFile).GetResultSafely();
         if (snapshotInfo == null)
         {
-            Notify.Error($"Could not load snapshot: {Constants.SnapshotFileName} not found or invalid in {path}");
+            errorMessage = $"Could not load snapshot: {Constants.SnapshotFileName} not found or invalid in {path}";
             return false;
         }
 
@@ -101,7 +192,7 @@ public class SnapshotApplicationService : ISnapshotApplicationService
                          || customizePlusAvailable;
         if (!hasAnyData)
         {
-            Notify.Error("Could not load snapshot: No data (files, glamour, C+) to apply.");
+            errorMessage = "Could not load snapshot: No data (files, glamour, C+) to apply.";
             return false;
         }
 
@@ -119,73 +210,19 @@ public class SnapshotApplicationService : ISnapshotApplicationService
             }
         }
 
-        if (applyFiles)
-        {
-            _ipcManager.PenumbraRemoveTemporaryCollection(characterApplyTo.ObjectIndex);
-            if (moddedPaths.Any() || !string.IsNullOrEmpty(resolvedManipulations))
-                _ipcManager.PenumbraSetTempMods(characterApplyTo, objIdx, moddedPaths, resolvedManipulations);
-        }
-
-        var existingSnapshot = _activeSnapshotManager.GetSnapshotForCharacter(characterApplyTo);
-        _activeSnapshotManager.RemoveAllSnapshotsForCharacter(characterApplyTo);
-        Guid? cplusProfileId = null;
-        if (customizePlusAvailable)
-        {
-            _ipcManager.ClearCustomizePlusTemporaryProfile(characterApplyTo.ObjectIndex);
-
-            if (!string.IsNullOrEmpty(customizeDataToApply))
-            {
-                string cplusJson;
-                try
-                {
-                    cplusJson = Encoding.UTF8.GetString(Convert.FromBase64String(customizeDataToApply));
-                }
-                catch
-                {
-                    cplusJson = customizeDataToApply;
-                }
-
-                cplusProfileId = _ipcManager.SetCustomizePlusScale(characterApplyTo.Address, cplusJson);
-            }
-            else if (isOnLocalPlayer)
-            {
-                // Apply a temporary empty profile to neutralize local C+ when the snapshot has no C+ data.
-                cplusProfileId = _ipcManager.SetCustomizePlusScale(characterApplyTo.Address,
-                    EmptyCustomizePlusProfileJson);
-            }
-        }
-
-        var appliedGlamourerState = false;
-        if (applyGlamourer && glamourerToApply != null && !string.IsNullOrEmpty(glamourerToApply.GlamourerString))
-        {
-            _ipcManager.ApplyGlamourerState(glamourerToApply.GlamourerString, characterApplyTo);
-            appliedGlamourerState = true;
-        }
-
-        var shouldRedraw = applyFiles || appliedGlamourerState;
-        if (shouldRedraw)
-            _ipcManager.PenumbraRedraw(objIdx);
-
-        var hasPenumbraCollection = applyFiles || existingSnapshot?.HasPenumbraCollection == true;
-        var hasGlamourerState = appliedGlamourerState || existingSnapshot?.HasGlamourerState == true;
-        var isGlamourerLocked = appliedGlamourerState
-            ? true
-            : existingSnapshot?.IsGlamourerLocked ?? false;
-        var finalCplusProfileId = customizePlusAvailable
-            ? cplusProfileId
-            : existingSnapshot?.CustomizePlusProfileId;
-
-        _activeSnapshotManager.AddSnapshot(new ActiveSnapshot(characterApplyTo.ObjectIndex, finalCplusProfileId,
-            isOnLocalPlayer, characterApplyTo.Name.TextValue, isGlamourerLocked, hasPenumbraCollection,
-            hasGlamourerState));
-        PluginLog.Debug(
-            $"Snapshot loaded for index {characterApplyTo.ObjectIndex}. 'IsOnLocalPlayer' flag set to: {isOnLocalPlayer}.");
-
-        var snapshotName = Path.GetFileName(path);
-        Notify.Success($"Loaded snapshot '{snapshotName}' onto {characterApplyTo.Name.TextValue}.");
-
+        plan = new SnapshotLoadPlan(glamourerToApply, customizeDataToApply, moddedPaths, resolvedManipulations,
+            applyFiles, applyGlamourer, customizePlusAvailable);
         return true;
     }
+
+    private sealed record SnapshotLoadPlan(
+        GlamourerHistoryEntry? GlamourerToApply,
+        string? CustomizeDataToApply,
+        Dictionary<string, string> ModdedPaths,
+        string ResolvedManipulations,
+        bool ApplyFiles,
+        bool ApplyGlamourer,
+        bool CustomizePlusAvailable);
 
     private static CustomizeHistoryEntry? FindClosestCustomizeEntry(IReadOnlyList<CustomizeHistoryEntry> entries,
         GlamourerHistoryEntry glamourerEntry)

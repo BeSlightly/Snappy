@@ -51,44 +51,14 @@ public class SnapshotFileService : ISnapshotFileService
         }
 
         var charaName = character.Name.TextValue;
-        int? resolvedWorldId = null;
-        string? resolvedWorldName = null;
-        try
-        {
-            if (character is Dalamud.Game.ClientState.Objects.SubKinds.IPlayerCharacter pc)
-            {
-                var worldId = (int)pc.HomeWorld.RowId;
-                if (worldId > 0)
-                {
-                    resolvedWorldId = worldId;
-                    var worldName = ExcelWorldHelper.GetName((uint)worldId);
-                    if (!string.IsNullOrWhiteSpace(worldName))
-                        resolvedWorldName = worldName;
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            PluginLog.Verbose(
-                $"Failed to resolve HomeWorld for {charaName}: {ex.Message}");
-        }
+        var (resolvedWorldId, resolvedWorldName) = ResolveHomeWorld(character, charaName);
 
         var snapshotPath = _snapshotIndexService.FindSnapshotPathForActor(character) ??
                            BuildDefaultSnapshotPath(_configuration.WorkingDirectory, charaName, resolvedWorldId,
                                resolvedWorldName);
 
         var useLiveData = _configuration.UseLiveSnapshotData || isLocalPlayer;
-        SnapshotData? snapshotData;
-        if (useLiveData)
-        {
-            snapshotData = _configuration.UsePenumbraIpcResourcePaths
-                ? await _liveSnapshotDataBuilder.BuildAsync(character, penumbraReplacements)
-                : await _collectionSnapshotDataBuilder.BuildAsync(character);
-        }
-        else
-        {
-            snapshotData = _mareSnapshotDataBuilder.BuildFromMare(character);
-        }
+        var snapshotData = await BuildSnapshotDataAsync(character, useLiveData, penumbraReplacements);
 
         if (snapshotData == null) return null;
 
@@ -108,74 +78,19 @@ public class SnapshotFileService : ISnapshotFileService
         snapshotInfo.FileMaps ??= new List<FileMapEntry>();
 
         // Backfill missing per-map manipulation data for older snapshots.
-        if (snapshotInfo.FileMaps != null && snapshotInfo.FileMaps.Count > 0)
-            foreach (var entry in snapshotInfo.FileMaps)
-                if (entry.ManipulationString == null)
-                    entry.ManipulationString = snapshotInfo.ManipulationString;
-
-        // Try to populate SourceWorldId from the live actor if available
-        if (resolvedWorldId is > 0)
-        {
-            if (snapshotInfo.SourceWorldId == null || snapshotInfo.SourceWorldId <= 0
-                                                    || snapshotInfo.SourceWorldId != resolvedWorldId)
-                snapshotInfo.SourceWorldId = resolvedWorldId;
-            if (!string.IsNullOrWhiteSpace(resolvedWorldName)
-                && !string.Equals(snapshotInfo.SourceWorldName, resolvedWorldName, StringComparison.Ordinal))
-                snapshotInfo.SourceWorldName = resolvedWorldName;
-        }
+        BackfillManipulationStrings(snapshotInfo);
+        UpdateSourceWorld(snapshotInfo, resolvedWorldId, resolvedWorldName);
 
         var glamourerHistory = await JsonUtil.DeserializeAsync<GlamourerHistory>(paths.GlamourerHistoryFile) ??
                                new GlamourerHistory();
         var customizeHistory = await JsonUtil.DeserializeAsync<CustomizeHistory>(paths.CustomizeHistoryFile) ??
                                new CustomizeHistory();
 
-        var resolvedCurrentMap = FileMapUtil.ResolveFileMap(snapshotInfo, snapshotInfo.CurrentFileMapId);
+        var resolvedCurrentMap =
+            EnsureBaseFileMap(snapshotInfo, glamourerHistory, customizeHistory, now);
 
-        FileMapUtil.CreateBaseMapIfMissing(snapshotInfo, resolvedCurrentMap, now);
-        if (snapshotInfo.CurrentFileMapId != null)
-        {
-            foreach (var entry in glamourerHistory.Entries.Where(e => string.IsNullOrEmpty(e.FileMapId)))
-                entry.FileMapId = snapshotInfo.CurrentFileMapId;
-            foreach (var entry in customizeHistory.Entries.Where(e => string.IsNullOrEmpty(e.FileMapId)))
-                entry.FileMapId = snapshotInfo.CurrentFileMapId;
-        }
-        resolvedCurrentMap = FileMapUtil.ResolveFileMap(snapshotInfo, snapshotInfo.CurrentFileMapId);
-
-        var incomingFileMap = new Dictionary<string, string>(snapshotData.FileReplacements, StringComparer.OrdinalIgnoreCase);
         var includeRemovals = !useLiveData || !_configuration.UsePenumbraIpcResourcePaths;
-        var mapChanges = FileMapUtil.CalculateChanges(resolvedCurrentMap, incomingFileMap, includeRemovals);
-        var fileMapChanged = mapChanges.Any();
-        var fileMaps = snapshotInfo.FileMaps ?? new List<FileMapEntry>();
-        snapshotInfo.FileMaps = fileMaps;
-        var currentMapEntry = fileMaps.FirstOrDefault(m =>
-            string.Equals(m.Id, snapshotInfo.CurrentFileMapId, StringComparison.OrdinalIgnoreCase));
-        var currentManipulation = currentMapEntry?.ManipulationString ?? snapshotInfo.ManipulationString;
-        var manipChanged = !string.Equals(currentManipulation, snapshotData.Manipulation, StringComparison.Ordinal);
-        var mapChanged = fileMapChanged || manipChanged;
-        if (mapChanged)
-        {
-            if (currentMapEntry != null && currentMapEntry.ManipulationString == null)
-                currentMapEntry.ManipulationString = currentManipulation;
-
-            var newMapId = Guid.NewGuid().ToString("N");
-            fileMaps.Add(new FileMapEntry
-            {
-                Id = newMapId,
-                BaseId = snapshotInfo.CurrentFileMapId,
-                Changes = mapChanges,
-                Timestamp = now.ToString("o", CultureInfo.InvariantCulture),
-                ManipulationString = snapshotData.Manipulation
-            });
-            snapshotInfo.CurrentFileMapId = newMapId;
-        }
-        else if (currentMapEntry != null && currentMapEntry.ManipulationString == null)
-        {
-            currentMapEntry.ManipulationString = snapshotData.Manipulation;
-        }
-
-        resolvedCurrentMap = FileMapUtil.ResolveFileMap(snapshotInfo, snapshotInfo.CurrentFileMapId);
-        snapshotInfo.FileReplacements = new Dictionary<string, string>(resolvedCurrentMap,
-            StringComparer.OrdinalIgnoreCase);
+        var mapChanged = UpdateFileMaps(snapshotInfo, snapshotData, resolvedCurrentMap, includeRemovals, now);
 
         var useMareFileCache = !_configuration.UseLiveSnapshotData && !isLocalPlayer;
         foreach (var (gamePath, hash) in snapshotData.FileReplacements)
@@ -272,6 +187,130 @@ public class SnapshotFileService : ISnapshotFileService
             Notify.Success($"Snapshot for '{charaName}' updated successfully.");
 
         return snapshotPath;
+    }
+
+    private async Task<SnapshotData?> BuildSnapshotDataAsync(ICharacter character, bool useLiveData,
+        Dictionary<string, HashSet<string>>? penumbraReplacements)
+    {
+        if (useLiveData)
+        {
+            return _configuration.UsePenumbraIpcResourcePaths
+                ? await _liveSnapshotDataBuilder.BuildAsync(character, penumbraReplacements)
+                : await _collectionSnapshotDataBuilder.BuildAsync(character);
+        }
+
+        return _mareSnapshotDataBuilder.BuildFromMare(character);
+    }
+
+    private static (int? WorldId, string? WorldName) ResolveHomeWorld(ICharacter character, string charaName)
+    {
+        int? resolvedWorldId = null;
+        string? resolvedWorldName = null;
+
+        try
+        {
+            if (character is Dalamud.Game.ClientState.Objects.SubKinds.IPlayerCharacter pc)
+            {
+                var worldId = (int)pc.HomeWorld.RowId;
+                if (worldId > 0)
+                {
+                    resolvedWorldId = worldId;
+                    var worldName = ExcelWorldHelper.GetName((uint)worldId);
+                    if (!string.IsNullOrWhiteSpace(worldName))
+                        resolvedWorldName = worldName;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            PluginLog.Verbose(
+                $"Failed to resolve HomeWorld for {charaName}: {ex.Message}");
+        }
+
+        return (resolvedWorldId, resolvedWorldName);
+    }
+
+    private static void BackfillManipulationStrings(SnapshotInfo snapshotInfo)
+    {
+        if (snapshotInfo.FileMaps == null || snapshotInfo.FileMaps.Count == 0)
+            return;
+
+        foreach (var entry in snapshotInfo.FileMaps)
+            if (entry.ManipulationString == null)
+                entry.ManipulationString = snapshotInfo.ManipulationString;
+    }
+
+    private static void UpdateSourceWorld(SnapshotInfo snapshotInfo, int? resolvedWorldId, string? resolvedWorldName)
+    {
+        if (resolvedWorldId is not > 0)
+            return;
+
+        if (snapshotInfo.SourceWorldId == null || snapshotInfo.SourceWorldId <= 0
+                                                || snapshotInfo.SourceWorldId != resolvedWorldId)
+            snapshotInfo.SourceWorldId = resolvedWorldId;
+        if (!string.IsNullOrWhiteSpace(resolvedWorldName)
+            && !string.Equals(snapshotInfo.SourceWorldName, resolvedWorldName, StringComparison.Ordinal))
+            snapshotInfo.SourceWorldName = resolvedWorldName;
+    }
+
+    private static Dictionary<string, string> EnsureBaseFileMap(SnapshotInfo snapshotInfo,
+        GlamourerHistory glamourerHistory, CustomizeHistory customizeHistory, DateTime now)
+    {
+        var resolvedCurrentMap = FileMapUtil.ResolveFileMap(snapshotInfo, snapshotInfo.CurrentFileMapId);
+
+        FileMapUtil.CreateBaseMapIfMissing(snapshotInfo, resolvedCurrentMap, now);
+        if (snapshotInfo.CurrentFileMapId != null)
+        {
+            foreach (var entry in glamourerHistory.Entries.Where(e => string.IsNullOrEmpty(e.FileMapId)))
+                entry.FileMapId = snapshotInfo.CurrentFileMapId;
+            foreach (var entry in customizeHistory.Entries.Where(e => string.IsNullOrEmpty(e.FileMapId)))
+                entry.FileMapId = snapshotInfo.CurrentFileMapId;
+        }
+
+        return FileMapUtil.ResolveFileMap(snapshotInfo, snapshotInfo.CurrentFileMapId);
+    }
+
+    private static bool UpdateFileMaps(SnapshotInfo snapshotInfo, SnapshotData snapshotData,
+        Dictionary<string, string> resolvedCurrentMap, bool includeRemovals, DateTime now)
+    {
+        var incomingFileMap = new Dictionary<string, string>(snapshotData.FileReplacements,
+            StringComparer.OrdinalIgnoreCase);
+        var mapChanges = FileMapUtil.CalculateChanges(resolvedCurrentMap, incomingFileMap, includeRemovals);
+        var fileMapChanged = mapChanges.Any();
+
+        var fileMaps = snapshotInfo.FileMaps ?? new List<FileMapEntry>();
+        snapshotInfo.FileMaps = fileMaps;
+        var currentMapEntry = fileMaps.FirstOrDefault(m =>
+            string.Equals(m.Id, snapshotInfo.CurrentFileMapId, StringComparison.OrdinalIgnoreCase));
+        var currentManipulation = currentMapEntry?.ManipulationString ?? snapshotInfo.ManipulationString;
+        var manipChanged = !string.Equals(currentManipulation, snapshotData.Manipulation, StringComparison.Ordinal);
+        var mapChanged = fileMapChanged || manipChanged;
+        if (mapChanged)
+        {
+            if (currentMapEntry != null && currentMapEntry.ManipulationString == null)
+                currentMapEntry.ManipulationString = currentManipulation;
+
+            var newMapId = Guid.NewGuid().ToString("N");
+            fileMaps.Add(new FileMapEntry
+            {
+                Id = newMapId,
+                BaseId = snapshotInfo.CurrentFileMapId,
+                Changes = mapChanges,
+                Timestamp = now.ToString("o", CultureInfo.InvariantCulture),
+                ManipulationString = snapshotData.Manipulation
+            });
+            snapshotInfo.CurrentFileMapId = newMapId;
+        }
+        else if (currentMapEntry != null && currentMapEntry.ManipulationString == null)
+        {
+            currentMapEntry.ManipulationString = snapshotData.Manipulation;
+        }
+
+        resolvedCurrentMap = FileMapUtil.ResolveFileMap(snapshotInfo, snapshotInfo.CurrentFileMapId);
+        snapshotInfo.FileReplacements = new Dictionary<string, string>(resolvedCurrentMap,
+            StringComparer.OrdinalIgnoreCase);
+
+        return mapChanged;
     }
 
     private void BackfillSnapshotDataFromPenumbra(ICharacter character, SnapshotData snapshotData)
