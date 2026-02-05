@@ -27,17 +27,17 @@ public partial class MainWindow
 
         if (row.IsSnowcloak)
         {
-            using var _ = ImRaii.PushColor(ImGuiCol.Text, new Vector4(0.4275f, 0.6863f, 1f, 1f));
+            using var _ = ImRaii.PushColor(ImGuiCol.Text, MareForkColors.Snowcloak);
             ApplySelectableSelection(selectablePlayer, row.Label, selectablePlayer.ObjectIndex, isSelected);
         }
         else if (row.IsLightless)
         {
-            using var _ = ImRaii.PushColor(ImGuiCol.Text, new Vector4(0.6784f, 0.5412f, 0.9608f, 1f));
+            using var _ = ImRaii.PushColor(ImGuiCol.Text, MareForkColors.LightlessSync);
             ApplySelectableSelection(selectablePlayer, row.Label, selectablePlayer.ObjectIndex, isSelected);
         }
         else if (row.IsPlayerSync)
         {
-            using var _ = ImRaii.PushColor(ImGuiCol.Text, new Vector4(0.4745f, 0.8392f, 0.7569f, 1f));
+            using var _ = ImRaii.PushColor(ImGuiCol.Text, MareForkColors.PlayerSync);
             ApplySelectableSelection(selectablePlayer, row.Label, selectablePlayer.ObjectIndex, isSelected);
         }
         else

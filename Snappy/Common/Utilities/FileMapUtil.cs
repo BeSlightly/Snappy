@@ -17,6 +17,14 @@ public static class FileMapUtil
         return new Dictionary<string, string>(snapshotInfo.FileReplacements, StringComparer.OrdinalIgnoreCase);
     }
 
+    public static Dictionary<string, string> ResolveFileMapWithEmptyFallback(SnapshotInfo snapshotInfo, string? fileMapId)
+    {
+        var resolved = ResolveFileMap(snapshotInfo, fileMapId);
+        return resolved.Count == 0
+            ? new Dictionary<string, string>(snapshotInfo.FileReplacements, StringComparer.OrdinalIgnoreCase)
+            : resolved;
+    }
+
     public static string ResolveManipulation(SnapshotInfo snapshotInfo, string? fileMapId)
     {
         if (snapshotInfo.FileMaps == null || snapshotInfo.FileMaps.Count == 0 || string.IsNullOrEmpty(fileMapId))

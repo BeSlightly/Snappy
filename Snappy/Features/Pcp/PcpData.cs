@@ -21,7 +21,7 @@ public record PcpCharacterData
     public PcpActor Actor { get; set; } = new();
     public string Mod { get; set; } = string.Empty;
     public string Collection { get; set; } = string.Empty;
-    public DateTime Time { get; set; } = DateTime.Now;
+    public DateTime Time { get; set; } = DateTime.UtcNow;
     public string Note { get; set; } = string.Empty;
     public object? CustomizePlus { get; set; }
     public object? Glamourer { get; set; }

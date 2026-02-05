@@ -27,10 +27,7 @@ public partial class MainWindow
             var snapshotPath = _selectedSnapshot.FullName;
             var snapshotName = _selectedSnapshot.Name;
             var fileMapId = _pmpSelectedFileMapId ?? _selectedSnapshotInfo.CurrentFileMapId;
-            var resolvedFileMap = FileMapUtil.ResolveFileMap(_selectedSnapshotInfo, fileMapId);
-            if (!resolvedFileMap.Any())
-                resolvedFileMap = new Dictionary<string, string>(_selectedSnapshotInfo.FileReplacements,
-                    StringComparer.OrdinalIgnoreCase);
+            var resolvedFileMap = FileMapUtil.ResolveFileMapWithEmptyFallback(_selectedSnapshotInfo, fileMapId);
 
             var selectedPaths = BuildSelectedPmpGamePaths(selectedKeys);
             var filesDirectory = SnapshotPaths.From(snapshotPath).FilesDirectory;

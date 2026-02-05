@@ -6,9 +6,7 @@ public sealed partial class MareIpc
 {
     public string? GetFileCachePath(string hash)
     {
-        // Update plugin availability first
-        foreach (var kvp in _marePlugins)
-            kvp.Value.IsAvailable = DalamudReflector.TryGetDalamudPlugin(kvp.Key, out _, false, true);
+        RefreshPluginAvailability();
 
         var availablePlugins = _marePlugins.Values.Where(p => p.IsAvailable).ToList();
         if (!availablePlugins.Any()) return null;

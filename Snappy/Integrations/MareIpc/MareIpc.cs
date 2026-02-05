@@ -65,12 +65,14 @@ public sealed partial class MareIpc : IpcSubscriber
     }
 
     public override bool IsReady()
-        => _marePlugins.Keys.Any(name => DalamudReflector.TryGetDalamudPlugin(name, out _, false, true));
+    {
+        RefreshPluginAvailability();
+        return _marePlugins.Values.Any(plugin => plugin.IsAvailable);
+    }
 
     public Dictionary<string, bool> GetMarePluginStatus()
     {
-        foreach (var kvp in _marePlugins)
-            kvp.Value.IsAvailable = DalamudReflector.TryGetDalamudPlugin(kvp.Key, out _, false, true);
+        RefreshPluginAvailability();
         return _marePlugins.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.IsAvailable);
     }
 
@@ -205,5 +207,11 @@ public sealed partial class MareIpc : IpcSubscriber
         pluginInfo.PairLedger = null;
         pluginInfo.FileCacheManager = null;
         pluginInfo.GetFileCacheByHashMethod = null;
+    }
+
+    private void RefreshPluginAvailability()
+    {
+        foreach (var (pluginKey, pluginInfo) in _marePlugins)
+            pluginInfo.IsAvailable = DalamudReflector.TryGetDalamudPlugin(pluginKey, out _, false, true);
     }
 }

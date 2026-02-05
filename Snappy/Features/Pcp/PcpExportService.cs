@@ -45,10 +45,7 @@ internal sealed class PcpExportService
                                    new CustomizeHistory();
 
             var fileMapId = selectedGlamourer?.FileMapId ?? selectedCustomize?.FileMapId ?? snapshotInfo.CurrentFileMapId;
-            var resolvedFileMap = FileMapUtil.ResolveFileMap(snapshotInfo, fileMapId);
-            if (!resolvedFileMap.Any())
-                resolvedFileMap = new Dictionary<string, string>(snapshotInfo.FileReplacements,
-                    StringComparer.OrdinalIgnoreCase);
+            var resolvedFileMap = FileMapUtil.ResolveFileMapWithEmptyFallback(snapshotInfo, fileMapId);
             var resolvedManipulations = FileMapUtil.ResolveManipulation(snapshotInfo, fileMapId);
 
             using var archive = ZipFile.Open(outputPath, ZipArchiveMode.Create);
@@ -61,7 +58,7 @@ internal sealed class PcpExportService
 
             // Create metadata
             var snapshotName = Path.GetFileName(snapshotPath);
-            var meta = ModMetadataBuilder.BuildSnapshotMetadata(snapshotName, snapshotInfo.SourceActor);
+            var meta = ModMetadataBuilder.BuildSnapshotMetadata(snapshotName);
 
             ArchiveUtil.WriteJsonEntry(archive, "meta.json", meta);
 
@@ -77,7 +74,10 @@ internal sealed class PcpExportService
                 },
                 Mod = actorName, // Use specified/actor name as mod name
                 Collection = actorName, // Use specified/actor name for collection
-                Time = DateTime.TryParse(snapshotInfo.LastUpdate, out var lastUpdate) ? lastUpdate : DateTime.Now,
+                Time = DateTime.TryParse(snapshotInfo.LastUpdate, CultureInfo.InvariantCulture,
+                    DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out var lastUpdateUtc)
+                    ? lastUpdateUtc
+                    : DateTime.UtcNow,
                 Note = "Exported from Snappy"
             };
 

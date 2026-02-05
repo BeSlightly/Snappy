@@ -1,6 +1,5 @@
 using System.Collections;
 using System.Reflection;
-using ECommons.Reflection;
 
 namespace Snappy.Integrations;
 
@@ -32,9 +31,7 @@ public sealed partial class MareIpc
     {
         var pairedAddresses = new HashSet<nint>();
 
-        // Update plugin availability first
-        foreach (var kvp in _marePlugins)
-            kvp.Value.IsAvailable = DalamudReflector.TryGetDalamudPlugin(kvp.Key, out _, false, true);
+        RefreshPluginAvailability();
 
         if (_lightlessSyncHandledAddresses?.HasFunction == true)
             try
@@ -58,12 +55,11 @@ public sealed partial class MareIpc
                 PluginLog.Debug($"Failed to get SnowcloakSync handled addresses: {ex.Message}");
             }
 
-        if (IsPluginActive(MareSempiternePluginKey))
+        if (_marePlugins.TryGetValue(MareSempiternePluginKey, out var playerSyncPlugin) && playerSyncPlugin.IsAvailable)
         {
             try
             {
-                var pluginInfo = _marePlugins[MareSempiternePluginKey];
-                foreach (var addr in GetPlayerSyncAddressesViaPairs(pluginInfo))
+                foreach (var addr in GetPlayerSyncAddressesViaPairs(playerSyncPlugin))
                     pairedAddresses.Add(addr);
             }
             catch (Exception ex)

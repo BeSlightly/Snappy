@@ -57,7 +57,7 @@ internal sealed class PcpImportService
             var gamePathToHashMap = ExtractFiles(archive, paths.FilesDirectory, modData);
 
             // Create snapshot info
-            var snapshotInfo = CreateSnapshotInfo(metadata, characterData, snapshotPath, gamePathToHashMap, modData);
+            var snapshotInfo = CreateSnapshotInfo(characterData, gamePathToHashMap, modData);
 
             // Create Customize+ history
             var customizeHistory = new CustomizeHistory();
@@ -89,8 +89,8 @@ internal sealed class PcpImportService
         return SnapshotImportUtil.CreateUniqueSnapshotDirectory(_configuration.WorkingDirectory, snapshotDirName);
     }
 
-    private static SnapshotInfo CreateSnapshotInfo(PcpMetadata metadata, PcpCharacterData characterData,
-        string snapshotPath, Dictionary<string, string> gamePathToHashMap, PcpModData modData)
+    private static SnapshotInfo CreateSnapshotInfo(PcpCharacterData characterData,
+        Dictionary<string, string> gamePathToHashMap, PcpModData modData)
     {
         // Convert PCP manipulations to Penumbra Base64 format
         var manipulationString = string.Empty;

@@ -52,11 +52,9 @@ public class PmpExportManager : IPmpExportManager
             else
                 pmpOutputPath = Path.ChangeExtension(pmpOutputPath, ".pmp");
 
-            var resolvedFileMap = fileMapOverride ??
-                                  FileMapUtil.ResolveFileMap(snapshotInfo, fileMapId ?? snapshotInfo.CurrentFileMapId);
-            if (fileMapOverride == null && !resolvedFileMap.Any())
-                resolvedFileMap = new Dictionary<string, string>(snapshotInfo.FileReplacements,
-                    StringComparer.OrdinalIgnoreCase);
+            var resolvedFileMap = fileMapOverride
+                                  ?? FileMapUtil.ResolveFileMapWithEmptyFallback(snapshotInfo,
+                                      fileMapId ?? snapshotInfo.CurrentFileMapId);
 
             var resolvedManipulations = manipulationOverride ??
                                         FileMapUtil.ResolveManipulation(snapshotInfo,
@@ -65,7 +63,7 @@ public class PmpExportManager : IPmpExportManager
             using var fileStream = new FileStream(pmpOutputPath, FileMode.Create, FileAccess.Write, FileShare.None);
             using var archive = new ZipArchive(fileStream, ZipArchiveMode.Create);
 
-            var metadata = ModMetadataBuilder.BuildSnapshotMetadata(snapshotName, snapshotInfo.SourceActor);
+            var metadata = ModMetadataBuilder.BuildSnapshotMetadata(snapshotName);
             ArchiveUtil.WriteJsonEntry(archive, "meta.json", metadata);
 
             // Create default_mod.json entry
