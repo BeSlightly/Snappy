@@ -71,49 +71,20 @@ public class McdfManager : IMcdfManager
             ? $"MCDF_Import_{DateTime.Now:yyyyMMddHHmmss}"
             : description;
 
-        var snapshotPath = Path.Combine(_configuration.WorkingDirectory, snapshotDirName);
-
-        var counter = 1;
-        var originalPath = snapshotPath;
-        while (Directory.Exists(snapshotPath))
-        {
-            PluginLog.Debug($"Snapshot directory already exists, trying {snapshotDirName}_{counter}");
-            snapshotPath = $"{originalPath}_{counter}";
-            counter++;
-        }
-
-        Directory.CreateDirectory(snapshotPath);
-        return snapshotPath;
+        return SnapshotImportUtil.CreateUniqueSnapshotDirectory(
+            _configuration.WorkingDirectory,
+            snapshotDirName,
+            name => PluginLog.Debug($"Snapshot directory already exists, trying {name}"));
     }
 
     private static SnapshotInfo CreateSnapshotInfo(McdfHeader charaFile, string snapshotDirName,
         Dictionary<string, string> gamePathToHashMap)
     {
-        var snapshotInfo = new SnapshotInfo
-        {
-            SourceActor = Path.GetFileName(snapshotDirName),
-            SourceWorldId = null,
-            LastUpdate = DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture),
-            ManipulationString = charaFile.CharaFileData.ManipulationData,
-            FileReplacements = gamePathToHashMap
-        };
-
-        if (snapshotInfo.FileReplacements.Any())
-        {
-            var baseId = Guid.NewGuid().ToString("N");
-            snapshotInfo.FileMaps.Add(new FileMapEntry
-            {
-                Id = baseId,
-                BaseId = null,
-                Changes = new Dictionary<string, string>(snapshotInfo.FileReplacements,
-                    StringComparer.OrdinalIgnoreCase),
-                Timestamp = DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture),
-                ManipulationString = snapshotInfo.ManipulationString
-            });
-            snapshotInfo.CurrentFileMapId = baseId;
-        }
-
-        return snapshotInfo;
+        return SnapshotImportUtil.BuildSnapshotInfo(
+            Path.GetFileName(snapshotDirName),
+            null,
+            charaFile.CharaFileData.ManipulationData,
+            gamePathToHashMap);
     }
 
     private static GlamourerHistory CreateGlamourerHistory(McdfHeader charaFile, string? fileMapId,

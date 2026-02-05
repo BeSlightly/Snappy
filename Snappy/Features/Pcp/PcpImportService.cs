@@ -85,43 +85,8 @@ internal sealed class PcpImportService
 
     private string CreateSnapshotDirectory(string description)
     {
-        var snapshotDirName = string.IsNullOrEmpty(description)
-            ? $"PCP_Import_{DateTime.Now:yyyyMMddHHmmss}"
-            : SanitizeDirectoryName(description);
-
-        var snapshotPath = Path.Combine(_configuration.WorkingDirectory, snapshotDirName);
-
-        // Generate unique name if directory already exists to prevent data loss
-        var counter = 1;
-        var originalPath = snapshotPath;
-        while (Directory.Exists(snapshotPath))
-        {
-            snapshotPath = $"{originalPath}_{counter}";
-            counter++;
-        }
-
-        Directory.CreateDirectory(snapshotPath);
-        return snapshotPath;
-    }
-
-    private static string SanitizeDirectoryName(string name)
-    {
-        // Remove or replace invalid characters for Windows directory names
-        var invalidChars = Path.GetInvalidFileNameChars();
-        var sanitized = name;
-
-        foreach (var invalidChar in invalidChars) sanitized = sanitized.Replace(invalidChar, '_');
-
-        // Also replace colon specifically (which might not be in GetInvalidFileNameChars on all systems)
-        sanitized = sanitized.Replace(':', '_');
-
-        // Trim whitespace and dots from the end (Windows doesn't like these)
-        sanitized = sanitized.TrimEnd(' ', '.');
-
-        // Ensure the name isn't empty after sanitization
-        if (string.IsNullOrWhiteSpace(sanitized)) sanitized = $"PCP_Import_{DateTime.Now:yyyyMMddHHmmss}";
-
-        return sanitized;
+        var snapshotDirName = SnapshotImportUtil.SanitizeDirectoryName(description, "PCP_Import");
+        return SnapshotImportUtil.CreateUniqueSnapshotDirectory(_configuration.WorkingDirectory, snapshotDirName);
     }
 
     private static SnapshotInfo CreateSnapshotInfo(PcpMetadata metadata, PcpCharacterData characterData,
@@ -139,31 +104,8 @@ internal sealed class PcpImportService
                 PluginLog.Warning($"Failed to process manipulations from PCP: {ex.Message}");
             }
 
-        var snapshotInfo = new SnapshotInfo
-        {
-            SourceActor = characterData.Actor.PlayerName,
-            SourceWorldId = characterData.Actor.HomeWorld,
-            LastUpdate = DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture),
-            FileReplacements = gamePathToHashMap,
-            ManipulationString = manipulationString
-        };
-
-        if (snapshotInfo.FileReplacements.Any())
-        {
-            var baseId = Guid.NewGuid().ToString("N");
-            snapshotInfo.FileMaps.Add(new FileMapEntry
-            {
-                Id = baseId,
-                BaseId = null,
-                Changes = new Dictionary<string, string>(snapshotInfo.FileReplacements,
-                    StringComparer.OrdinalIgnoreCase),
-                Timestamp = DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture),
-                ManipulationString = snapshotInfo.ManipulationString
-            });
-            snapshotInfo.CurrentFileMapId = baseId;
-        }
-
-        return snapshotInfo;
+        return SnapshotImportUtil.BuildSnapshotInfo(characterData.Actor.PlayerName, characterData.Actor.HomeWorld,
+            manipulationString, gamePathToHashMap);
     }
 
     private static string ConvertPcpManipulationsToPenumbraFormat(List<JObject> pcpManipulations)

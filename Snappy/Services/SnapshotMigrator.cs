@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -32,12 +31,7 @@ public static class SnapshotMigrator
 
             Directory.CreateDirectory(paths.FilesDirectory);
 
-            var newInfo = new SnapshotInfo
-            {
-                SourceActor = Path.GetFileName(snapshotPath),
-                LastUpdate = DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture),
-                ManipulationString = oldInfo.ManipulationString
-            };
+            var fileReplacements = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
             foreach (var (sourceFileName, gamePaths) in oldInfo.FileReplacements)
             {
@@ -54,23 +48,14 @@ public static class SnapshotMigrator
 
                 if (!File.Exists(newHashedPath)) await File.WriteAllBytesAsync(newHashedPath, fileBytes);
 
-                foreach (var gamePath in gamePaths) newInfo.FileReplacements[gamePath] = hash;
+                foreach (var gamePath in gamePaths) fileReplacements[gamePath] = hash;
             }
 
-            if (newInfo.FileReplacements.Any())
-            {
-                var baseId = Guid.NewGuid().ToString("N");
-                newInfo.FileMaps.Add(new FileMapEntry
-                {
-                    Id = baseId,
-                    BaseId = null,
-                    Changes = new Dictionary<string, string>(newInfo.FileReplacements,
-                        StringComparer.OrdinalIgnoreCase),
-                    Timestamp = DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture),
-                    ManipulationString = newInfo.ManipulationString
-                });
-                newInfo.CurrentFileMapId = baseId;
-            }
+            var newInfo = SnapshotImportUtil.BuildSnapshotInfo(
+                Path.GetFileName(snapshotPath),
+                null,
+                oldInfo.ManipulationString,
+                fileReplacements);
 
             var glamourerHistory = new GlamourerHistory();
             glamourerHistory.Entries.Add(GlamourerHistoryEntry.Create(oldInfo.GlamourerString,

@@ -160,7 +160,7 @@ public partial class MainWindow
             if (selectedSnapshot != null)
             {
                 var defaultName =
-                    $"{selectedSnapshot.Name}_{SanitizeForFileName(entry.Description ?? "entry")}.pmp";
+                    $"{selectedSnapshot.Name}_{PathSanitizer.SanitizeFileSystemName(entry.Description, "entry")}.pmp";
                 var snapshotPath = selectedSnapshot.FullName;
                 _snappy.FileDialogManager.SaveFileDialog(
                     "Export PMP for Entry",
@@ -195,18 +195,4 @@ public partial class MainWindow
         if (ImUtf8.IconButton(FontAwesomeIcon.Trash, "Delete Entry", default)) _historyEntryToDelete = entry;
     }
 
-    private static string SanitizeForFileName(string value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-            return "entry";
-
-        var sanitized = value;
-        foreach (var c in Path.GetInvalidFileNameChars()) sanitized = sanitized.Replace(c, '_');
-        sanitized = sanitized.Trim('.', ' ');
-
-        if (string.IsNullOrWhiteSpace(sanitized))
-            sanitized = "entry";
-
-        return sanitized;
-    }
 }

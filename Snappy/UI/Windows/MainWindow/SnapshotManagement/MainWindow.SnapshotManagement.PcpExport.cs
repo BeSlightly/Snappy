@@ -34,7 +34,7 @@ public partial class MainWindow
             ImGui.Spacing();
 
             var glamourerPreview = _pcpSelectedGlamourerEntry != null
-                ? FormatHistoryEntryPreview(_pcpSelectedGlamourerEntry)
+                ? HistoryEntryUtil.FormatEntryPreview(_pcpSelectedGlamourerEntry)
                 : "Use latest entry";
             ImGui.SetNextItemWidth(-1);
             if (ImGui.BeginCombo("##PcpGlamourerEntry", glamourerPreview))
@@ -47,7 +47,7 @@ public partial class MainWindow
                 for (var i = _glamourerHistory.Entries.Count - 1; i >= 0; i--)
                 {
                     var entry = _glamourerHistory.Entries[i];
-                    var label = FormatHistoryEntryPreview(entry);
+                    var label = HistoryEntryUtil.FormatEntryPreview(entry);
                     var isSelected = ReferenceEquals(_pcpSelectedGlamourerEntry, entry);
                     if (ImGui.Selectable(label, isSelected))
                         _pcpSelectedGlamourerEntry = entry;
@@ -67,7 +67,7 @@ public partial class MainWindow
             ImGui.Spacing();
 
             var customizePreview = _pcpSelectedCustomizeEntry != null
-                ? FormatHistoryEntryPreview(_pcpSelectedCustomizeEntry)
+                ? HistoryEntryUtil.FormatEntryPreview(_pcpSelectedCustomizeEntry)
                 : "Use latest entry";
             ImGui.SetNextItemWidth(-1);
             if (ImGui.BeginCombo("##PcpCustomizeEntry", customizePreview))
@@ -80,7 +80,7 @@ public partial class MainWindow
                 for (var i = _customizeHistory.Entries.Count - 1; i >= 0; i--)
                 {
                     var entry = _customizeHistory.Entries[i];
-                    var label = FormatHistoryEntryPreview(entry);
+                    var label = HistoryEntryUtil.FormatEntryPreview(entry);
                     var isSelected = ReferenceEquals(_pcpSelectedCustomizeEntry, entry);
                     if (ImGui.Selectable(label, isSelected))
                         _pcpSelectedCustomizeEntry = entry;
@@ -202,12 +202,4 @@ public partial class MainWindow
         }
     }
 
-    private static string FormatHistoryEntryPreview(HistoryEntryBase entry)
-    {
-        DateTime.TryParse(entry.Timestamp, CultureInfo.InvariantCulture,
-            DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out var parsedUtc);
-        var time = parsedUtc == default ? entry.Timestamp : parsedUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm");
-        var name = string.IsNullOrWhiteSpace(entry.Description) ? "Unnamed Entry" : entry.Description;
-        return $"{name}  ({time})";
-    }
 }

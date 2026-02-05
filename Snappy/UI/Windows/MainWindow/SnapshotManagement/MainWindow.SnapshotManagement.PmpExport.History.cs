@@ -48,7 +48,7 @@ public partial class MainWindow
         for (var i = _glamourerHistory.Entries.Count - 1; i >= 0; i--)
         {
             var entry = _glamourerHistory.Entries[i];
-            var label = $"Glamourer: {FormatHistoryEntryPreview(entry)}";
+            var label = $"Glamourer: {HistoryEntryUtil.FormatEntryPreview(entry)}";
             options.Add(new PmpHistoryOption(i, label, entry.FileMapId, entry.GlamourerString));
         }
 

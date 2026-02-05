@@ -230,14 +230,14 @@ public class SnapshotApplicationService : ISnapshotApplicationService
         if (entries.Count == 0)
             return null;
 
-        if (!TryParseHistoryTimestamp(glamourerEntry.Timestamp, out var glamourerTimestamp))
+        if (!HistoryEntryUtil.TryParseTimestamp(glamourerEntry.Timestamp, out var glamourerTimestamp))
             return entries.LastOrDefault();
 
         CustomizeHistoryEntry? closest = null;
         var closestDelta = TimeSpan.MaxValue;
         foreach (var entry in entries)
         {
-            if (!TryParseHistoryTimestamp(entry.Timestamp, out var entryTimestamp))
+            if (!HistoryEntryUtil.TryParseTimestamp(entry.Timestamp, out var entryTimestamp))
                 continue;
 
             var delta = (entryTimestamp - glamourerTimestamp).Duration();
@@ -251,9 +251,4 @@ public class SnapshotApplicationService : ISnapshotApplicationService
         return closest ?? entries.LastOrDefault();
     }
 
-    private static bool TryParseHistoryTimestamp(string? timestamp, out DateTime parsedUtc)
-    {
-        return DateTime.TryParse(timestamp, CultureInfo.InvariantCulture,
-            DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out parsedUtc);
-    }
 }
