@@ -56,7 +56,7 @@ public partial class MainWindow
                         var filteredManip = await _snapshotChangedItemService
                             .FilterManipulationsAsync(manipBase, selectedKeys);
                         await _pmpExportManager.SnapshotToPMPAsync(snapshotPath, path, fileMapId,
-                            filteredFileMap, filteredManip);
+                            filteredFileMap, filteredManip, true);
                     });
                 },
                 _snappy.Configuration.WorkingDirectory);

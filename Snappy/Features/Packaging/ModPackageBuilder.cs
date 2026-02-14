@@ -16,7 +16,8 @@ public static class ModPackageBuilder
         SnapshotInfo snapshotInfo,
         string sourceFilesDirectory,
         Dictionary<string, string> filesDictionary,
-        IReadOnlyDictionary<string, string>? resolvedFileMap = null)
+        IReadOnlyDictionary<string, string>? resolvedFileMap = null,
+        bool useReadableArchivePaths = false)
         => ModpackExportUtil.AddSnapshotFilesToArchive(archive, snapshotInfo, sourceFilesDirectory, filesDictionary,
-            resolvedFileMap);
+            resolvedFileMap, useReadableArchivePaths);
 }

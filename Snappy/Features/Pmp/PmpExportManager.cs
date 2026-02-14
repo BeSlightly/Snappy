@@ -21,10 +21,11 @@ public class PmpExportManager : IPmpExportManager
     public bool IsExporting { get; private set; }
 
     public Task SnapshotToPMPAsync(string snapshotPath, string? outputPath = null, string? fileMapId = null)
-        => SnapshotToPMPAsync(snapshotPath, outputPath, fileMapId, null, null);
+        => SnapshotToPMPAsync(snapshotPath, outputPath, fileMapId, null, null, false);
 
     public async Task SnapshotToPMPAsync(string snapshotPath, string? outputPath, string? fileMapId,
-        IReadOnlyDictionary<string, string>? fileMapOverride, string? manipulationOverride)
+        IReadOnlyDictionary<string, string>? fileMapOverride, string? manipulationOverride,
+        bool useReadableArchivePaths = false)
     {
         if (IsExporting)
         {
@@ -70,7 +71,7 @@ public class PmpExportManager : IPmpExportManager
             var modData = new PmpDefaultMod();
             modData.Manipulations = ModPackageBuilder.BuildManipulations(resolvedManipulations);
             ModPackageBuilder.AddSnapshotFiles(archive, snapshotInfo, paths.FilesDirectory, modData.Files,
-                resolvedFileMap);
+                resolvedFileMap, useReadableArchivePaths);
 
             ArchiveUtil.WriteJsonEntry(archive, "default_mod.json", modData);
 
