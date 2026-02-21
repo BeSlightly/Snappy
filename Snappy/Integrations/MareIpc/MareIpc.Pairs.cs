@@ -27,6 +27,12 @@ public sealed partial class MareIpc
                 if (pairObject == null) continue;
 
                 var characterData = pairObject.GetFoP("LastReceivedCharacterData");
+                if (characterData == null)
+                {
+                    var handler = pairObject.GetFoP("Handler");
+                    if (handler != null)
+                        characterData = handler.GetFoP("LastReceivedCharacterData");
+                }
                 if (characterData != null)
                 {
                     PluginLog.Debug(
@@ -40,20 +46,21 @@ public sealed partial class MareIpc
         }).Result;
     }
 
-    private IDictionary? GetAllMareClientPairsFromPlugin(MarePluginInfo pluginInfo)
+    private IEnumerable<object> EnumeratePairsFromPlugin(MarePluginInfo pluginInfo)
     {
-        if (!pluginInfo.IsAvailable || pluginInfo.PairManager == null) return null;
+        if (!pluginInfo.IsAvailable || pluginInfo.PairManager == null)
+            yield break;
 
-        try
-        {
-            return pluginInfo.PairManager.GetFoP("_allClientPairs") as IDictionary;
-        }
-        catch (Exception e)
-        {
-            PluginLog.Error(
-                $"An exception occurred while reflecting into {pluginInfo.PluginName} to get client pairs.\n{e}");
-            return null;
-        }
+        var pairManager = pluginInfo.PairManager;
+
+        foreach (var pair in EnumeratePairsFromResult(InvokePairManagerMethod(pairManager, "GetOnlineUserPairs")))
+            yield return pair;
+
+        foreach (var pair in EnumeratePairsFromResult(InvokePairManagerMethod(pairManager, "GetAllPairObjects")))
+            yield return pair;
+
+        foreach (var pair in EnumeratePairsFromResult(GetAllClientPairsField(pairManager, pluginInfo.PluginName)))
+            yield return pair;
     }
 
     private object? GetMarePairFromPlugin(ICharacter character, MarePluginInfo pluginInfo)
@@ -73,19 +80,7 @@ public sealed partial class MareIpc
                         var handler = entry.GetFoP("Handler");
                         if (handler == null) continue;
 
-                        var addrObj = handler.GetFoP("PlayerCharacter");
-                        if (addrObj is nint ptr && ptr == character.Address)
-                        {
-                            return handler;
-                        }
-                        if (addrObj is IntPtr iptr && iptr == character.Address)
-                        {
-                            return handler;
-                        }
-
-                        var handlerName = handler.GetFoP("PlayerName") as string;
-                        if (!string.IsNullOrEmpty(handlerName) &&
-                            string.Equals(handlerName, character.Name.TextValue, StringComparison.Ordinal))
+                        if (IsMatchingPairObject(handler, character))
                             return handler;
                     }
                     PluginLog.Debug(
@@ -99,15 +94,17 @@ public sealed partial class MareIpc
             }
         }
 
-        var allClientPairs = GetAllMareClientPairsFromPlugin(pluginInfo);
-        if (allClientPairs == null) return null;
-
         try
         {
-            foreach (var pairObject in allClientPairs.Values)
-                if (pairObject.GetFoP("PlayerName") is string pairPlayerName &&
-                    string.Equals(pairPlayerName, character.Name.TextValue, StringComparison.Ordinal))
+            foreach (var pairObject in EnumeratePairsFromPlugin(pluginInfo))
+            {
+                if (IsMatchingPairObject(pairObject, character))
                     return pairObject;
+
+                var handler = pairObject.GetFoP("Handler");
+                if (handler != null && IsMatchingPairObject(handler, character))
+                    return handler;
+            }
         }
         catch (Exception e)
         {
@@ -116,5 +113,86 @@ public sealed partial class MareIpc
         }
 
         return null;
+    }
+
+    private static bool IsMatchingPairObject(object pairObject, ICharacter character)
+    {
+        var addrObj = pairObject.GetFoP("PlayerCharacter");
+        if (addrObj is nint ptr && ptr == character.Address)
+            return true;
+        if (addrObj is IntPtr iptr && iptr == character.Address)
+            return true;
+
+        var handlerName = pairObject.GetFoP("PlayerName") as string;
+        return !string.IsNullOrEmpty(handlerName)
+            && string.Equals(handlerName, character.Name.TextValue, StringComparison.Ordinal);
+    }
+
+    private static object? InvokePairManagerMethod(object pairManager, string methodName)
+    {
+        try
+        {
+            var method = pairManager.GetType().GetMethod(methodName, BindingFlags.Instance | BindingFlags.Public);
+            return method?.Invoke(pairManager, null);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static object? GetAllClientPairsField(object pairManager, string pluginName)
+    {
+        try
+        {
+            return pairManager.GetFoP("_allClientPairs");
+        }
+        catch (Exception e)
+        {
+            PluginLog.Error(
+                $"An exception occurred while reflecting into {pluginName} to get client pairs.\n{e}");
+            return null;
+        }
+    }
+
+    private static IEnumerable<object> EnumeratePairsFromResult(object? pairsContainer)
+    {
+        if (pairsContainer == null) yield break;
+
+        if (pairsContainer is IDictionary dict)
+        {
+            foreach (var value in dict.Values)
+                if (value != null)
+                    yield return value;
+            yield break;
+        }
+
+        if (pairsContainer is IEnumerable enumerable)
+        {
+            foreach (var item in enumerable)
+            {
+                if (item == null) continue;
+
+                if (item is DictionaryEntry entry)
+                {
+                    if (entry.Value != null)
+                        yield return entry.Value;
+                    continue;
+                }
+
+                var valueProp = item.GetType().GetProperty("Value", BindingFlags.Instance | BindingFlags.Public);
+                if (valueProp != null && valueProp.GetIndexParameters().Length == 0)
+                {
+                    var value = valueProp.GetValue(item);
+                    if (value != null)
+                    {
+                        yield return value;
+                        continue;
+                    }
+                }
+
+                yield return item;
+            }
+        }
     }
 }
