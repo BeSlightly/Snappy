@@ -104,7 +104,7 @@ public class SnapshotFileService : ISnapshotFileService
                 string? sourceFile = null;
                 if (useMareFileCache)
                     sourceFile = _ipcManager.GetMareFileCachePath(hash);
-                else
+                if (string.IsNullOrEmpty(sourceFile))
                     snapshotData.ResolvedPaths.TryGetValue(hash, out sourceFile);
 
                 if (!string.IsNullOrEmpty(sourceFile) && File.Exists(sourceFile))
@@ -342,6 +342,7 @@ public class SnapshotFileService : ISnapshotFileService
         var hashCache = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         int backfilled = 0;
         int mismatched = 0;
+        int skippedVerify = 0;
 
         foreach (var (gamePath, expectedHash) in snapshotData.FileReplacements.ToList())
         {
@@ -354,28 +355,41 @@ public class SnapshotFileService : ISnapshotFileService
             if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath))
                 continue;
 
-            if (!hashCache.TryGetValue(filePath, out var actualHash))
+            var isSha1 = expectedHash.Length == 40;
+            var resolvedHash = expectedHash;
+            if (isSha1)
             {
-                actualHash = PluginUtil.GetFileHash(filePath);
-                if (string.IsNullOrEmpty(actualHash))
-                    continue;
-                hashCache[filePath] = actualHash;
+                if (!hashCache.TryGetValue(filePath, out var actualHash))
+                {
+                    actualHash = PluginUtil.GetFileHash(filePath);
+                    if (string.IsNullOrEmpty(actualHash))
+                        continue;
+                    hashCache[filePath] = actualHash;
+                }
+
+                if (!string.Equals(actualHash, expectedHash, StringComparison.OrdinalIgnoreCase))
+                    mismatched++;
+
+                resolvedHash = actualHash;
+                snapshotData.FileReplacements[gamePath] = actualHash;
+            }
+            else
+            {
+                skippedVerify++;
+                snapshotData.FileReplacements[gamePath] = expectedHash;
             }
 
-            if (!string.Equals(actualHash, expectedHash, StringComparison.OrdinalIgnoreCase))
-                mismatched++;
-
-            snapshotData.FileReplacements[gamePath] = actualHash;
-            if (!snapshotData.ResolvedPaths.ContainsKey(actualHash))
-                snapshotData.ResolvedPaths[actualHash] = filePath;
+            if (!snapshotData.ResolvedPaths.ContainsKey(resolvedHash))
+                snapshotData.ResolvedPaths[resolvedHash] = filePath;
 
             backfilled++;
         }
 
         if (backfilled > 0)
         {
+            var skippedMessage = skippedVerify > 0 ? $", hash verification skipped: {skippedVerify}" : "";
             PluginLog.Debug(
-                $"[Snappy] Backfilled {backfilled} file(s) from Penumbra for snapshot; hash mismatches: {mismatched}.");
+                $"[Snappy] Backfilled {backfilled} file(s) from Penumbra for snapshot; hash mismatches: {mismatched}{skippedMessage}.");
         }
     }
 
