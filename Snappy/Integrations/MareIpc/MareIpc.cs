@@ -32,7 +32,6 @@ public sealed partial class MareIpc : IpcSubscriber
         public bool IsAvailable { get; set; }
         public object? Plugin { get; set; }
         public object? PairManager { get; set; }
-        public object? PairLedger { get; set; }
         public object? FileCacheManager { get; set; }
         public MethodInfo? GetFileCacheByHashMethod { get; set; }
 
@@ -122,15 +121,6 @@ public sealed partial class MareIpc : IpcSubscriber
                         PluginLog.Warning($"[Mare IPC] Could not get PairManager service for {pluginName}.");
                 }
 
-                var pairLedgerType = marePlugin.GetType().Assembly
-                    .GetType($"{pluginInfo.NamespacePrefix}.PlayerData.Pairs.PairLedger");
-                if (pairLedgerType != null)
-                {
-                    pluginInfo.PairLedger = serviceProvider.GetService(pairLedgerType);
-                    if (pluginInfo.PairLedger == null)
-                        PluginLog.Warning($"[Mare IPC] Could not get PairLedger service for {pluginName}.");
-                }
-
                 var fileCacheManagerType = marePlugin.GetType().Assembly
                     .GetType($"{pluginInfo.NamespacePrefix}.FileCache.FileCacheManager");
                 if (fileCacheManagerType != null)
@@ -204,7 +194,6 @@ public sealed partial class MareIpc : IpcSubscriber
         pluginInfo.IsAvailable = false;
         pluginInfo.Plugin = null;
         pluginInfo.PairManager = null;
-        pluginInfo.PairLedger = null;
         pluginInfo.FileCacheManager = null;
         pluginInfo.GetFileCacheByHashMethod = null;
     }

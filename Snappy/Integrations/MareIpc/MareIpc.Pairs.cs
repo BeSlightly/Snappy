@@ -65,35 +65,6 @@ public sealed partial class MareIpc
 
     private object? GetMarePairFromPlugin(ICharacter character, MarePluginInfo pluginInfo)
     {
-        if (pluginInfo.PairLedger != null)
-        {
-            try
-            {
-                var getAllEntriesMethod = pluginInfo.PairLedger.GetType()
-                    .GetMethod("GetAllEntries", BindingFlags.Instance | BindingFlags.Public);
-                if (getAllEntriesMethod?.Invoke(pluginInfo.PairLedger, null) is IEnumerable entries)
-                {
-                    int entryCount = 0;
-                    foreach (var entry in entries)
-                    {
-                        entryCount++;
-                        var handler = entry.GetFoP("Handler");
-                        if (handler == null) continue;
-
-                        if (IsMatchingPairObject(handler, character))
-                            return handler;
-                    }
-                    PluginLog.Debug(
-                        $"[Mare IPC] Checked {entryCount} PairLedger entries in {pluginInfo.PluginName}, no match found for {character.Name.TextValue} (Addr: {character.Address:X})");
-                }
-            }
-            catch (Exception e)
-            {
-                PluginLog.Error(
-                    $"An exception occurred while processing {pluginInfo.PluginName} pair ledger entries.\n{e}");
-            }
-        }
-
         try
         {
             foreach (var pairObject in EnumeratePairsFromPlugin(pluginInfo))
