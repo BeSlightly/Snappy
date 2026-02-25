@@ -1,4 +1,4 @@
-using Penumbra.UI;
+using Penumbra.UI.Classes;
 
 namespace Snappy.Features.Pmp.ChangedItems;
 

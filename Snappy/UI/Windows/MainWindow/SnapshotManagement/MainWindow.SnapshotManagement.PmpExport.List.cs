@@ -1,5 +1,5 @@
 using Dalamud.Interface.Colors;
-using Penumbra.UI;
+using Penumbra.UI.Classes;
 using Snappy.Features.Pmp.ChangedItems;
 
 namespace Snappy.UI.Windows;
@@ -11,15 +11,15 @@ public partial class MainWindow
         var selectedCount = _pmpItemSelection.Count(kvp => kvp.Value);
         var totalCount = _pmpItemSelection.Count;
 
-        if (ImUtf8.Button("Select All"u8))
+        if (Im.Button("Select All"u8))
             SetAllPmpSelections(true);
 
         ImGui.SameLine();
-        if (ImUtf8.Button("Clear All"u8))
+        if (Im.Button("Clear All"u8))
             SetAllPmpSelections(false);
 
         ImGui.SameLine();
-        ImUtf8.Text($"Selected {selectedCount} / {totalCount} items");
+        Im.Text($"Selected {selectedCount} / {totalCount} items");
     }
 
     private void DrawPmpCategoryTabs()
@@ -27,7 +27,7 @@ public partial class MainWindow
         if (_pmpChangedItems == null)
             return;
 
-        using var tabBar = ImUtf8.TabBar("PmpItemCategories"u8);
+        using var tabBar = Im.TabBar.Begin("PmpItemCategories"u8);
         if (!tabBar)
             return;
 
@@ -37,7 +37,7 @@ public partial class MainWindow
                 continue;
 
             var label = BuildPmpCategoryLabel(category.Category, category.Items.Count);
-            using var tab = ImUtf8.TabItem(label);
+            using var tab = Im.TabBar.BeginItem(label);
             if (tab)
                 DrawPmpItemList(category.Category, category.Items);
         }
@@ -74,16 +74,16 @@ public partial class MainWindow
                 }
 
                 ImGui.TableNextColumn();
-                ImUtf8.Text(item.Name);
+                Im.Text(item.Name);
                 if (!string.IsNullOrWhiteSpace(item.AdditionalData))
                 {
                     ImGui.SameLine();
                     using var color = ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.DalamudGrey);
-                    ImUtf8.Text(item.AdditionalData);
+                    Im.Text(item.AdditionalData);
                 }
 
                 ImGui.TableNextColumn();
-                ImUtf8.Text(item.Count.ToString());
+                Im.Text(item.Count.ToString());
             }
         }
 
@@ -93,7 +93,9 @@ public partial class MainWindow
 
     private static string BuildPmpCategoryLabel(ChangedItemIconFlag category, int count)
     {
-        var name = category == ChangedItemIconFlag.Unknown ? "Misc / Unknown" : category.ToDescription();
+        var name = category == ChangedItemIconFlag.Unknown
+            ? "Misc / Unknown"
+            : Encoding.UTF8.GetString(category.ToDescription());
         return $"{name} ({count})";
     }
 }

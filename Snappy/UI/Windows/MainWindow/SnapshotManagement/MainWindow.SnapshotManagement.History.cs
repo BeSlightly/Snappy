@@ -15,28 +15,28 @@ public partial class MainWindow
     private void DrawHistoryList<T>(string type, List<T> entries)
         where T : HistoryEntryBase
     {
-        using var child = ImUtf8.Child(
+        using var child = Im.Child.Begin(
             "HistoryList" + type,
             new Vector2(0, -1),
             false,
-            ImGuiWindowFlags.HorizontalScrollbar
+            (WindowFlags)ImGuiWindowFlags.HorizontalScrollbar
         );
         if (!child)
             return;
 
         var tableId = $"HistoryTable{type}";
-        using var table = ImUtf8.Table(
+        using var table = Im.Table.Begin(
             tableId,
             2,
-            ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingFixedFit
+            (TableFlags)(ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingFixedFit)
         );
         if (!table)
             return;
 
-        ImUtf8.TableSetupColumn("Description", ImGuiTableColumnFlags.WidthStretch);
-        ImUtf8.TableSetupColumn(
+        table.SetupColumn("Description", (TableColumnFlags)ImGuiTableColumnFlags.WidthStretch);
+        table.SetupColumn(
             "Controls",
-            ImGuiTableColumnFlags.WidthFixed,
+            (TableColumnFlags)ImGuiTableColumnFlags.WidthFixed,
             260f * ImGuiHelpers.GlobalScale
         );
 
@@ -68,7 +68,7 @@ public partial class MainWindow
                     var description = entry.Description;
                     if (string.IsNullOrEmpty(description))
                         description = "Unnamed Entry";
-                    ImUtf8.Text(description);
+                    Im.Text(description);
                 }
 
                 ImGui.TableNextColumn();
@@ -101,7 +101,7 @@ public partial class MainWindow
         ImGui.SetCursorPosX(startX);
 
         if (
-            ImUtf8.IconButton(
+            UiHelpers.IconButton(
                 FontAwesomeIcon.Download,
                 "Load this entry",
                 default,
@@ -128,7 +128,7 @@ public partial class MainWindow
         ImGui.SameLine();
 
         if (
-            ImUtf8.IconButton(
+            UiHelpers.IconButton(
                 FontAwesomeIcon.Copy,
                 "Copy Data to Clipboard",
                 default
@@ -143,7 +143,7 @@ public partial class MainWindow
 
             if (!string.IsNullOrEmpty(textToCopy))
             {
-                ImUtf8.SetClipboardText(textToCopy);
+                Im.Clipboard.Set(textToCopy);
                 Notify.Info("Copied data to clipboard.");
             }
         }
@@ -154,7 +154,7 @@ public partial class MainWindow
         var pmpTooltip = _pmpExportManager.IsExporting
             ? "An export is already in progress..."
             : "Export this entry's state to a Penumbra Mod Pack (.pmp).";
-        if (ImUtf8.IconButton(FontAwesomeIcon.BoxOpen, pmpTooltip, default, pmpDisabled))
+        if (UiHelpers.IconButton(FontAwesomeIcon.BoxOpen, pmpTooltip, default, pmpDisabled))
         {
             var selectedSnapshot = _selectedSnapshot;
             if (selectedSnapshot != null)
@@ -183,7 +183,7 @@ public partial class MainWindow
 
         ImGui.SameLine();
 
-        if (ImUtf8.IconButton(FontAwesomeIcon.Pen, "Rename Entry", default))
+        if (UiHelpers.IconButton(FontAwesomeIcon.Pen, "Rename Entry", default))
         {
             _historyEntryToRename = entry;
             _tempHistoryEntryName = entry.Description ?? "";
@@ -192,7 +192,7 @@ public partial class MainWindow
 
         ImGui.SameLine();
 
-        if (ImUtf8.IconButton(FontAwesomeIcon.Trash, "Delete Entry", default)) _historyEntryToDelete = entry;
+        if (UiHelpers.IconButton(FontAwesomeIcon.Trash, "Delete Entry", default)) _historyEntryToDelete = entry;
     }
 
 }

@@ -4,10 +4,10 @@ public partial class MainWindow
 {
     private void HandlePopups()
     {
-        if (_historyEntryToDelete != null) ImUtf8.OpenPopup("Delete History Entry");
+        if (_historyEntryToDelete != null) ImGui.OpenPopup("Delete History Entry");
         if (_openDeleteSnapshotPopup)
         {
-            ImUtf8.OpenPopup("Delete Snapshot");
+            ImGui.OpenPopup("Delete Snapshot");
             _openDeleteSnapshotPopup = false;
         }
 
@@ -16,14 +16,14 @@ public partial class MainWindow
             if (_selectedSnapshotInfo != null)
             {
                 _tempSourceActorName = _selectedSnapshotInfo.SourceActor;
-                ImUtf8.OpenPopup("Rename Source Actor"u8);
+                ImGui.OpenPopup("Rename Source Actor");
             }
 
             _openRenameActorPopup = false;
         }
 
         using (
-            var modal = ImUtf8.Modal(
+            var modal = ImRaii.PopupModal(
                 "Delete History Entry",
                 ImGuiWindowFlags.AlwaysAutoResize
             )
@@ -31,11 +31,11 @@ public partial class MainWindow
         {
             if (modal)
             {
-                ImUtf8.Text(
+                Im.Text(
                     "Are you sure you want to delete this history entry?\nThis action cannot be undone."
                 );
                 ImGui.Separator();
-                if (ImUtf8.Button("Yes, Delete", new Vector2(120, 0)))
+                if (Im.Button("Yes, Delete", new Vector2(120, 0)))
                 {
                     if (_historyEntryToDelete is GlamourerHistoryEntry gEntry)
                         _glamourerHistory.Entries.Remove(gEntry);
@@ -50,7 +50,7 @@ public partial class MainWindow
                 }
 
                 ImGui.SameLine();
-                if (ImUtf8.Button("Cancel", new Vector2(120, 0)))
+                if (Im.Button("Cancel", new Vector2(120, 0)))
                 {
                     _historyEntryToDelete = null;
                     ImGui.CloseCurrentPopup();
@@ -59,7 +59,7 @@ public partial class MainWindow
         }
 
         using (
-            var modal = ImUtf8.Modal(
+            var modal = ImRaii.PopupModal(
                 "Delete Snapshot",
                 ImGuiWindowFlags.AlwaysAutoResize
             )
@@ -67,11 +67,11 @@ public partial class MainWindow
         {
             if (modal)
             {
-                ImUtf8.Text(
+                Im.Text(
                     $"Are you sure you want to permanently delete the snapshot '{_selectedSnapshot?.Name}'?\nThis will delete the entire folder and its contents.\nThis action cannot be undone."
                 );
                 ImGui.Separator();
-                if (ImUtf8.Button("Yes, Delete Snapshot", new Vector2(180, 0)))
+                if (Im.Button("Yes, Delete Snapshot", new Vector2(180, 0)))
                 {
                     try
                     {
@@ -91,28 +91,28 @@ public partial class MainWindow
                 }
 
                 ImGui.SameLine();
-                if (ImUtf8.Button("Cancel", new Vector2(120, 0))) ImGui.CloseCurrentPopup();
+                if (Im.Button("Cancel", new Vector2(120, 0))) ImGui.CloseCurrentPopup();
             }
         }
 
         using (
-            var modal = ImUtf8.Modal(
-                "Rename Source Actor"u8,
+            var modal = ImRaii.PopupModal(
+                "Rename Source Actor",
                 ImGuiWindowFlags.AlwaysAutoResize
             )
         )
         {
             if (modal)
             {
-                ImUtf8.Text("Enter the new name for the Source Actor of this snapshot.");
-                ImUtf8.Text("This name is used to find the snapshot when using 'Update Snapshot'.");
+                Im.Text("Enter the new name for the Source Actor of this snapshot.");
+                Im.Text("This name is used to find the snapshot when using 'Update Snapshot'.");
                 ImGui.Separator();
 
                 ImGui.SetNextItemWidth(300 * ImGuiHelpers.GlobalScale);
-                var enterPressed = ImUtf8.InputText(
+                var enterPressed = Im.Input.Text(
                     "##SourceActorName"u8,
                     ref _tempSourceActorName,
-                    flags: ImGuiInputTextFlags.EnterReturnsTrue | ImGuiInputTextFlags.AutoSelectAll
+                    flags: (InputTextFlags)(ImGuiInputTextFlags.EnterReturnsTrue | ImGuiInputTextFlags.AutoSelectAll)
                 );
                 if (ImGui.IsWindowAppearing()) ImGui.SetKeyboardFocusHere(-1);
 
@@ -123,7 +123,7 @@ public partial class MainWindow
                 using (var d = ImRaii.Disabled(isInvalidName))
                 {
                     if (
-                        ImUtf8.Button("Save", new Vector2(120, 0))
+                        Im.Button("Save", new Vector2(120, 0))
                         || (enterPressed && !isInvalidName)
                     )
                     {
@@ -133,7 +133,7 @@ public partial class MainWindow
                 }
 
                 ImGui.SameLine();
-                if (ImUtf8.Button("Cancel", new Vector2(120, 0))) ImGui.CloseCurrentPopup();
+                if (Im.Button("Cancel", new Vector2(120, 0))) ImGui.CloseCurrentPopup();
             }
         }
     }

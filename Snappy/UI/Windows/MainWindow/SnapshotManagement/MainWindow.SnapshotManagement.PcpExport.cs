@@ -9,13 +9,13 @@ public partial class MainWindow
     private void DrawPcpExportTab()
     {
         // Content container (use default styling similar to Penumbra Effective Changes)
-        using var _pcpChild = ImUtf8.Child("PcpExportContent", new Vector2(0, -1), false, ImGuiWindowFlags.None);
+        using var _pcpChild = Im.Child.Begin("PcpExportContent", new Vector2(0, -1), false, (WindowFlags)ImGuiWindowFlags.None);
         if (!_pcpChild)
             return;
         // Instruction (subtle helper text)
         using (var _pcpTextGrey = ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.DalamudGrey))
         {
-            ImUtf8.Text(
+            Im.Text(
                 "Select which Glamourer and Customize+ history entries to include in the PCP export.\nIf no selection is made, the latest entry will be used for each."u8);
         }
 
@@ -30,7 +30,7 @@ public partial class MainWindow
             // Glamourer selector
             ImGui.TableNextColumn();
             ImGui.AlignTextToFramePadding();
-            ImUtf8.Text("Glamourer Entry"u8);
+            Im.Text("Glamourer Entry"u8);
             ImGui.Spacing();
 
             var glamourerPreview = _pcpSelectedGlamourerEntry != null
@@ -57,13 +57,13 @@ public partial class MainWindow
                 ImGui.EndCombo();
             }
 
-            ImUtf8.HoverTooltip(
+            Im.Tooltip.OnHover(
                 "Pick a specific Glamourer design to include in the PCP. If not selected, the latest design will be used.");
 
             // Customize+ selector
             ImGui.TableNextColumn();
             ImGui.AlignTextToFramePadding();
-            ImUtf8.Text("Customize+ Entry"u8);
+            Im.Text("Customize+ Entry"u8);
             ImGui.Spacing();
 
             var customizePreview = _pcpSelectedCustomizeEntry != null
@@ -90,7 +90,7 @@ public partial class MainWindow
                 ImGui.EndCombo();
             }
 
-            ImUtf8.HoverTooltip(
+            Im.Tooltip.OnHover(
                 "Pick a specific Customize+ template to include in the PCP. If not selected, the latest template will be used.");
 
             ImGui.EndTable();
@@ -109,21 +109,21 @@ public partial class MainWindow
             // Player Name input
             ImGui.TableNextColumn();
             ImGui.AlignTextToFramePadding();
-            ImUtf8.Text("Player Name"u8);
+            Im.Text("Player Name"u8);
             ImGui.Spacing();
             ImGui.SetNextItemWidth(-1);
-            ImUtf8.InputText(
+            Im.Input.Text(
                 "##PcpPlayerName"u8,
                 ref _pcpPlayerNameOverride,
-                flags: ImGuiInputTextFlags.AutoSelectAll
+                flags: (InputTextFlags)ImGuiInputTextFlags.AutoSelectAll
             );
-            ImUtf8.HoverTooltip(
+            Im.Tooltip.OnHover(
                 "Name written to PCP's character.json Actor.PlayerName. Defaults to snapshot's Source Actor."u8);
 
             // Homeworld selection (reusing searchable combo pattern)
             ImGui.TableNextColumn();
             ImGui.AlignTextToFramePadding();
-            ImUtf8.Text("Homeworld"u8);
+            Im.Text("Homeworld"u8);
             ImGui.Spacing();
 
             // Use Lifestream-style WorldSelector grouped by Region/Data Center
@@ -137,7 +137,7 @@ public partial class MainWindow
             ImGui.SetNextItemWidth(-1);
             _pcpWorldSelector.Draw(ref tmpWorldId);
             _pcpSelectedWorldIdOverride = tmpWorldId == 0 ? null : tmpWorldId;
-            ImUtf8.HoverTooltip("Search and select the player's Homeworld. Written to PCP's Actor.HomeWorld (ID)."u8);
+            Im.Tooltip.OnHover("Search and select the player's Homeworld. Written to PCP's Actor.HomeWorld (ID)."u8);
 
             ImGui.EndTable();
         }
@@ -190,15 +190,15 @@ public partial class MainWindow
         using (var warningColor = ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.DalamudYellow))
         {
             var warningText = "Warning: PCP export is experimental. Please report any issues on GitHub.";
-            var textWidth = ImUtf8.CalcTextSize(warningText).X;
+            var textWidth = Im.Font.CalculateSize(warningText).X;
             var availableWidth = ImGui.GetContentRegionAvail().X;
 
             // Calculate the starting X position to center the text
             var cursorPosX = (availableWidth - textWidth) * 0.5f;
             if (cursorPosX > 0) ImGui.SetCursorPosX(ImGui.GetCursorPosX() + cursorPosX);
 
-            // Use ImUtf8.Text for precise centering
-            ImUtf8.Text(warningText);
+            // Keep centered text drawing consistent with the warning style.
+            Im.Text(warningText);
         }
     }
 

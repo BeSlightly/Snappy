@@ -36,7 +36,7 @@ public sealed class ConfigWindow : Window
     public override void Draw()
     {
         var disableRevert = _configuration.DisableAutomaticRevert;
-        if (ImUtf8.Checkbox("Disable Automatic Revert on GPose Exit", ref disableRevert))
+        if (Im.Checkbox("Disable Automatic Revert on GPose Exit", ref disableRevert))
         {
             if (_configuration.DisableAutomaticRevert && !disableRevert)
                 if (Player.Available)
@@ -55,7 +55,7 @@ public sealed class ConfigWindow : Window
         using (var d = ImRaii.Disabled(!_configuration.DisableAutomaticRevert))
         {
             var allowOutside = _configuration.AllowOutsideGpose;
-            if (ImUtf8.Checkbox("Allow loading to your character outside of GPose", ref allowOutside))
+            if (Im.Checkbox("Allow loading to your character outside of GPose", ref allowOutside))
             {
                 _configuration.AllowOutsideGpose = allowOutside;
                 _configuration.Save();
@@ -65,12 +65,12 @@ public sealed class ConfigWindow : Window
             using (var d2 = ImRaii.Disabled(!allowOutside))
             {
                 var allowOwnedPets = _configuration.AllowOutsideGposeOwnedPets;
-                if (ImUtf8.Checkbox("Allow loading to your own pets outside of GPose", ref allowOwnedPets))
+                if (Im.Checkbox("Allow loading to your own pets outside of GPose", ref allowOwnedPets))
                 {
                     _configuration.AllowOutsideGposeOwnedPets = allowOwnedPets;
                     _configuration.Save();
                 }
-                ImUtf8.HoverTooltip("Also shows your pets in the actor list.");
+                Im.Tooltip.OnHover("Also shows your pets in the actor list.");
             }
             ImGui.Unindent();
         }
@@ -80,60 +80,60 @@ public sealed class ConfigWindow : Window
         using (ImRaii.PushFont(UiBuilder.IconFont))
         {
             using var color = ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.DalamudYellow);
-            ImUtf8.Text(FontAwesomeIcon.ExclamationTriangle.ToIconString());
+            Im.Text(FontAwesomeIcon.ExclamationTriangle.ToIconString());
         }
 
         ImGui.SameLine();
         using (var textColor = ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.DalamudGrey))
         {
-            ImUtf8.Text("Warning: These features are unsupported and may cause issues.");
+            Im.Text("Warning: These features are unsupported and may cause issues.");
         }
 
         ImGui.Separator();
 
-        ImUtf8.Text("Snapshot data source:");
+        Im.Text("Snapshot data source:");
         ImGui.Indent();
 
         var useLiveSnapshotData = _configuration.UseLiveSnapshotData;
-        if (ImUtf8.Checkbox("Use Penumbra/Customize+/Glamourer (fallback)", ref useLiveSnapshotData))
+        if (Im.Checkbox("Use Penumbra/Customize+/Glamourer (fallback)", ref useLiveSnapshotData))
         {
             _configuration.UseLiveSnapshotData = useLiveSnapshotData;
             _configuration.Save();
         }
-        ImUtf8.HoverTooltip(
+        Im.Tooltip.OnHover(
             "Fallback for unsupported forks; Mare reflection is usually more complete for supported forks."
         );
 
         using (var d = ImRaii.Disabled(!useLiveSnapshotData))
         {
             var useIpcResourcePaths = _configuration.UsePenumbraIpcResourcePaths;
-            if (ImUtf8.Checkbox("Use Penumbra IPC (resource paths)", ref useIpcResourcePaths))
+            if (Im.Checkbox("Use Penumbra IPC (resource paths)", ref useIpcResourcePaths))
             {
                 _configuration.UsePenumbraIpcResourcePaths = useIpcResourcePaths;
                 _configuration.Save();
             }
-            ImUtf8.HoverTooltip("IPC uses only currently loaded/on-screen files (no full collection). Use if reflection fails.");
+            Im.Tooltip.OnHover("IPC uses only currently loaded/on-screen files (no full collection). Use if reflection fails.");
 
             var includeTempActors = _configuration.IncludeVisibleTempCollectionActors;
-            if (ImUtf8.Checkbox("Include visible actors with temporary collections", ref includeTempActors))
+            if (Im.Checkbox("Include visible actors with temporary collections", ref includeTempActors))
             {
                 _configuration.IncludeVisibleTempCollectionActors = includeTempActors;
                 _configuration.Save();
             }
-            ImUtf8.HoverTooltip("Adds players with temporary Penumbra collections to the actor selection.");
+            Im.Tooltip.OnHover("Adds players with temporary Penumbra collections to the actor selection.");
         }
 
         ImGui.Unindent();
         ImGui.Separator();
 
         if (
-            ImUtf8.Button(
+            Im.Button(
                 "Run Snapshot Migration Scan",
                 new Vector2(ImGui.GetContentRegionAvail().X, 0)
             )
         )
             _snappy.ManuallyRunMigration();
-        ImUtf8.HoverTooltip(
+        Im.Tooltip.OnHover(
             "Manually scans your working directory for old-format snapshots and migrates them to the current format.\n"
             + "A backup is created before any changes are made."
         );
@@ -144,7 +144,7 @@ public sealed class ConfigWindow : Window
 
     private void DrawMarePluginStatus()
     {
-        ImUtf8.Text("Mare Plugin Status:");
+        Im.Text("Mare Plugin Status:");
         ImGui.Indent();
 
         var mareStatus = _ipcManager.GetMarePluginStatus();
@@ -166,7 +166,7 @@ public sealed class ConfigWindow : Window
             using (ImRaii.PushFont(UiBuilder.IconFont))
             {
                 using var color = ImRaii.PushColor(ImGuiCol.Text, iconColor);
-                ImUtf8.Text(icon.ToIconString());
+                Im.Text(icon.ToIconString());
             }
 
             ImGui.SameLine();
@@ -177,7 +177,7 @@ public sealed class ConfigWindow : Window
                 ? new Vector4(forkColor.X, forkColor.Y, forkColor.Z, isAvailable ? forkColor.W : 0.4f)
                 : fallbackColor;
             using var textColorScope = ImRaii.PushColor(ImGuiCol.Text, textColor);
-            ImUtf8.Text(displayName);
+            Im.Text(displayName);
         }
 
         ImGui.Unindent();

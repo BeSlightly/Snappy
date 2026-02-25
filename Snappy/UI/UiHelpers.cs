@@ -14,10 +14,10 @@ public static class UiHelpers
         Vector2 iconSize;
         using (var font = ImRaii.PushFont(UiBuilder.IconFont))
         {
-            iconSize = ImUtf8.CalcTextSize(icon.ToIconString());
+            iconSize = Im.Font.CalculateSize(icon.ToIconString());
         }
 
-        var textSize = ImUtf8.CalcTextSize(text);
+        var textSize = Im.Font.CalculateSize(text);
         var framePadding = ImGui.GetStyle().FramePadding;
 
         var contentMaxHeight = Math.Max(iconSize.Y, textSize.Y);
@@ -29,10 +29,10 @@ public static class UiHelpers
         var buttonId = $"##{icon}{text}_stretched";
         using (var d = ImRaii.Disabled(disabled))
         {
-            result = ImUtf8.Button(buttonId, buttonSize);
+            result = Im.Button(buttonId, buttonSize);
         }
 
-        ImUtf8.HoverTooltip(ImGuiHoveredFlags.AllowWhenDisabled, tooltip);
+        Im.Tooltip.OnHover(HoveredFlags.AllowWhenDisabled, tooltip);
 
         var drawList = ImGui.GetWindowDrawList();
         var buttonRectMin = ImGui.GetItemRectMin();
@@ -73,18 +73,42 @@ public static class UiHelpers
         ImGui.SetNextItemWidth(inputWidth);
         using (var color = ImRaii.PushColor(ImGuiCol.Border, new Vector4(1, 1, 0, 0.5f)))
         {
-            if (ImUtf8.InputText(
+            if (Im.Input.Text(
                     "##" + id,
                     ref text,
-                    flags: ImGuiInputTextFlags.EnterReturnsTrue | ImGuiInputTextFlags.AutoSelectAll
+                    flags: (InputTextFlags)(ImGuiInputTextFlags.EnterReturnsTrue | ImGuiInputTextFlags.AutoSelectAll)
                 ))
                 onCommit();
         }
 
         ImGui.SameLine();
-        if (ImUtf8.IconButton(FontAwesomeIcon.Check)) onCommit();
+        if (IconButton(FontAwesomeIcon.Check)) onCommit();
 
         ImGui.SameLine();
-        if (ImUtf8.IconButton(FontAwesomeIcon.Times)) onCancel();
+        if (IconButton(FontAwesomeIcon.Times)) onCancel();
+    }
+
+    public static bool ButtonEx(string label, string tooltip, Vector2 size, bool disabled = false)
+    {
+        using var _ = ImRaii.Disabled(disabled);
+        var ret = Im.Button(label, size);
+        Im.Tooltip.OnHover(HoveredFlags.AllowWhenDisabled, tooltip);
+        return ret && !disabled;
+    }
+
+    public static bool IconButton(FontAwesomeIcon icon, string tooltip = "", Vector2 size = default, bool disabled = false)
+    {
+        var actualSize = size == default ? new Vector2(ImGui.GetFrameHeight(), ImGui.GetFrameHeight()) : size;
+        bool ret;
+        using (var disabledScope = ImRaii.Disabled(disabled))
+        using (var iconFont = ImRaii.PushFont(UiBuilder.IconFont))
+        {
+            ret = Im.Button(icon.ToIconString(), actualSize);
+        }
+
+        if (!string.IsNullOrEmpty(tooltip))
+            Im.Tooltip.OnHover(HoveredFlags.AllowWhenDisabled, tooltip);
+
+        return ret && !disabled;
     }
 }

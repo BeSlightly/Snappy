@@ -9,7 +9,7 @@ public partial class MainWindow
     {
         var width = ImGui.GetContentRegionAvail().X;
         ImGui.SetNextItemWidth(width);
-        if (ImUtf8.InputText("##playerFilter", ref _playerFilter, "Filter Players..."))
+        if (Im.Input.Text("##playerFilter", ref _playerFilter, "Filter Players..."))
         {
             _playerFilterLower = _playerFilter.ToLowerInvariant();
             _actorFilterDirty = true;
@@ -48,7 +48,7 @@ public partial class MainWindow
 
     private void ApplySelectableSelection(ICharacter selectablePlayer, string label, int objIdx, bool isSelected)
     {
-        if (!ImUtf8.Selectable(label, isSelected))
+        if (!Im.Selectable(label, isSelected))
             return;
 
         if (isSelected)
@@ -108,7 +108,7 @@ public partial class MainWindow
         var saveButtonSize = new Vector2(saveButtonWidth, 0);
 
         if (
-            ImUtf8.ButtonEx(
+            UiHelpers.ButtonEx(
                 buttonText,
                 tooltipText,
                 saveButtonSize,
@@ -146,7 +146,7 @@ public partial class MainWindow
         {
             using (var font = ImRaii.PushFont(UiBuilder.IconFont))
             {
-                if (ImUtf8.Button(lockIcon.ToIconString(), lockButtonSize))
+                if (Im.Button(lockIcon.ToIconString(), lockButtonSize))
                     if (_isActorLockedBySnappy && TryGetSelectedActor(out var selectedActor))
                     {
                         var isCurrentlyLocked = _activeSnapshotManager.IsActorGlamourerLocked(selectedActor);
@@ -158,7 +158,7 @@ public partial class MainWindow
             }
         }
 
-        ImUtf8.HoverTooltip(ImGuiHoveredFlags.AllowWhenDisabled, lockTooltip);
+        Im.Tooltip.OnHover(HoveredFlags.AllowWhenDisabled, lockTooltip);
 
         ImGui.EndGroup();
     }

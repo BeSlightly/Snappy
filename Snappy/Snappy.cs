@@ -6,8 +6,6 @@ using Dalamud.Interface.Windowing;
 using Dalamud.Plugin;
 using ECommons;
 using ECommons.Configuration;
-using OtterGui.Filesystem;
-using OtterGui.Log;
 using Snappy.Features.Mcdf;
 using Snappy.Features.Pcp;
 using Snappy.Features.Pmp;
@@ -23,12 +21,20 @@ public sealed partial class Snappy : IDalamudPlugin
 {
     private const string CommandName = "/snappy";
     private readonly ConcurrentQueue<Action> _mainThreadActions = new();
+    private readonly Luna.ImSharpDalamudContext _imSharpContext;
 
     public Snappy(IDalamudPluginInterface pluginInterface)
     {
         ECommonsMain.Init(pluginInterface, this, Module.DalamudReflector);
 
-        Log = new Logger();
+        Log = new Luna.Logger();
+        _imSharpContext = new Luna.ImSharpDalamudContext(
+            Svc.PluginInterface,
+            Svc.PluginInterface.UiBuilder,
+            Svc.Framework,
+            Log,
+            EmptyServiceProvider.Instance
+        );
 
         EzConfig.Migrate<Configuration>();
         Configuration = EzConfig.Init<Configuration>();
@@ -56,7 +62,7 @@ public sealed partial class Snappy : IDalamudPlugin
         PcpManager = new PcpManager(Configuration, SnapshotFileService, InvokeSnapshotsUpdated);
         PmpManager = new PmpExportManager(Configuration);
         SnapshotChangedItemService = new SnapshotChangedItemService(Log);
-        SnapshotFS = new FileSystem<Snapshot>();
+        SnapshotFS = new Luna.BaseFileSystem("SnappySnapshots", Log, false);
 
         SnapshotIndexService.RefreshSnapshotIndex();
         RunInitialSnapshotMigration();
@@ -82,7 +88,7 @@ public sealed partial class Snappy : IDalamudPlugin
 
     public string Name => "Snappy";
 
-    public Logger Log { get; }
+    public Luna.Logger Log { get; }
 
     public Configuration Configuration { get; }
     public WindowSystem WindowSystem { get; } = new("Snappy");
@@ -99,7 +105,7 @@ public sealed partial class Snappy : IDalamudPlugin
     public IPcpManager PcpManager { get; }
     public IPmpExportManager PmpManager { get; }
     public ISnapshotChangedItemService SnapshotChangedItemService { get; }
-    public FileSystem<Snapshot> SnapshotFS { get; }
+    public Luna.BaseFileSystem SnapshotFS { get; }
 
     public string Version =>
         Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "Unknown";
@@ -119,6 +125,7 @@ public sealed partial class Snappy : IDalamudPlugin
         Svc.PluginInterface.UiBuilder.Draw -= DrawUI;
         Svc.PluginInterface.UiBuilder.OpenConfigUi -= DrawConfigUI;
         Svc.PluginInterface.UiBuilder.OpenMainUi -= ToggleMainUI;
+        _imSharpContext.Dispose();
         ECommonsMain.Dispose();
     }
 
@@ -127,5 +134,13 @@ public sealed partial class Snappy : IDalamudPlugin
         if (ActiveSnapshotManager.HasActiveSnapshots)
             ActiveSnapshotManager.RevertAllSnapshots();
         MainWindow.ClearActorSelection();
+    }
+
+    private sealed class EmptyServiceProvider : IServiceProvider
+    {
+        public static readonly EmptyServiceProvider Instance = new();
+
+        public object? GetService(Type serviceType)
+            => null;
     }
 }

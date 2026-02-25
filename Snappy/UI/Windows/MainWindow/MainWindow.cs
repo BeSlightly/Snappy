@@ -1,5 +1,4 @@
 using Dalamud.Interface.Windowing;
-using OtterGui.Filesystem;
 using Snappy.Features.Mcdf;
 using Snappy.Features.Pcp;
 using Snappy.Features.Pmp;
@@ -54,7 +53,7 @@ public partial class MainWindow : Window, IDisposable
     private Snapshot? _selectedSnapshot;
     private SnapshotInfo? _selectedSnapshotInfo;
 
-    private FileSystem<Snapshot>.Leaf[] _snapshotList = Array.Empty<FileSystem<Snapshot>.Leaf>();
+    private Luna.IFileSystemData<Snapshot>[] _snapshotList = Array.Empty<Luna.IFileSystemData<Snapshot>>();
     private string _tempHistoryEntryName = string.Empty;
     private string _tempSnapshotName = string.Empty;
     private string _tempSourceActorName = string.Empty;
@@ -87,7 +86,7 @@ public partial class MainWindow : Window, IDisposable
         _snapshotFileService = snapshotFileService;
         _snapshotIndexService = snapshotIndexService;
         _ipcManager = ipcManager;
-        _snapshotCombo = new SnapshotCombo(() => _snapshotList, snappy.Log);
+        _snapshotCombo = new SnapshotCombo(() => _snapshotList);
         _snapshotCombo.SelectionChanged += OnSnapshotSelectionChanged;
 
         // Configure world selector
@@ -178,7 +177,7 @@ public partial class MainWindow : Window, IDisposable
                         ImGuiStyleVar.WindowPadding,
                         new Vector2(8f, 8f) * ImGuiHelpers.GlobalScale
                     );
-                    ImUtf8.Text("ACTOR SELECTION");
+                    Im.Text("ACTOR SELECTION");
                     ImGui.Separator();
                     DrawPlayerSelector();
                 }

@@ -16,16 +16,16 @@ internal static class MainWindowBottomBar
         var inputWidth = totalSelectorWidth - buttonSize.X - itemSpacing;
 
         ImGui.SetNextItemWidth(inputWidth);
-        ImUtf8.InputText(
+        Im.Input.Text(
             "##SnapshotsFolder",
             ref workingDirectory,
-            flags: ImGuiInputTextFlags.ReadOnly
+            flags: (InputTextFlags)ImGuiInputTextFlags.ReadOnly
         );
 
         ImGui.SameLine();
 
         if (
-            ImUtf8.IconButton(
+            UiHelpers.IconButton(
                 FontAwesomeIcon.Folder,
                 "Select Snapshots Folder",
                 buttonSize,
@@ -55,9 +55,9 @@ internal static class MainWindowBottomBar
         ImGui.SetCursorPosX(buttonPosX);
 
         using var d = ImRaii.Disabled(isRevertDisabled);
-        if (ImUtf8.Button(revertButtonText, revertButtonSize)) activeSnapshotManager.RevertAllSnapshots();
-        ImUtf8.HoverTooltip(
-            ImGuiHoveredFlags.AllowWhenDisabled,
+        if (Im.Button(revertButtonText, revertButtonSize)) activeSnapshotManager.RevertAllSnapshots();
+        Im.Tooltip.OnHover(
+            HoveredFlags.AllowWhenDisabled,
             isRevertDisabled
                 ? "No snapshots are currently active."
                 : "Revert all currently applied snapshots."

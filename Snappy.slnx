@@ -11,7 +11,7 @@
   <Project Path="Penumbra/Penumbra.GameData/Penumbra.GameData.csproj">
     <Platform Project="x64" />
   </Project>
-  <Project Path="Penumbra/OtterGui/OtterGui.csproj">
+  <Project Path="Penumbra/Luna/Luna/Luna.csproj">
     <Platform Project="x64" />
   </Project>
   <Project Path="Penumbra/Penumbra.Api/Penumbra.Api.csproj">

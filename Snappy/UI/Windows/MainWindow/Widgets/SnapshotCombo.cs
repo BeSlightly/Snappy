@@ -1,70 +1,53 @@
-using OtterGui.Filesystem;
-using OtterGui.Log;
-using OtterGui.Widgets;
+using ImSharp;
+using Luna;
 
 namespace Snappy.UI.Windows;
 
-internal sealed class SnapshotCombo : FilterComboCache<FileSystem<Snapshot>.Leaf>
+internal sealed class SnapshotCombo(Func<IReadOnlyList<IFileSystemData<Snapshot>>> generator)
+    : SimpleFilterCombo<IFileSystemData<Snapshot>>(SimpleFilterType.Text)
 {
-    private float _popupWidth;
+    private readonly Func<IReadOnlyList<IFileSystemData<Snapshot>>> _generator = generator;
+    private IFileSystemData<Snapshot>? _selection;
 
-    public SnapshotCombo(Func<IReadOnlyList<FileSystem<Snapshot>.Leaf>> generator, Logger log)
-        : base(generator, MouseWheelType.None, log)
+    public event Action<IFileSystemData<Snapshot>?, IFileSystemData<Snapshot>?>? SelectionChanged;
+
+    public void SetSelection(IFileSystemData<Snapshot>? selection)
     {
-        SearchByParts = true;
-    }
-
-    protected override int UpdateCurrentSelected(int currentSelected)
-    {
-        if (currentSelected < 0 && CurrentSelection != null)
-            for (var i = 0; i < Items.Count; ++i)
-                if (ReferenceEquals(Items[i], CurrentSelection))
-                {
-                    currentSelected = i;
-                    break;
-                }
-
-        return base.UpdateCurrentSelected(currentSelected);
-    }
-
-    public void SetSelection(FileSystem<Snapshot>.Leaf? leaf)
-    {
-        if (ReferenceEquals(CurrentSelection, leaf))
+        if (ReferenceEquals(_selection, selection))
             return;
 
-        var idx = -1;
-        if (leaf != null && IsInitialized)
-            for (var i = 0; i < Items.Count; ++i)
-                if (ReferenceEquals(Items[i], leaf))
-                {
-                    idx = i;
-                    break;
-                }
-
-        CurrentSelectionIdx = idx;
-        UpdateSelection(leaf);
+        var old = _selection;
+        _selection = selection;
+        SelectionChanged?.Invoke(old, _selection);
     }
 
-    protected override string ToString(FileSystem<Snapshot>.Leaf obj)
-    {
-        return obj.Name;
-    }
+    public override StringU8 DisplayString(in IFileSystemData<Snapshot> value)
+        => new(value.Value.Name);
 
-    protected override float GetFilterWidth()
-    {
-        return _popupWidth;
-    }
+    public override string FilterString(in IFileSystemData<Snapshot> value)
+        => value.Value.Name;
+
+    public override IEnumerable<IFileSystemData<Snapshot>> GetBaseItems()
+        => _generator();
+
+    protected override bool IsSelected(SimpleCacheItem<IFileSystemData<Snapshot>> item, int globalIndex)
+        => ReferenceEquals(item.Item, _selection);
 
     public bool Draw(string label, string preview, float width)
     {
-        _popupWidth = width;
-        return Draw(
-            label,
-            preview,
-            string.Empty,
-            ref CurrentSelectionIdx,
-            width,
-            ImGui.GetFrameHeight()
-        );
+        if (_selection != null)
+        {
+            if (!Draw(label, _selection, string.Empty, width, out var result))
+                return false;
+
+            SetSelection(result);
+            return true;
+        }
+
+        if (!base.Draw(label, preview, string.Empty, width, out var resultItem))
+            return false;
+
+        SetSelection(resultItem.Item);
+        return true;
     }
 }

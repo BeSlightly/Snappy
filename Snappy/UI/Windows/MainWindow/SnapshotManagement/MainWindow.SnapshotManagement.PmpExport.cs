@@ -8,13 +8,13 @@ public partial class MainWindow
     {
         if (_selectedSnapshotInfo == null || _selectedSnapshot == null)
         {
-            ImUtf8.Text("Select a snapshot to export."u8);
+            Im.Text("Select a snapshot to export."u8);
             return;
         }
 
         using (var warningColor = ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.DalamudYellow))
         {
-            ImUtf8.TextWrapped(
+            Im.TextWrapped(
                 "Warning: PMP export is highly experimental. Please report any issues on GitHub.");
         }
         ImGui.Spacing();
@@ -30,20 +30,20 @@ public partial class MainWindow
 
         if (_pmpIsBuilding)
         {
-            ImUtf8.Text("Building item list..."u8);
+            Im.Text("Building item list..."u8);
             return;
         }
 
         if (!string.IsNullOrEmpty(_pmpBuildError))
         {
             using var _ = ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.DalamudRed);
-            ImUtf8.Text(_pmpBuildError);
+            Im.Text(_pmpBuildError);
             return;
         }
 
         if (_pmpChangedItems == null || _pmpChangedItems.AllItems.Count == 0)
         {
-            ImUtf8.Text("No modded items found for this history entry."u8);
+            Im.Text("No modded items found for this history entry."u8);
             return;
         }
 
@@ -54,8 +54,8 @@ public partial class MainWindow
         var availableHeight = ImGui.GetContentRegionAvail().Y;
         var listHeight = Math.Max(0f, availableHeight - footerHeight);
 
-        using (var listRegion = ImUtf8.Child("PmpItemsRegion", new Vector2(0, listHeight), false,
-                   ImGuiWindowFlags.NoScrollbar))
+        using (var listRegion = Im.Child.Begin("PmpItemsRegion", new Vector2(0, listHeight), false,
+                   (WindowFlags)ImGuiWindowFlags.NoScrollbar))
         {
             if (listRegion)
                 DrawPmpCategoryTabs();

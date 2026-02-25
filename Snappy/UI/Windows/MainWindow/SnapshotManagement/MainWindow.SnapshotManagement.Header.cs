@@ -8,7 +8,7 @@ public partial class MainWindow
     private void DrawSnapshotHeader()
     {
         ImGui.AlignTextToFramePadding();
-        ImUtf8.Text("SNAPSHOT:"u8);
+        Im.Text("SNAPSHOT:"u8);
         ImGui.SameLine();
 
         var buttonsDisabled = _selectedSnapshot == null;
@@ -35,14 +35,14 @@ public partial class MainWindow
             disabled.Dispose();
 
             if (ImGui.IsItemHovered() && ImGui.IsItemClicked(ImGuiMouseButton.Right)) ClearSnapshotSelection();
-            ImUtf8.HoverTooltip("Right-click to clear selection.");
+            Im.Tooltip.OnHover("Right-click to clear selection.");
 
             if (ImGui.IsItemHovered() && _snapshotList.Length == 0)
-                ImUtf8.HoverTooltip("No snapshots exist yet. Save one first."u8);
+                Im.Tooltip.OnHover("No snapshots exist yet. Save one first."u8);
 
             ImGui.SameLine();
             if (
-                ImUtf8.IconButton(
+                UiHelpers.IconButton(
                     FontAwesomeIcon.Sync,
                     "Refresh List",
                     default,
@@ -53,7 +53,7 @@ public partial class MainWindow
 
             ImGui.SameLine();
             if (
-                ImUtf8.IconButton(
+                UiHelpers.IconButton(
                     FontAwesomeIcon.Pen,
                     buttonsDisabled
                         ? "Select a snapshot to rename"
@@ -73,7 +73,7 @@ public partial class MainWindow
 
             ImGui.SameLine();
             if (
-                ImUtf8.IconButton(
+                UiHelpers.IconButton(
                     FontAwesomeIcon.Trash,
                     buttonsDisabled
                         ? "Select a snapshot to delete"

@@ -13,7 +13,7 @@ public partial class MainWindow
         EnsurePmpHistorySelection(options);
 
         ImGui.AlignTextToFramePadding();
-        ImUtf8.Text("Glamourer Entry"u8);
+        Im.Text("Glamourer Entry"u8);
         ImGui.SameLine();
 
         ImGui.SetNextItemWidth(-1);
@@ -39,7 +39,7 @@ public partial class MainWindow
             ImGui.EndCombo();
         }
 
-        ImUtf8.HoverTooltip("Select a snapshot or Glamourer entry to build the export list from its file map."u8);
+        Im.Tooltip.OnHover("Select a snapshot or Glamourer entry to build the export list from its file map."u8);
     }
 
     private IReadOnlyList<PmpHistoryOption> BuildPmpHistoryOptions()

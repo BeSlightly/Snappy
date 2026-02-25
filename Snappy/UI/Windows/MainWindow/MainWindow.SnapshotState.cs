@@ -1,4 +1,4 @@
-using OtterGui.Filesystem;
+using Luna;
 using Snappy.Common;
 
 namespace Snappy.UI.Windows;
@@ -15,8 +15,8 @@ public partial class MainWindow
     }
 
     private void OnSnapshotSelectionChanged(
-        FileSystem<Snapshot>.Leaf? oldSelection,
-        FileSystem<Snapshot>.Leaf? newSelection
+        IFileSystemData<Snapshot>? oldSelection,
+        IFileSystemData<Snapshot>? newSelection
     )
     {
         var newSnapshot = newSelection?.Value;
@@ -32,7 +32,7 @@ public partial class MainWindow
         var fs = _snappy.SnapshotFS;
         var selectedPath = _selectedSnapshot?.FullName;
 
-        foreach (var child in fs.Root.GetChildren(ISortMode<Snapshot>.Lexicographical).ToList())
+        foreach (var child in fs.Root.GetChildren(ISortMode.Lexicographical).ToList())
             fs.Delete(child);
 
         var dir = _snappy.Configuration.WorkingDirectory;
@@ -45,14 +45,14 @@ public partial class MainWindow
             foreach (var d in snapshotDirs)
             {
                 var snapshot = new Snapshot(d.FullName);
-                fs.CreateLeaf(fs.Root, snapshot.Name, snapshot);
+                fs.CreateDataNode(fs.Root, snapshot.Name, snapshot);
             }
         }
 
         _snapshotList = fs
-            .Root.GetChildren(ISortMode<Snapshot>.Lexicographical)
-            .OfType<FileSystem<Snapshot>.Leaf>()
-            .OrderBy(s => s.Name)
+            .Root.GetChildren(ISortMode.Lexicographical)
+            .OfType<IFileSystemData<Snapshot>>()
+            .OrderBy(s => s.Name.ToString(), StringComparer.OrdinalIgnoreCase)
             .ToArray();
 
         var newSelection = Array.Find(_snapshotList, s => s.Value.FullName == selectedPath);
