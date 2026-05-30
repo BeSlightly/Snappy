@@ -3,7 +3,7 @@
   <!-- Plugin manifest -->
   <PropertyGroup>
     <Name>Snappy</Name>
-    <Version>0.5.1.0</Version>
+    <Version>0.5.1.1</Version>
     <Author>Eqbot, Vivi, astrodoobs, BeSlightly</Author>
     <RepoUrl>https://github.com/BeSlightly/Snappy</RepoUrl>
     <Punchline>Plugin to save current appearance and applied mods of a character</Punchline>
@@ -26,7 +26,7 @@
 
   <!-- NuGet -->
   <ItemGroup>
-    <PackageReference Include="ECommons" Version="3.2.0.9" />
+    <PackageReference Include="ECommons" Version="3.2.1.6" />
     <PackageReference Include="lz4net" Version="1.0.15.93" />
   </ItemGroup>
 </Project>
