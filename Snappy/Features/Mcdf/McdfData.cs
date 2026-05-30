@@ -18,5 +18,5 @@ public record McdfData
         return JsonConvert.DeserializeObject<McdfData>(Encoding.UTF8.GetString(data))!;
     }
 
-    public record FileData(IEnumerable<string> GamePaths, long Length);
+    public record FileData(IEnumerable<string> GamePaths, long Length, string Hash = "");
 }

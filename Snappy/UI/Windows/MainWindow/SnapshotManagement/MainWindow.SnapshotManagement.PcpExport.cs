@@ -6,17 +6,17 @@ namespace Snappy.UI.Windows;
 
 public partial class MainWindow
 {
-    private void DrawPcpExportTab()
+    private void DrawCharacterExportTab()
     {
         // Content container (use default styling similar to Penumbra Effective Changes)
-        using var _pcpChild = Im.Child.Begin("PcpExportContent", new Vector2(0, -1), false, WindowFlags.None);
+        using var _pcpChild = Im.Child.Begin("CharacterExportContent", new Vector2(0, -1), false, WindowFlags.None);
         if (!_pcpChild)
             return;
         // Instruction (subtle helper text)
         using (var _pcpTextGrey = ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.DalamudGrey))
         {
             Im.Text(
-                "Select which Glamourer and Customize+ history entries to include in the PCP export.\nIf no selection is made, the latest entry will be used for each."u8);
+                "Select which Glamourer and Customize+ history entries to include in the character export.\nIf no selection is made, the latest entry will be used for each."u8);
         }
 
         ImGui.Separator();
@@ -58,7 +58,7 @@ public partial class MainWindow
             }
 
             Im.Tooltip.OnHover(
-                "Pick a specific Glamourer design to include in the PCP. If not selected, the latest design will be used.");
+                "Pick a specific Glamourer design to include in the export. If not selected, the latest design will be used.");
 
             // Customize+ selector
             ImGui.TableNextColumn();
@@ -91,7 +91,7 @@ public partial class MainWindow
             }
 
             Im.Tooltip.OnHover(
-                "Pick a specific Customize+ template to include in the PCP. If not selected, the latest template will be used.");
+                "Pick a specific Customize+ profile/template to include in the export. If not selected, the latest entry will be used.");
 
             ImGui.EndTable();
         }
@@ -100,7 +100,7 @@ public partial class MainWindow
         ImGui.Separator();
         ImGui.Spacing();
 
-        // Player details overrides
+        // PCP player details overrides
         if (ImGui.BeginTable("PcpExportPlayerDetails", 2, ImGuiTableFlags.SizingStretchProp))
         {
             ImGui.TableSetupColumn("Left", ImGuiTableColumnFlags.WidthStretch, 0.5f);
@@ -146,50 +146,34 @@ public partial class MainWindow
         ImGui.Separator();
         ImGui.Spacing();
 
-        // Export button centered with icon (matching PMP style)
-        var buttonWidth = 220f * ImGuiHelpers.GlobalScale;
-        var cursorX = (ImGui.GetContentRegionAvail().X - buttonWidth) * 0.5f;
-        var cursorPos = ImGui.GetCursorPosX();
-        ImGui.SetCursorPosX(cursorPos + Math.Max(0, cursorX));
-
-        var exportDisabled = _selectedSnapshot == null || string.IsNullOrWhiteSpace(_pcpPlayerNameOverride);
-        var exportTooltip =
-            "Export the selected entries to a Penumbra Character Package (.pcp). If an entry is not selected, the latest will be used.";
-        if (UiHelpers.DrawStretchedIconButtonWithText(FontAwesomeIcon.FileExport, "Export Selected to PCP",
-                exportTooltip, exportDisabled, buttonWidth))
+        var exportDisabled = _selectedSnapshot == null;
+        if (ImGui.BeginTable("CharacterExportButtons", 2, ImGuiTableFlags.SizingStretchSame))
         {
-            var snapshot = _selectedSnapshot;
-            if (snapshot != null)
+            ImGui.TableNextColumn();
+            var pcpTooltip =
+                "Export the selected entries to a Penumbra Character Package (.pcp). If an entry is not selected, the latest will be used.";
+            if (UiHelpers.DrawStretchedIconButtonWithText(FontAwesomeIcon.FileExport, "Export PCP",
+                    pcpTooltip, exportDisabled))
             {
-                var snapshotName = snapshot.Name;
-                var snapshotPath = snapshot.FullName;
-                _snappy.FileDialogManager.SaveFileDialog(
-                    "Export PCP",
-                    ".pcp",
-                    $"{snapshotName}.pcp",
-                    ".pcp",
-                    (status, path) =>
-                    {
-                        if (!status || string.IsNullOrEmpty(path))
-                            return;
-
-                        Notify.Info($"Starting PCP export for '{snapshotName}'...");
-                        var glam = _pcpSelectedGlamourerEntry;
-                        var cust = _pcpSelectedCustomizeEntry;
-                        var nameOverride = _pcpPlayerNameOverride;
-                        var worldOverride = _pcpSelectedWorldIdOverride;
-                        _snappy.ExecuteBackgroundTask(() =>
-                            _pcpManager.ExportPcp(snapshotPath, path, glam, cust, nameOverride,
-                                worldOverride));
-                    },
-                    _snappy.Configuration.WorkingDirectory
-                );
+                ExportSelectedCharacterAsPcp();
             }
+
+            ImGui.TableNextColumn();
+            var mcdfTooltip =
+                "Export the selected entries to a Mare Chara File (.mcdf). If an entry is not selected, the latest will be used.";
+            if (UiHelpers.DrawStretchedIconButtonWithText(FontAwesomeIcon.FileExport, "Export MCDF",
+                    mcdfTooltip, exportDisabled))
+            {
+                ExportSelectedCharacterAsMcdf();
+            }
+
+            ImGui.EndTable();
         }
+
         ImGui.Spacing();
         using (var warningColor = ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.DalamudYellow))
         {
-            var warningText = "Warning: PCP export is experimental. Please report any issues on GitHub.";
+            var warningText = "Warning: Character export is experimental. Please report any issues on GitHub.";
             var textWidth = Im.Font.CalculateSize(warningText).X;
             var availableWidth = ImGui.GetContentRegionAvail().X;
 
@@ -200,6 +184,63 @@ public partial class MainWindow
             // Keep centered text drawing consistent with the warning style.
             Im.Text(warningText);
         }
+    }
+
+    private void ExportSelectedCharacterAsPcp()
+    {
+        var snapshot = _selectedSnapshot;
+        if (snapshot == null)
+            return;
+
+        var snapshotName = snapshot.Name;
+        var snapshotPath = snapshot.FullName;
+        _snappy.FileDialogManager.SaveFileDialog(
+            "Export PCP",
+            ".pcp",
+            $"{snapshotName}.pcp",
+            ".pcp",
+            (status, path) =>
+            {
+                if (!status || string.IsNullOrEmpty(path))
+                    return;
+
+                Notify.Info($"Starting PCP export for '{snapshotName}'...");
+                var glam = _pcpSelectedGlamourerEntry;
+                var cust = _pcpSelectedCustomizeEntry;
+                var nameOverride = _pcpPlayerNameOverride;
+                var worldOverride = _pcpSelectedWorldIdOverride;
+                _snappy.ExecuteBackgroundTask(() =>
+                    _pcpManager.ExportPcp(snapshotPath, path, glam, cust, nameOverride, worldOverride));
+            },
+            _snappy.Configuration.WorkingDirectory
+        );
+    }
+
+    private void ExportSelectedCharacterAsMcdf()
+    {
+        var snapshot = _selectedSnapshot;
+        if (snapshot == null)
+            return;
+
+        var snapshotName = snapshot.Name;
+        var snapshotPath = snapshot.FullName;
+        _snappy.FileDialogManager.SaveFileDialog(
+            "Export MCDF",
+            ".mcdf",
+            $"{snapshotName}.mcdf",
+            ".mcdf",
+            (status, path) =>
+            {
+                if (!status || string.IsNullOrEmpty(path))
+                    return;
+
+                Notify.Info($"Starting MCDF export for '{snapshotName}'...");
+                var glam = _pcpSelectedGlamourerEntry;
+                var cust = _pcpSelectedCustomizeEntry;
+                _snappy.ExecuteBackgroundTask(() => _mcdfManager.ExportMcdf(snapshotPath, path, glam, cust));
+            },
+            _snappy.Configuration.WorkingDirectory
+        );
     }
 
 }

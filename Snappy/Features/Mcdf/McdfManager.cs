@@ -65,6 +65,60 @@ public class McdfManager : IMcdfManager
         }
     }
 
+    public async Task ExportMcdf(string snapshotPath, string outputPath, GlamourerHistoryEntry? selectedGlamourer,
+        CustomizeHistoryEntry? selectedCustomize)
+    {
+        try
+        {
+            var paths = SnapshotPaths.From(snapshotPath);
+            var snapshotInfo = await JsonUtil.DeserializeAsync<SnapshotInfo>(paths.SnapshotFile);
+            if (snapshotInfo == null)
+            {
+                Notify.Error("Failed to load snapshot info for MCDF export.");
+                return;
+            }
+
+            var glamourerHistory = await JsonUtil.DeserializeAsync<GlamourerHistory>(paths.GlamourerHistoryFile) ??
+                                   new GlamourerHistory();
+            var customizeHistory = await JsonUtil.DeserializeAsync<CustomizeHistory>(paths.CustomizeHistoryFile) ??
+                                   new CustomizeHistory();
+
+            var glamourerEntry = selectedGlamourer ??
+                                  (glamourerHistory.Entries.Count > 0 ? glamourerHistory.Entries.Last() : null);
+            var customizeEntry = selectedCustomize ??
+                                 (customizeHistory.Entries.Count > 0 ? customizeHistory.Entries.Last() : null);
+            var fileMapId = glamourerEntry?.FileMapId ?? customizeEntry?.FileMapId ?? snapshotInfo.CurrentFileMapId;
+            var resolvedFileMap = FileMapUtil.ResolveFileMapWithEmptyFallback(snapshotInfo, fileMapId);
+            var resolvedManipulations = FileMapUtil.ResolveManipulation(snapshotInfo, fileMapId);
+
+            var output = Path.ChangeExtension(outputPath, ".mcdf");
+            using var fileStream = new FileStream(output, FileMode.Create, FileAccess.Write, FileShare.None);
+            using var lz4Stream = new LZ4Stream(fileStream, LZ4StreamMode.Compress);
+            using var writer = new BinaryWriter(lz4Stream, Encoding.UTF8, false);
+
+            var files = BuildMcdfFiles(paths.FilesDirectory, resolvedFileMap, out var fileBytes);
+            var header = new McdfHeader(McdfHeader.CurrentVersion, new McdfData
+            {
+                Description = Path.GetFileName(snapshotPath),
+                GlamourerData = glamourerEntry?.GlamourerString ?? string.Empty,
+                CustomizePlusData = ResolveCustomizePlusData(customizeEntry, glamourerEntry),
+                ManipulationData = resolvedManipulations,
+                Files = files
+            });
+
+            header.WriteToStream(writer);
+            foreach (var data in fileBytes)
+                writer.Write(data);
+
+            Notify.Success($"Successfully exported MCDF: {output}");
+        }
+        catch (Exception ex)
+        {
+            Notify.Error($"Failed during MCDF export: {ex.Message}");
+            PluginLog.Error($"Failed during MCDF export for '{snapshotPath}': {ex}");
+        }
+    }
+
     private string CreateSnapshotDirectory(string? description)
     {
         var snapshotDirName = string.IsNullOrEmpty(description)
@@ -140,5 +194,47 @@ public class McdfManager : IMcdfManager
         }
 
         return gamePathToHash;
+    }
+
+    private static List<McdfData.FileData> BuildMcdfFiles(string filesDirectory,
+        IReadOnlyDictionary<string, string> resolvedFileMap, out List<byte[]> fileBytes)
+    {
+        var files = new List<McdfData.FileData>();
+        fileBytes = [];
+
+        foreach (var group in resolvedFileMap
+                     .Where(kvp => !string.IsNullOrWhiteSpace(kvp.Value))
+                     .GroupBy(kvp => kvp.Value, StringComparer.OrdinalIgnoreCase))
+        {
+            var gamePaths = group.Select(kvp => kvp.Key).Where(path => !string.IsNullOrWhiteSpace(path)).ToList();
+            if (gamePaths.Count == 0)
+                continue;
+
+            var hash = group.Key;
+            var blobPath = SnapshotBlobUtil.ResolveBlobPath(filesDirectory, hash, gamePaths[0]);
+            if (!File.Exists(blobPath))
+            {
+                PluginLog.Warning($"Skipping missing MCDF export blob '{hash}' for '{gamePaths[0]}'.");
+                continue;
+            }
+
+            var data = File.ReadAllBytes(blobPath);
+            files.Add(new McdfData.FileData(gamePaths, data.LongLength, hash));
+            fileBytes.Add(data);
+        }
+
+        return files;
+    }
+
+    private static string ResolveCustomizePlusData(CustomizeHistoryEntry? customizeEntry,
+        GlamourerHistoryEntry? glamourerEntry)
+    {
+        if (!string.IsNullOrWhiteSpace(customizeEntry?.CustomizeData))
+            return customizeEntry.CustomizeData;
+
+        if (!string.IsNullOrWhiteSpace(glamourerEntry?.CustomizeData))
+            return glamourerEntry.CustomizeData;
+
+        return string.Empty;
     }
 }

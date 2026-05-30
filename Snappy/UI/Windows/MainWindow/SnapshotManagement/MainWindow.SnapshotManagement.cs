@@ -45,10 +45,10 @@ public partial class MainWindow
                 DrawPmpExportTab();
         }
 
-        using (var tab = Im.TabBar.BeginItem("PCP Export"u8))
+        using (var tab = Im.TabBar.BeginItem("Character Export"u8))
         {
             if (tab)
-                DrawPcpExportTab();
+                DrawCharacterExportTab();
         }
     }
 }
