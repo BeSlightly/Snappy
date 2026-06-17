@@ -121,9 +121,7 @@ public class McdfManager : IMcdfManager
 
     private string CreateSnapshotDirectory(string? description)
     {
-        var snapshotDirName = string.IsNullOrEmpty(description)
-            ? $"MCDF_Import_{DateTime.Now:yyyyMMddHHmmss}"
-            : description;
+        var snapshotDirName = SnapshotImportUtil.SanitizeDirectoryName(description, "MCDF_Import");
 
         return SnapshotImportUtil.CreateUniqueSnapshotDirectory(
             _configuration.WorkingDirectory,

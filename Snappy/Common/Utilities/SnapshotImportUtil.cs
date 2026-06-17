@@ -1,3 +1,5 @@
+using Luna;
+
 namespace Snappy.Common.Utilities;
 
 public static class SnapshotImportUtil
@@ -35,14 +37,18 @@ public static class SnapshotImportUtil
     public static string CreateUniqueSnapshotDirectory(string workingDirectory, string directoryName,
         Action<string>? onConflict = null)
     {
-        var snapshotPath = Path.Combine(workingDirectory, directoryName);
+        var sanitizedName = PathSanitizer.SanitizeFileSystemName(
+            directoryName,
+            $"Snapshot_{DateTime.Now:yyyyMMddHHmmss}");
+        var snapshotPath = Path.CombineSafely(workingDirectory, sanitizedName);
 
         var counter = 1;
-        var originalPath = snapshotPath;
+        var originalName = sanitizedName;
         while (Directory.Exists(snapshotPath))
         {
-            onConflict?.Invoke($"{directoryName}_{counter}");
-            snapshotPath = $"{originalPath}_{counter}";
+            var candidateName = $"{originalName}_{counter}";
+            onConflict?.Invoke(candidateName);
+            snapshotPath = Path.CombineSafely(workingDirectory, candidateName);
             counter++;
         }
 
