@@ -1,4 +1,3 @@
-using System.Collections;
 using System.Reflection;
 using Dalamud.Plugin.Ipc;
 
@@ -48,18 +47,8 @@ public sealed partial class MareIpc
                 PluginLog.Debug($"Failed to get SnowcloakSync handled addresses: {ex.Message}");
             }
 
-        if (_marePlugins.TryGetValue(MareSempiternePluginKey, out var playerSyncPlugin) && playerSyncPlugin.IsAvailable)
-        {
-            try
-            {
-                foreach (var addr in GetPlayerSyncAddressesViaPairs(playerSyncPlugin))
-                    pairedAddresses.Add(addr);
-            }
-            catch (Exception ex)
-            {
-                PluginLog.Debug($"Failed to reflect PlayerSync pair addresses: {ex.Message}");
-            }
-        }
+        foreach (var addr in GetCurrentPlayerSyncAddresses())
+            pairedAddresses.Add(addr);
 
         return pairedAddresses;
     }
@@ -98,11 +87,7 @@ public sealed partial class MareIpc
 
         try
         {
-            var pluginInfo = _marePlugins[MareSempiternePluginKey];
-            var viaPairs = GetPlayerSyncAddressesViaPairs(pluginInfo);
-            if (viaPairs.Contains(address)) return true;
-
-            // Do not read Mare label to avoid ambiguity
+            return GetCurrentPlayerSyncAddresses().Contains(address);
         }
         catch (Exception ex)
         {
@@ -128,6 +113,14 @@ public sealed partial class MareIpc
         }
 
         return handledAddresses ?? [];
+    }
+
+    private HashSet<nint> GetCurrentPlayerSyncAddresses()
+    {
+        if (!IsPluginActive(MareSempiternePluginKey))
+            return [];
+
+        return GetHandledAddressesFromIpc(_playerSyncHandledAddresses, "PlayerSync") ?? [];
     }
 
     private static HashSet<nint>? GetHandledAddressesFromIpc(ICallGateSubscriber<List<nint>>? subscriber, string pluginName)
@@ -168,9 +161,8 @@ public sealed partial class MareIpc
                 if (isVisibleObj is not true)
                     continue;
 
-                var addrObj = pairType.GetProperty("PlayerCharacter", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
-                    ?.GetValue(pair);
-                if (addrObj is nint addr && addr != nint.Zero)
+                var addr = GetPairAddress(pair);
+                if (addr != nint.Zero)
                     results.Add(addr);
             }
 
@@ -183,61 +175,4 @@ public sealed partial class MareIpc
         }
     }
 
-    private HashSet<nint> GetPlayerSyncAddressesViaPairs(MarePluginInfo pluginInfo)
-    {
-        var results = new HashSet<nint>();
-        try
-        {
-            if (!pluginInfo.IsAvailable)
-                return results;
-
-            if (pluginInfo.Plugin == null || pluginInfo.PairManager == null)
-                InitializeAllPlugins();
-
-            if (pluginInfo.PairManager == null)
-                return results;
-
-            var pairManager = pluginInfo.PairManager;
-            var pmType = pairManager.GetType();
-
-            var getOnlinePairs = pmType.GetMethod("GetOnlineUserPairs", BindingFlags.Instance | BindingFlags.Public);
-            if (getOnlinePairs == null)
-                return results;
-
-            if (getOnlinePairs.Invoke(pairManager, null) is not IEnumerable onlinePairs)
-                return results;
-
-            foreach (var pair in onlinePairs)
-            {
-                var pairType = pair.GetType();
-                var hasCachedObj =
-                    pairType.GetProperty("HasCachedPlayer", BindingFlags.Instance | BindingFlags.Public)?.GetValue(pair);
-                var isVisibleObj =
-                    pairType.GetProperty("IsVisible", BindingFlags.Instance | BindingFlags.Public)?.GetValue(pair);
-                bool hasCached = hasCachedObj is bool b1 && b1;
-                bool isVisible = isVisibleObj is bool b2 && b2;
-                if (!hasCached) continue;
-
-                var cachedPlayer =
-                    pairType.GetProperty("CachedPlayer", BindingFlags.Instance | BindingFlags.NonPublic)
-                        ?.GetValue(pair);
-                if (cachedPlayer == null) continue;
-
-                var addrObj = cachedPlayer.GetType()
-                    .GetProperty("PlayerCharacter", BindingFlags.Instance | BindingFlags.Public)
-                    ?.GetValue(cachedPlayer);
-                if (addrObj is nint np && np != nint.Zero)
-                {
-                    if (isVisible)
-                        results.Add(np);
-                }
-            }
-        }
-        catch (Exception e)
-        {
-            PluginLog.Debug($"[Mare IPC] PairManager reflection failed for {pluginInfo.PluginName}: {e.Message}");
-        }
-
-        return results;
-    }
 }

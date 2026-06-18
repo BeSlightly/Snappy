@@ -14,6 +14,7 @@ public sealed partial class MareIpc : IpcSubscriber
     private const string MareSynchronosNamespacePrefix = "MareSynchronos";
     private const string LightlessHandledAddressesIpc = "LightlessSync.GetHandledAddresses";
     private const string SnowcloakHandledAddressesIpc = "Snowcloak.GetHandledAddresses";
+    private const string PlayerSyncHandledAddressesIpc = "PlayerSync.GetHandledAddresses";
 
     private bool _isUiOpen;
 
@@ -49,11 +50,14 @@ public sealed partial class MareIpc : IpcSubscriber
             Svc.PluginInterface.GetIpcSubscriber<List<nint>>(LightlessHandledAddressesIpc);
         _snowcloakSyncHandledAddresses =
             Svc.PluginInterface.GetIpcSubscriber<List<nint>>(SnowcloakHandledAddressesIpc);
+        _playerSyncHandledAddresses =
+            Svc.PluginInterface.GetIpcSubscriber<List<nint>>(PlayerSyncHandledAddressesIpc);
     }
 
     // Manual IPC subscribers for different plugins
     private ICallGateSubscriber<List<nint>>? _lightlessSyncHandledAddresses;
     private ICallGateSubscriber<List<nint>>? _snowcloakSyncHandledAddresses;
+    private ICallGateSubscriber<List<nint>>? _playerSyncHandledAddresses;
 
     private bool IsPluginActive(string pluginKey)
     {
@@ -208,6 +212,7 @@ public sealed partial class MareIpc : IpcSubscriber
         if (host?.GetFoP("Services") is IServiceProvider serviceProvider)
             return serviceProvider;
 
+        // Lightless wraps its host behind the plugin lifecycle object.
         var lifecycle = plugin.GetFoP("_lifecycle");
         host = lifecycle?.GetFoP("_host");
         return host?.GetFoP("Services") as IServiceProvider;

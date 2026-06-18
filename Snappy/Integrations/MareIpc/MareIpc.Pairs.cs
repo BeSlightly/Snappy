@@ -53,18 +53,9 @@ public sealed partial class MareIpc
 
         var pairManager = pluginInfo.PairManager;
 
-        foreach (var pair in EnumeratePairsFromResult(InvokePairManagerMethod(pairManager, "GetOnlineUserPairs")))
-            yield return pair;
-
-        foreach (var pair in EnumeratePairsFromResult(InvokePairManagerMethod(pairManager, "GetAllPairObjects")))
-            yield return pair;
-
-        // Newer Lightless builds expose a direct pair enumeration API instead of the older Mare methods above.
-        foreach (var pair in EnumeratePairsFromResult(InvokePairManagerMethod(pairManager, "EnumeratePairs")))
-            yield return pair;
-
-        foreach (var pair in EnumeratePairsFromResult(GetAllClientPairsField(pairManager, pluginInfo.PluginName)))
-            yield return pair;
+        foreach (var probe in GetPairProbeOrder(pluginInfo))
+            foreach (var pair in EnumeratePairsFromResult(InvokePairProbe(pairManager, pluginInfo.PluginName, probe)))
+                yield return pair;
     }
 
     private object? GetMarePairFromPlugin(ICharacter character, MarePluginInfo pluginInfo)
@@ -92,15 +83,45 @@ public sealed partial class MareIpc
 
     private static bool IsMatchingPairObject(object pairObject, ICharacter character)
     {
-        var addrObj = pairObject.GetFoP("PlayerCharacter");
-        if (addrObj is nint ptr && ptr == character.Address)
-            return true;
-        if (addrObj is IntPtr iptr && iptr == character.Address)
+        var address = GetPairAddress(pairObject);
+        if (address == character.Address)
             return true;
 
         var handlerName = pairObject.GetFoP("PlayerName") as string;
         return !string.IsNullOrEmpty(handlerName)
             && string.Equals(handlerName, character.Name.TextValue, StringComparison.Ordinal);
+    }
+
+    private static IEnumerable<string> GetPairProbeOrder(MarePluginInfo pluginInfo)
+    {
+        return pluginInfo.NamespacePrefix switch
+        {
+            LightlessSyncPluginKey => ["EnumeratePairs"],
+            SnowcloakPluginKey => ["GetOnlineUserPairs", "_allClientPairs"],
+            MareSynchronosNamespacePrefix => ["GetOnlineUserPairs", "_allClientPairs"],
+            _ => ["GetOnlineUserPairs", "GetAllPairObjects", "EnumeratePairs", "_allClientPairs"]
+        };
+    }
+
+    private static object? InvokePairProbe(object pairManager, string pluginName, string probeName)
+    {
+        return probeName == "_allClientPairs"
+            ? GetAllClientPairsField(pairManager, pluginName)
+            : InvokePairManagerMethod(pairManager, probeName);
+    }
+
+    private static nint GetPairAddress(object pairObject)
+    {
+        foreach (var propertyName in new[] { "PlayerCharacter", "Address" })
+        {
+            var addrObj = pairObject.GetFoP(propertyName);
+            if (addrObj is nint ptr)
+                return ptr;
+            if (addrObj is IntPtr iptr)
+                return iptr;
+        }
+
+        return nint.Zero;
     }
 
     private static object? InvokePairManagerMethod(object pairManager, string methodName)

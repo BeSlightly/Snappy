@@ -5,6 +5,8 @@ namespace Snappy.Services.SnapshotManager;
 
 public sealed class MareSnapshotDataBuilder
 {
+    private const int PlayerObjectKind = 0;
+
     private readonly IIpcManager _ipcManager;
 
     public MareSnapshotDataBuilder(IIpcManager ipcManager)
@@ -22,21 +24,10 @@ public sealed class MareSnapshotDataBuilder
             return null;
         }
 
-        var newManipulation = mareCharaData.GetFoP("ManipulationData") as string ?? string.Empty;
-
-        var glamourerDict = mareCharaData.GetFoP("GlamourerData") as IDictionary;
-        var newGlamourer =
-            glamourerDict?.Count > 0 && glamourerDict.Keys.Cast<object>().FirstOrDefault(k => (int)k == 0) is
-                { } glamourerKey
-                ? glamourerDict[glamourerKey] as string ?? string.Empty
-                : string.Empty;
-
-        var customizeDict = mareCharaData.GetFoP("CustomizePlusData") as IDictionary;
+        var newManipulation = GetStringProperty(mareCharaData, "ManipulationString", "ManipulationData");
+        var newGlamourer = GetPlayerStringFromDictionary(mareCharaData, "GlamourerString", "GlamourerData");
         var remoteB64Customize =
-            customizeDict?.Count > 0 && customizeDict.Keys.Cast<object>().FirstOrDefault(k => (int)k == 0) is
-                { } customizeKey
-                ? customizeDict[customizeKey] as string ?? string.Empty
-                : string.Empty;
+            GetPlayerStringFromDictionary(mareCharaData, "CustomizePlusScale", "CustomizePlusData");
 
         var newCustomize = string.Empty;
         if (!string.IsNullOrEmpty(remoteB64Customize))
@@ -53,20 +44,93 @@ public sealed class MareSnapshotDataBuilder
         }
 
         var newFileReplacements = new Dictionary<string, string>();
-        var fileReplacementsDict = mareCharaData.GetFoP("FileReplacements") as IDictionary;
-        if (fileReplacementsDict != null &&
-            fileReplacementsDict.Keys.Cast<object>().FirstOrDefault(k => (int)k == 0) is { } playerKey)
-            if (fileReplacementsDict[playerKey] is IEnumerable fileList)
-                foreach (var fileData in fileList)
-                {
-                    var gamePaths = fileData.GetFoP("GamePaths") as string[];
-                    var hash = fileData.GetFoP("Hash") as string;
-                    if (gamePaths != null && !string.IsNullOrEmpty(hash))
-                        foreach (var path in gamePaths)
-                            newFileReplacements[path] = hash;
-                }
+        if (TryGetPlayerDictionaryValue(mareCharaData.GetFoP("FileReplacements"), out var fileReplacements)
+            && fileReplacements is IEnumerable fileList)
+        {
+            foreach (var fileData in fileList)
+            {
+                var hash = GetStringProperty(fileData, "Hash");
+                if (string.IsNullOrEmpty(hash))
+                    continue;
+
+                foreach (var path in GetStringEnumerable(fileData.GetFoP("GamePaths")))
+                    newFileReplacements[path] = hash;
+            }
+        }
 
         return new SnapshotData(newGlamourer, newCustomize, newManipulation, newFileReplacements,
             new Dictionary<string, string>());
+    }
+
+    private static string GetStringProperty(object source, params string[] names)
+    {
+        foreach (var name in names)
+            if (source.GetFoP(name) is string value)
+                return value;
+
+        return string.Empty;
+    }
+
+    private static string GetPlayerStringFromDictionary(object source, params string[] names)
+    {
+        foreach (var name in names)
+        {
+            if (!TryGetPlayerDictionaryValue(source.GetFoP(name), out var value))
+                continue;
+
+            if (value is string stringValue)
+                return stringValue;
+        }
+
+        return string.Empty;
+    }
+
+    private static bool TryGetPlayerDictionaryValue(object? dictionaryObject, out object? value)
+    {
+        value = null;
+        if (dictionaryObject is not IDictionary dictionary)
+            return false;
+
+        foreach (var key in dictionary.Keys)
+        {
+            if (!IsPlayerObjectKind(key))
+                continue;
+
+            value = dictionary[key];
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool IsPlayerObjectKind(object? key)
+    {
+        if (key == null)
+            return false;
+
+        try
+        {
+            return Convert.ToInt32(key, CultureInfo.InvariantCulture) == PlayerObjectKind;
+        }
+        catch
+        {
+            return string.Equals(key.ToString(), "Player", StringComparison.Ordinal);
+        }
+    }
+
+    private static IEnumerable<string> GetStringEnumerable(object? value)
+    {
+        if (value is string singlePath)
+        {
+            yield return singlePath;
+            yield break;
+        }
+
+        if (value is not IEnumerable paths)
+            yield break;
+
+        foreach (var item in paths)
+            if (item is string path && !string.IsNullOrEmpty(path))
+                yield return path;
     }
 }
