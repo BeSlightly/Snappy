@@ -19,17 +19,6 @@ public class PcpManager : IPcpManager
         _importService.ImportPcp(filePath);
     }
 
-    public Task ExportPcp(string snapshotPath, string outputPath)
-    {
-        return _exportService.ExportPcp(snapshotPath, outputPath);
-    }
-
-    public Task ExportPcp(string snapshotPath, string outputPath, GlamourerHistoryEntry? selectedGlamourer,
-        CustomizeHistoryEntry? selectedCustomize)
-    {
-        return _exportService.ExportPcp(snapshotPath, outputPath, selectedGlamourer, selectedCustomize);
-    }
-
     public Task ExportPcp(
         string snapshotPath,
         string outputPath,

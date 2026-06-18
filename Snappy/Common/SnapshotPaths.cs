@@ -26,11 +26,6 @@ public class SnapshotPaths
         return new SnapshotPaths(snapshotPath);
     }
 
-    public string GetLegacyHashedFilePath(string hash)
-    {
-        return Path.Combine(FilesDirectory, hash + Constants.DataFileExtension);
-    }
-
     public string GetPreferredHashedFilePath(string hash, string gamePath)
     {
         return SnapshotBlobUtil.GetPreferredBlobPath(FilesDirectory, hash, gamePath);

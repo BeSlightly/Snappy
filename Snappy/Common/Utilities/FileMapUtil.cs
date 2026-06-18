@@ -93,7 +93,7 @@ public static class FileMapUtil
         return baseId;
     }
 
-    public static Dictionary<string, string> ApplyChanges(
+    private static Dictionary<string, string> ApplyChanges(
         IReadOnlyDictionary<string, string> baseMap,
         IReadOnlyDictionary<string, string> changes)
     {

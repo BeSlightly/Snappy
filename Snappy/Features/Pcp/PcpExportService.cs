@@ -9,17 +9,6 @@ namespace Snappy.Features.Pcp;
 
 internal sealed class PcpExportService
 {
-    public async Task ExportPcp(string snapshotPath, string outputPath)
-    {
-        await ExportPcp(snapshotPath, outputPath, null, null);
-    }
-
-    public async Task ExportPcp(string snapshotPath, string outputPath, GlamourerHistoryEntry? selectedGlamourer,
-        CustomizeHistoryEntry? selectedCustomize)
-    {
-        await ExportPcp(snapshotPath, outputPath, selectedGlamourer, selectedCustomize, null, null);
-    }
-
     public async Task ExportPcp(
         string snapshotPath,
         string outputPath,

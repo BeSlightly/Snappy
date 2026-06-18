@@ -6,7 +6,6 @@ public record McdfHeader(byte Version, McdfData CharaFileData)
 
     public byte Version { get; set; } = Version;
     public McdfData CharaFileData { get; set; } = CharaFileData;
-    public string? FilePath { get; private set; } = string.Empty;
 
     public void WriteToStream(BinaryWriter writer)
     {
@@ -41,11 +40,7 @@ public record McdfHeader(byte Version, McdfData CharaFileData)
         try
         {
             var (version, dataLength) = ReadHeader(reader);
-            var decoded = new McdfHeader(version, McdfData.FromByteArray(reader.ReadBytes(dataLength)))
-            {
-                FilePath = path
-            };
-            return decoded;
+            return new McdfHeader(version, McdfData.FromByteArray(reader.ReadBytes(dataLength)));
         }
         catch (Exception)
         {
