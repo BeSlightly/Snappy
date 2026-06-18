@@ -12,11 +12,9 @@ public static class PluginUtil
     /// </summary>
     public static string GetFileHash(string filePath)
     {
-#pragma warning disable SYSLIB0021 // Type or member is obsolete
-        using SHA1CryptoServiceProvider cryptoProvider = new();
-        return BitConverter.ToString(cryptoProvider.ComputeHash(File.ReadAllBytes(filePath)))
+        using var sha1 = SHA1.Create();
+        return BitConverter.ToString(sha1.ComputeHash(File.ReadAllBytes(filePath)))
             .Replace("-", "", StringComparison.Ordinal);
-#pragma warning restore SYSLIB0021 // Type or member is obsolete
     }
 
     /// <summary>
@@ -26,10 +24,8 @@ public static class PluginUtil
     /// </summary>
     public static string GetFileHash(byte[] bytes)
     {
-#pragma warning disable SYSLIB0021 // Type or member is obsolete
-        using SHA1CryptoServiceProvider cryptoProvider = new();
-        return BitConverter.ToString(cryptoProvider.ComputeHash(bytes)).Replace("-", "", StringComparison.Ordinal);
-#pragma warning restore SYSLIB0021 // Type or member is obsolete
+        using var sha1 = SHA1.Create();
+        return BitConverter.ToString(sha1.ComputeHash(bytes)).Replace("-", "", StringComparison.Ordinal);
     }
 
     public static bool IsInGpose()
