@@ -1,4 +1,3 @@
-using System.Collections;
 using System.Diagnostics.CodeAnalysis;
 using ECommons.EzIpcManager;
 using ECommons.Reflection;
@@ -42,35 +41,10 @@ public abstract class IpcSubscriber
         if (!IsPluginLoaded(identifier))
             return false;
 
-        try
-        {
-            var pluginManager = DalamudReflector.GetPluginManager();
-            if (pluginManager?.GetFoP("InstalledPlugins") is IEnumerable installedPlugins)
-            {
-                foreach (var installedPlugin in installedPlugins)
-                {
-                    if (installedPlugin.GetFoP("InternalName") is not string internalName ||
-                        !string.Equals(internalName, identifier, StringComparison.OrdinalIgnoreCase))
-                        continue;
-
-                    if (installedPlugin.GetFoP("IsLoaded") is false)
-                        return false;
-
-                    plugin = installedPlugin.GetFoP("instance");
-                    if (plugin != null)
-                        return true;
-                }
-            }
-        }
-        catch (Exception e)
-        {
-            PluginLog.Debug($"[{identifier} IPC] Failed to get loaded plugin instance from Dalamud plugin manager: {e.Message}");
-        }
-
-        if (!DalamudReflector.TryGetDalamudPlugin(identifier, out var legacyPlugin, true, true))
+        if (!DalamudReflector.TryGetDalamudPlugin(identifier, out var loadedPlugin, true))
             return false;
 
-        plugin = legacyPlugin;
+        plugin = loadedPlugin;
         return true;
     }
 

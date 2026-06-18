@@ -1,6 +1,6 @@
 using Dalamud.Game.ClientState.Objects.SubKinds;
+using ECommons.GameFunctions;
 using ECommons.GameHelpers;
-using ECommons.Reflection;
 using Snappy.Common;
 using Snappy.Common.Utilities;
 using Penumbra.GameData.Structs;
@@ -51,7 +51,7 @@ public class ActorService : IActorService
         {
             var tempCollectionActors = Svc.Objects
                 .OfType<IPlayerCharacter>()
-                .Where(c => c.IsValid() && IsActorVisible(c))
+                .Where(c => c.IsValid() && c.IsCharacterVisible())
                 .Where(c => _ipcManager.PenumbraHasTemporaryCollection(c.ObjectIndex));
 
             selectableActors = selectableActors.UnionBy(tempCollectionActors, p => p.Address);
@@ -74,17 +74,6 @@ public class ActorService : IActorService
             .ThenBy(p => p.Name.ToString(), StringComparer.OrdinalIgnoreCase)
             .Select(p => (ICharacter)p)
             .ToList();
-    }
-
-    private static bool IsActorVisible(IGameObject actor)
-    {
-        var visibleObj = actor.GetFoP("IsVisible");
-        if (visibleObj is bool isVisible) return isVisible;
-
-        var targetableObj = actor.GetFoP("IsTargetable");
-        if (targetableObj is bool isTargetable) return isTargetable;
-
-        return true;
     }
 
     private static int GetActorSortKey(ICharacter actor, IntPtr localAddress, bool allowOwnedPets)

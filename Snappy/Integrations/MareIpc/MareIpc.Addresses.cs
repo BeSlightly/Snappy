@@ -1,5 +1,5 @@
-using System.Reflection;
 using Dalamud.Plugin.Ipc;
+using ECommons.GameFunctions;
 
 namespace Snappy.Integrations;
 
@@ -15,7 +15,7 @@ public sealed partial class MareIpc
         var result = pairedAddresses
             .Select(addr => Svc.Objects.FirstOrDefault(obj => obj.Address == addr))
             .OfType<ICharacter>()
-            .Where(c => c.IsValid())
+            .Where(c => c.IsValid() && c.IsCharacterVisible())
             .ToList();
 
         return result;
@@ -101,7 +101,7 @@ public sealed partial class MareIpc
     {
         var handledAddresses = GetHandledAddressesFromIpc(_lightlessSyncHandledAddresses, "LightlessSync");
         var visibleAddresses = _marePlugins.TryGetValue(LightlessSyncPluginKey, out var lightlessPlugin)
-            ? GetVisiblePairAddressesViaPairs(lightlessPlugin)
+            ? GetVisiblePairedAddressesViaPairs(lightlessPlugin)
             : null;
 
         if (visibleAddresses != null)
@@ -120,7 +120,20 @@ public sealed partial class MareIpc
         if (!IsPluginActive(MareSempiternePluginKey))
             return [];
 
-        return GetHandledAddressesFromIpc(_playerSyncHandledAddresses, "PlayerSync") ?? [];
+        var handledAddresses = GetHandledAddressesFromIpc(_playerSyncHandledAddresses, "PlayerSync");
+        var visibleAddresses = _marePlugins.TryGetValue(MareSempiternePluginKey, out var playerSyncPlugin)
+            ? GetVisiblePairedAddressesViaPairs(playerSyncPlugin)
+            : null;
+
+        if (visibleAddresses != null)
+        {
+            if (handledAddresses != null)
+                visibleAddresses.IntersectWith(handledAddresses);
+
+            return visibleAddresses;
+        }
+
+        return handledAddresses ?? [];
     }
 
     private static HashSet<nint>? GetHandledAddressesFromIpc(ICallGateSubscriber<List<nint>>? subscriber, string pluginName)
@@ -139,7 +152,7 @@ public sealed partial class MareIpc
         }
     }
 
-    private HashSet<nint>? GetVisiblePairAddressesViaPairs(MarePluginInfo pluginInfo)
+    private HashSet<nint>? GetVisiblePairedAddressesViaPairs(MarePluginInfo pluginInfo)
     {
         try
         {
@@ -155,10 +168,7 @@ public sealed partial class MareIpc
             var results = new HashSet<nint>();
             foreach (var pair in EnumeratePairsFromPlugin(pluginInfo))
             {
-                var pairType = pair.GetType();
-                var isVisibleObj = pairType.GetProperty("IsVisible", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
-                    ?.GetValue(pair);
-                if (isVisibleObj is not true)
+                if (!IsVisibleConnectedPairObject(pair))
                     continue;
 
                 var addr = GetPairAddress(pair);
@@ -170,7 +180,7 @@ public sealed partial class MareIpc
         }
         catch (Exception e)
         {
-            PluginLog.Debug($"[Mare IPC] Visible pair reflection failed for {pluginInfo.PluginName}: {e.Message}");
+            PluginLog.Debug($"[Mare IPC] Visible paired reflection failed for {pluginInfo.PluginName}: {e.Message}");
             return null;
         }
     }

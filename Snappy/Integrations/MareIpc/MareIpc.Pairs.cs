@@ -124,6 +124,32 @@ public sealed partial class MareIpc
         return nint.Zero;
     }
 
+    private static bool IsVisibleConnectedPairObject(object pairObject)
+    {
+        return pairObject.GetFoP("IsVisible") is true && IsConnectedPairObject(pairObject);
+    }
+
+    private static bool IsConnectedPairObject(object pairObject)
+    {
+        if (pairObject.GetFoP("IsPaired") is bool isPaired)
+            return isPaired;
+
+        try
+        {
+            var method = pairObject.GetType().GetMethod("HasAnyConnection",
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+                null,
+                Type.EmptyTypes,
+                null);
+
+            return method?.Invoke(pairObject, null) is true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     private static object? InvokePairManagerMethod(object pairManager, string methodName)
     {
         try
