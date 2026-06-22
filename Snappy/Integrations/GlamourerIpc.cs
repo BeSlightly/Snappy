@@ -1,3 +1,4 @@
+using System.Reflection;
 using Glamourer.Api.Enums;
 using Glamourer.Api.IpcSubscribers;
 using Snappy.Common;
@@ -12,6 +13,14 @@ public sealed class GlamourerIpc : IpcSubscriber
     private readonly RevertToAutomation _revertToAutomation;
     private readonly UnlockState _unlockState;
     private readonly ApiVersion _version;
+
+    private bool _reflectionInitialized;
+    private object? _stateManager;
+    private object? _actorObjectManager;
+    private FieldInfo? _actorObjectsField;
+    private PropertyInfo? _objectsIndexer;
+    private MethodInfo? _getOrCreateMethod;
+    private FieldInfo? _combinationField;
 
     public GlamourerIpc() : base("Glamourer")
     {
@@ -28,8 +37,7 @@ public sealed class GlamourerIpc : IpcSubscriber
 
         try
         {
-            PluginLog.Verbose(
-                $"Glamourer applying state with lock key {Constants.GlamourerLockKey:X} for {obj.Address:X}");
+            PluginLog.Verbose($"Glamourer applying state with lock key {Constants.GlamourerLockKey:X} for {obj.Address:X}");
             _apply.Invoke(base64, obj.ObjectIndex, Constants.GlamourerLockKey);
         }
         catch (Exception ex)
@@ -55,8 +63,7 @@ public sealed class GlamourerIpc : IpcSubscriber
         PluginLog.Information($"Glamourer reverting to automation for object index {obj.ObjectIndex}.");
         var revertResult = _revertToAutomation.Invoke(obj.ObjectIndex);
         if (revertResult is not (GlamourerApiEc.Success or GlamourerApiEc.NothingDone))
-            PluginLog.Warning(
-                $"Failed to revert to automation for object index {obj.ObjectIndex}. Result: {revertResult}");
+            PluginLog.Warning($"Failed to revert to automation for object index {obj.ObjectIndex}. Result: {revertResult}");
     }
 
     public string GetCharacterCustomization(ICharacter c)
@@ -66,15 +73,12 @@ public sealed class GlamourerIpc : IpcSubscriber
         try
         {
             PluginLog.Debug($"Getting customization for {c.Name} / {c.ObjectIndex}");
-            var (code, base64) = _getStateBase64.Invoke(c.ObjectIndex);
-            if (code != GlamourerApiEc.Success || string.IsNullOrEmpty(base64))
-            {
-                PluginLog.Warning(
-                    $"Glamourer GetStateBase64 returned {code} for {c.Name.TextValue} (index {c.ObjectIndex}). Returning empty string.");
-                return string.Empty;
-            }
+            var (code, base64) = _getStateBase64.Invoke(c.ObjectIndex, TryGetLockKey(c.ObjectIndex));
+            if (code == GlamourerApiEc.Success && !string.IsNullOrEmpty(base64))
+                return base64;
 
-            return base64;
+            PluginLog.Warning($"Glamourer GetStateBase64 returned {code} for {c.Name.TextValue} (index {c.ObjectIndex}). Returning empty string.");
+            return string.Empty;
         }
         catch (Exception ex)
         {
@@ -101,6 +105,91 @@ public sealed class GlamourerIpc : IpcSubscriber
     {
         if (isAvailable && !wasAvailable)
             PluginLog.Information("[Glamourer] Plugin loaded/reloaded");
-        else if (!isAvailable && wasAvailable) PluginLog.Information("[Glamourer] Plugin unloaded");
+        else if (!isAvailable && wasAvailable)
+            PluginLog.Information("[Glamourer] Plugin unloaded");
+
+        if (isAvailable != wasAvailable)
+            ResetReflectionState();
+    }
+
+    private uint TryGetLockKey(int objectIndex)
+    {
+        try
+        {
+            InitializeReflection();
+            if (_objectsIndexer == null || _getOrCreateMethod == null || _combinationField == null)
+                return 0;
+
+            var objectManager = _actorObjectsField!.GetValue(_actorObjectManager);
+            var actor = objectManager == null ? null : _objectsIndexer.GetValue(objectManager, [objectIndex]);
+            if (actor == null)
+                return 0;
+
+            var args = new object?[] { actor, null };
+            if (_getOrCreateMethod.Invoke(_stateManager, args) is not true || args[1] == null)
+                return 0;
+
+            return _combinationField.GetValue(args[1]) is uint key ? key : 0;
+        }
+        catch (Exception ex)
+        {
+            PluginLog.Debug($"Glamourer lock key reflection failed: {ex.Message}");
+            return 0;
+        }
+    }
+
+    private void InitializeReflection()
+    {
+        if (_reflectionInitialized) return;
+        _reflectionInitialized = true;
+
+        try
+        {
+            if (!TryGetLoadedPluginInstance("Glamourer", out var plugin))
+                return;
+
+            var assembly = plugin.GetType().Assembly;
+            var services = plugin.GetType().GetField("_services", BindingFlags.Instance | BindingFlags.NonPublic)?.GetValue(plugin);
+            var provider = services?.GetType().GetProperty("Provider", BindingFlags.Instance | BindingFlags.Public)?.GetValue(services) as IServiceProvider;
+            var stateApiType = assembly.GetType("Glamourer.Api.StateApi");
+            var stateApi = provider != null && stateApiType != null ? provider.GetService(stateApiType) : null;
+            if (stateApi == null || stateApiType == null)
+                return;
+
+            _stateManager = stateApiType.GetField("_stateManager", BindingFlags.Instance | BindingFlags.NonPublic)?.GetValue(stateApi);
+            _actorObjectManager = stateApiType.GetField("_objects", BindingFlags.Instance | BindingFlags.NonPublic)?.GetValue(stateApi);
+            if (_stateManager == null || _actorObjectManager == null)
+                return;
+
+            var actorStateType = assembly.GetType("Glamourer.State.ActorState");
+            _actorObjectsField = _actorObjectManager.GetType().GetField("Objects", BindingFlags.Instance | BindingFlags.Public);
+            _objectsIndexer = _actorObjectsField?.FieldType.GetProperty("Item", [typeof(int)]);
+            _combinationField = actorStateType?.GetField("Combination", BindingFlags.Instance | BindingFlags.Public);
+            _getOrCreateMethod = _stateManager.GetType().GetMethods(BindingFlags.Instance | BindingFlags.Public)
+                .FirstOrDefault(m => m.Name == "GetOrCreate"
+                    && m.GetParameters() is { Length: 2 } p
+                    && p[1].IsOut && p[1].ParameterType.GetElementType() == actorStateType);
+
+            var ready = _objectsIndexer != null && _getOrCreateMethod != null && _combinationField != null;
+            PluginLog.Debug(ready
+                ? "Glamourer lock key reflection initialized successfully."
+                : "Glamourer lock key reflection incomplete; locked states may be unreadable.");
+        }
+        catch (Exception ex)
+        {
+            PluginLog.Debug($"Glamourer reflection initialization failed: {ex.Message}");
+            ResetReflectionState();
+        }
+    }
+
+    private void ResetReflectionState()
+    {
+        _reflectionInitialized = false;
+        _stateManager = null;
+        _actorObjectManager = null;
+        _actorObjectsField = null;
+        _objectsIndexer = null;
+        _getOrCreateMethod = null;
+        _combinationField = null;
     }
 }
