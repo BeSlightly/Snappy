@@ -1,8 +1,6 @@
-using System.Collections.Generic;
 using Dalamud.Utility;
 using ECommons.GameHelpers;
 using Snappy.Common;
-using Snappy.Common.Utilities;
 using Penumbra.GameData.Structs;
 
 namespace Snappy.Services.SnapshotManager;
@@ -176,12 +174,14 @@ public class SnapshotApplicationService : ISnapshotApplicationService
         }
 
         var resolvedFileMap = new Dictionary<string, string>();
+        var resolvedFileSwaps = new Dictionary<string, string>();
         var resolvedManipulations = string.Empty;
         if (applyFiles)
         {
             var mapIdToUse = glamourerToApply?.FileMapId ?? customizeOverride?.FileMapId ??
                              snapshotInfo.CurrentFileMapId;
             resolvedFileMap = FileMapUtil.ResolveFileMap(snapshotInfo, mapIdToUse);
+            resolvedFileSwaps = FileMapUtil.ResolveFileSwaps(snapshotInfo, mapIdToUse);
             resolvedManipulations = FileMapUtil.ResolveManipulation(snapshotInfo, mapIdToUse);
         }
 
@@ -209,6 +209,11 @@ public class SnapshotApplicationService : ISnapshotApplicationService
                     PluginLog.Warning($"Missing file blob for {gamePath} (hash: {hash}). It will not be applied.");
             }
         }
+
+        if (applyFiles)
+            foreach (var (gamePath, swapPath) in resolvedFileSwaps)
+                if (!string.IsNullOrWhiteSpace(gamePath) && !string.IsNullOrWhiteSpace(swapPath))
+                    moddedPaths[gamePath] = swapPath;
 
         plan = new SnapshotLoadPlan(glamourerToApply, customizeDataToApply, moddedPaths, resolvedManipulations,
             applyFiles, applyGlamourer, customizePlusAvailable);

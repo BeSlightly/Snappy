@@ -1,5 +1,4 @@
 using System.IO.Compression;
-using System.Text;
 using Newtonsoft.Json.Linq;
 
 namespace Snappy.Common.Utilities;

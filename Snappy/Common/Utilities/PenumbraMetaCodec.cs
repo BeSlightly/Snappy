@@ -1,7 +1,5 @@
 using System.IO.Compression;
-using System.Text;
 using Newtonsoft.Json.Linq;
-using Newtonsoft.Json;
 using Penumbra.GameData.Files.AtchStructs;
 using Penumbra.GameData.Structs;
 using Penumbra.Meta.Manipulations;

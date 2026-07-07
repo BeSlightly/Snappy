@@ -5,4 +5,5 @@ public record SnapshotData(
     string Customize,
     string Manipulation,
     Dictionary<string, string> FileReplacements,
+    Dictionary<string, string> FileSwaps,
     Dictionary<string, string> ResolvedPaths);

@@ -1,11 +1,5 @@
-using System;
-using System.Collections.Generic;
-using System.Globalization;
-using System.Linq;
 using ECommons.ExcelServices;
 using Snappy.Common;
-using Snappy.Common.Utilities;
-using Snappy.Models;
 
 namespace Snappy.Services.SnapshotManager;
 
@@ -76,6 +70,7 @@ public class SnapshotFileService : ISnapshotFileService
         var snapshotInfo = await JsonUtil.DeserializeAsync<SnapshotInfo>(paths.SnapshotFile) ??
                            new SnapshotInfo { SourceActor = charaName };
         snapshotInfo.FileMaps ??= new List<FileMapEntry>();
+        snapshotInfo.FileSwaps ??= new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
         // Backfill missing per-map manipulation data for older snapshots.
         BackfillManipulationStrings(snapshotInfo);
@@ -88,9 +83,11 @@ public class SnapshotFileService : ISnapshotFileService
 
         var resolvedCurrentMap =
             EnsureBaseFileMap(snapshotInfo, glamourerHistory, customizeHistory, now);
+        var resolvedCurrentFileSwaps = FileMapUtil.ResolveFileSwaps(snapshotInfo, snapshotInfo.CurrentFileMapId);
 
         var includeRemovals = !useLiveData || !_configuration.UsePenumbraIpcResourcePaths;
-        var mapChanged = UpdateFileMaps(snapshotInfo, snapshotData, resolvedCurrentMap, includeRemovals, now);
+        var mapChanged = UpdateFileMaps(snapshotInfo, snapshotData, resolvedCurrentMap, resolvedCurrentFileSwaps,
+            includeRemovals, now);
 
         var useMareFileCache = !_configuration.UseLiveSnapshotData && !isLocalPlayer;
         foreach (var (gamePath, hash) in snapshotData.FileReplacements)
@@ -257,8 +254,9 @@ public class SnapshotFileService : ISnapshotFileService
         GlamourerHistory glamourerHistory, CustomizeHistory customizeHistory, DateTime now)
     {
         var resolvedCurrentMap = FileMapUtil.ResolveFileMap(snapshotInfo, snapshotInfo.CurrentFileMapId);
+        var resolvedCurrentFileSwaps = FileMapUtil.ResolveFileSwaps(snapshotInfo, snapshotInfo.CurrentFileMapId);
 
-        FileMapUtil.CreateBaseMapIfMissing(snapshotInfo, resolvedCurrentMap, now);
+        FileMapUtil.CreateBaseMapIfMissing(snapshotInfo, resolvedCurrentMap, resolvedCurrentFileSwaps, now);
         if (snapshotInfo.CurrentFileMapId != null)
         {
             foreach (var entry in glamourerHistory.Entries.Where(e => string.IsNullOrEmpty(e.FileMapId)))
@@ -271,12 +269,19 @@ public class SnapshotFileService : ISnapshotFileService
     }
 
     private static bool UpdateFileMaps(SnapshotInfo snapshotInfo, SnapshotData snapshotData,
-        Dictionary<string, string> resolvedCurrentMap, bool includeRemovals, DateTime now)
+        Dictionary<string, string> resolvedCurrentMap, Dictionary<string, string> resolvedCurrentFileSwaps,
+        bool includeRemovals, DateTime now)
     {
         var incomingFileMap = new Dictionary<string, string>(snapshotData.FileReplacements,
             StringComparer.OrdinalIgnoreCase);
         var mapChanges = FileMapUtil.CalculateChanges(resolvedCurrentMap, incomingFileMap, includeRemovals);
-        var fileMapChanged = mapChanges.Any();
+        var incomingFileSwaps = new Dictionary<string, string>(snapshotData.FileSwaps,
+            StringComparer.OrdinalIgnoreCase);
+        foreach (var gamePath in incomingFileSwaps.Keys)
+            incomingFileMap.Remove(gamePath);
+        var fileSwapChanges = FileMapUtil.CalculateChanges(resolvedCurrentFileSwaps, incomingFileSwaps,
+            includeRemovals);
+        var fileMapChanged = mapChanges.Any() || fileSwapChanges.Any();
 
         var fileMaps = snapshotInfo.FileMaps ?? new List<FileMapEntry>();
         snapshotInfo.FileMaps = fileMaps;
@@ -296,6 +301,7 @@ public class SnapshotFileService : ISnapshotFileService
                 Id = newMapId,
                 BaseId = snapshotInfo.CurrentFileMapId,
                 Changes = mapChanges,
+                FileSwapChanges = fileSwapChanges,
                 Timestamp = now.ToString("o", CultureInfo.InvariantCulture),
                 ManipulationString = snapshotData.Manipulation
             });
@@ -309,6 +315,7 @@ public class SnapshotFileService : ISnapshotFileService
         resolvedCurrentMap = FileMapUtil.ResolveFileMap(snapshotInfo, snapshotInfo.CurrentFileMapId);
         snapshotInfo.FileReplacements = new Dictionary<string, string>(resolvedCurrentMap,
             StringComparer.OrdinalIgnoreCase);
+        snapshotInfo.FileSwaps = FileMapUtil.ResolveFileSwaps(snapshotInfo, snapshotInfo.CurrentFileMapId);
 
         return mapChanged;
     }

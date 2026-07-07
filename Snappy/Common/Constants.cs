@@ -1,5 +1,3 @@
-using Penumbra.GameData.Structs;
-
 namespace Snappy.Common;
 
 public static class Constants

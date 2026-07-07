@@ -1,7 +1,6 @@
 using Newtonsoft.Json.Linq;
 using Penumbra.GameData.Enums;
 using Penumbra.GameData.Structs;
-using Snappy.Common.Utilities;
 
 namespace Snappy.Features.Pmp.ChangedItems;
 

@@ -1,6 +1,4 @@
 using System.IO.Compression;
-using System.Text;
-using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Snappy.Common;
 using Snappy.Services.SnapshotManager;
@@ -105,7 +103,8 @@ internal sealed class PcpImportService
             }
 
         return SnapshotImportUtil.BuildSnapshotInfo(characterData.Actor.PlayerName, characterData.Actor.HomeWorld,
-            manipulationString, gamePathToHashMap);
+            manipulationString, gamePathToHashMap,
+            new Dictionary<string, string>(modData.FileSwaps, StringComparer.OrdinalIgnoreCase));
     }
 
     private static string ConvertPcpManipulationsToPenumbraFormat(List<JObject> pcpManipulations)

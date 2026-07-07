@@ -1,5 +1,3 @@
-using System;
-
 namespace Snappy.Services.SnapshotManager;
 
 [Flags]

@@ -1,5 +1,4 @@
 using Dalamud.Game.ClientState.Objects.Enums;
-using Dalamud.Game.ClientState.Objects.Types;
 using ECommons.GameHelpers;
 
 namespace Snappy.Common.Utilities;

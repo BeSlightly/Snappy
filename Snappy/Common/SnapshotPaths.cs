@@ -1,5 +1,3 @@
-using Snappy.Common.Utilities;
-
 namespace Snappy.Common;
 
 public class SnapshotPaths

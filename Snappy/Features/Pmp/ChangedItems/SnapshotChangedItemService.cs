@@ -5,7 +5,6 @@ using Penumbra.GameData.Files;
 using Penumbra.GameData.Structs;
 using Penumbra.Meta.Manipulations;
 using Penumbra.UI.Classes;
-using Snappy.Common.Utilities;
 using Snappy.Services;
 
 namespace Snappy.Features.Pmp.ChangedItems;

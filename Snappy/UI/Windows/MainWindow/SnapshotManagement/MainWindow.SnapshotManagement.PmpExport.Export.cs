@@ -28,6 +28,7 @@ public partial class MainWindow
             var snapshotName = _selectedSnapshot.Name;
             var fileMapId = _pmpSelectedFileMapId ?? _selectedSnapshotInfo.CurrentFileMapId;
             var resolvedFileMap = FileMapUtil.ResolveFileMapWithEmptyFallback(_selectedSnapshotInfo, fileMapId);
+            var resolvedFileSwaps = FileMapUtil.ResolveFileSwaps(_selectedSnapshotInfo, fileMapId);
 
             var selectedPaths = BuildSelectedPmpGamePaths(selectedKeys);
             var filesDirectory = SnapshotPaths.From(snapshotPath).FilesDirectory;
@@ -36,6 +37,9 @@ public partial class MainWindow
                 resolvedFileMap,
                 filesDirectory);
             var filteredFileMap = resolvedFileMap
+                .Where(kvp => selectedPaths.Contains(kvp.Key))
+                .ToDictionary(kvp => kvp.Key, kvp => kvp.Value, StringComparer.OrdinalIgnoreCase);
+            var filteredFileSwaps = resolvedFileSwaps
                 .Where(kvp => selectedPaths.Contains(kvp.Key))
                 .ToDictionary(kvp => kvp.Key, kvp => kvp.Value, StringComparer.OrdinalIgnoreCase);
             var manipBase = FileMapUtil.ResolveManipulation(_selectedSnapshotInfo, fileMapId);
@@ -56,7 +60,7 @@ public partial class MainWindow
                         var filteredManip = await _snapshotChangedItemService
                             .FilterManipulationsAsync(manipBase, selectedKeys);
                         await _pmpExportManager.SnapshotToPMPAsync(snapshotPath, path, fileMapId,
-                            filteredFileMap, filteredManip, true);
+                            filteredFileMap, filteredFileSwaps, filteredManip, true);
                     });
                 },
                 _snappy.Configuration.WorkingDirectory);

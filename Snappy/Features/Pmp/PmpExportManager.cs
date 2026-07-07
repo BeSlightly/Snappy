@@ -1,11 +1,7 @@
-using System;
-using System.Collections.Generic;
 using System.IO.Compression;
-using System.Linq;
 using Snappy.Common;
 using Snappy.Features.Pmp.Models;
 using Snappy.Features.Packaging;
-using Snappy.Common.Utilities;
 
 namespace Snappy.Features.Pmp;
 
@@ -21,10 +17,11 @@ public class PmpExportManager : IPmpExportManager
     public bool IsExporting { get; private set; }
 
     public Task SnapshotToPMPAsync(string snapshotPath, string? outputPath = null, string? fileMapId = null)
-        => SnapshotToPMPAsync(snapshotPath, outputPath, fileMapId, null, null, false);
+        => SnapshotToPMPAsync(snapshotPath, outputPath, fileMapId, null, null, null, false);
 
     public async Task SnapshotToPMPAsync(string snapshotPath, string? outputPath, string? fileMapId,
-        IReadOnlyDictionary<string, string>? fileMapOverride, string? manipulationOverride,
+        IReadOnlyDictionary<string, string>? fileMapOverride,
+        IReadOnlyDictionary<string, string>? fileSwapOverride, string? manipulationOverride,
         bool useReadableArchivePaths = false)
     {
         if (IsExporting)
@@ -60,6 +57,12 @@ public class PmpExportManager : IPmpExportManager
             var resolvedManipulations = manipulationOverride ??
                                         FileMapUtil.ResolveManipulation(snapshotInfo,
                                             fileMapId ?? snapshotInfo.CurrentFileMapId);
+            var resolvedFileSwaps = fileSwapOverride
+                                    ?? FileMapUtil.ResolveFileSwaps(snapshotInfo,
+                                        fileMapId ?? snapshotInfo.CurrentFileMapId);
+            var effectiveFileMap = resolvedFileMap
+                .Where(kvp => !resolvedFileSwaps.ContainsKey(kvp.Key))
+                .ToDictionary(kvp => kvp.Key, kvp => kvp.Value, StringComparer.OrdinalIgnoreCase);
 
             using var fileStream = new FileStream(pmpOutputPath, FileMode.Create, FileAccess.Write, FileShare.None);
             using var archive = new ZipArchive(fileStream, ZipArchiveMode.Create);
@@ -70,8 +73,10 @@ public class PmpExportManager : IPmpExportManager
             // Create default_mod.json entry
             var modData = new PmpDefaultMod();
             modData.Manipulations = ModPackageBuilder.BuildManipulations(resolvedManipulations);
+            modData.FileSwaps = new Dictionary<string, string>(resolvedFileSwaps,
+                StringComparer.OrdinalIgnoreCase);
             ModPackageBuilder.AddSnapshotFiles(archive, snapshotInfo, paths.FilesDirectory, modData.Files,
-                resolvedFileMap, useReadableArchivePaths);
+                effectiveFileMap, useReadableArchivePaths);
 
             ArchiveUtil.WriteJsonEntry(archive, "default_mod.json", modData);
 

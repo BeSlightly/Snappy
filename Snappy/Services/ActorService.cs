@@ -1,8 +1,6 @@
 using Dalamud.Game.ClientState.Objects.SubKinds;
 using ECommons.GameFunctions;
 using ECommons.GameHelpers;
-using Snappy.Common;
-using Snappy.Common.Utilities;
 using Penumbra.GameData.Structs;
 
 namespace Snappy.Services;

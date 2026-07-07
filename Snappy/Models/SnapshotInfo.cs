@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-
 namespace Snappy.Models;
 
 public record SnapshotInfo
@@ -12,6 +9,7 @@ public record SnapshotInfo
     public string LastUpdate { get; set; } = string.Empty;
 
     public Dictionary<string, string> FileReplacements { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<string, string> FileSwaps { get; set; } = new(StringComparer.OrdinalIgnoreCase);
     public List<FileMapEntry> FileMaps { get; set; } = new();
     public string? CurrentFileMapId { get; set; }
     public string ManipulationString { get; set; } = string.Empty;

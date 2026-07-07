@@ -35,7 +35,6 @@ public partial class MainWindow : Window, IDisposable
     private CustomizeHistoryEntry? _pcpSelectedCustomizeEntry;
     private string _pcpPlayerNameOverride = string.Empty;
     private int? _pcpSelectedWorldIdOverride;
-    private string _pcpWorldSearch = string.Empty;
     private SnapshotChangedItemSet? _pmpChangedItems;
     private readonly Dictionary<string, bool> _pmpItemSelection = new(StringComparer.OrdinalIgnoreCase);
     private string? _pmpSelectedFileMapId;

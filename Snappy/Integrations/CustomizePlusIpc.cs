@@ -1,7 +1,6 @@
 using System.Collections;
 using System.Reflection;
 using Dalamud.Plugin.Ipc;
-using ECommons.Reflection;
 using Snappy.Services;
 
 namespace Snappy.Integrations;
@@ -9,7 +8,7 @@ namespace Snappy.Integrations;
 public sealed class CustomizePlusIpc : IpcSubscriber
 {
     private static readonly JsonSerializerSettings IpcProfileSerializerSettings = new()
-        { DefaultValueHandling = DefaultValueHandling.Ignore };
+    { DefaultValueHandling = DefaultValueHandling.Ignore };
 
     private readonly ICallGateSubscriber<Guid, int> _deleteTempProfileById;
     private readonly ICallGateSubscriber<ushort, int> _deleteTempProfileOnCharacter;

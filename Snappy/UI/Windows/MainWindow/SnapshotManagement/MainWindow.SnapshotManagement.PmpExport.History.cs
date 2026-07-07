@@ -95,8 +95,10 @@ public partial class MainWindow
 
         var fileMapId = _pmpSelectedFileMapId ?? _selectedSnapshotInfo.CurrentFileMapId;
         var resolvedFileMap = FileMapUtil.ResolveFileMapWithEmptyFallback(_selectedSnapshotInfo, fileMapId);
+        var resolvedFileSwaps = FileMapUtil.ResolveFileSwaps(_selectedSnapshotInfo, fileMapId);
 
-        var gamePaths = resolvedFileMap.Keys.ToArray();
+        var gamePaths = resolvedFileMap.Keys.Concat(resolvedFileSwaps.Keys)
+            .Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
         var manipulations = FileMapUtil.ResolveManipulation(_selectedSnapshotInfo, fileMapId);
         var filesDirectory = _selectedSnapshot == null
             ? null

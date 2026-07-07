@@ -1,5 +1,4 @@
 using Dalamud.Utility;
-using System.IO;
 
 namespace Snappy.UI.Windows;
 

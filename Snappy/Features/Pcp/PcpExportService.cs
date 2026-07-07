@@ -1,6 +1,4 @@
 using System.IO.Compression;
-using System.Text;
-using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Snappy.Common;
 using Snappy.Features.Packaging;
@@ -35,6 +33,9 @@ internal sealed class PcpExportService
 
             var fileMapId = selectedGlamourer?.FileMapId ?? selectedCustomize?.FileMapId ?? snapshotInfo.CurrentFileMapId;
             var resolvedFileMap = FileMapUtil.ResolveFileMapWithEmptyFallback(snapshotInfo, fileMapId);
+            var resolvedFileSwaps = FileMapUtil.ResolveFileSwaps(snapshotInfo, fileMapId);
+            foreach (var gamePath in resolvedFileSwaps.Keys)
+                resolvedFileMap.Remove(gamePath);
             var resolvedManipulations = FileMapUtil.ResolveManipulation(snapshotInfo, fileMapId);
 
             using var archive = ZipFile.Open(outputPath, ZipArchiveMode.Create);
@@ -153,6 +154,8 @@ internal sealed class PcpExportService
             // Create mod data and add files
             var modData = new PcpModData();
             modData.Manipulations = ModPackageBuilder.BuildManipulations(resolvedManipulations);
+            modData.FileSwaps = new Dictionary<string, string>(resolvedFileSwaps,
+                StringComparer.OrdinalIgnoreCase);
             ModPackageBuilder.AddSnapshotFiles(archive, snapshotInfo, paths.FilesDirectory, modData.Files,
                 resolvedFileMap);
 

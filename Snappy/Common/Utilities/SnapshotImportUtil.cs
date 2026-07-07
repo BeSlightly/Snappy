@@ -5,18 +5,27 @@ namespace Snappy.Common.Utilities;
 public static class SnapshotImportUtil
 {
     public static SnapshotInfo BuildSnapshotInfo(string sourceActor, int? sourceWorldId, string manipulationString,
-        Dictionary<string, string> fileReplacements)
+        Dictionary<string, string> fileReplacements, Dictionary<string, string>? fileSwaps = null)
     {
+        var normalizedReplacements = new Dictionary<string, string>(fileReplacements,
+            StringComparer.OrdinalIgnoreCase);
+        var normalizedSwaps = new Dictionary<string, string>(fileSwaps
+                                                              ?? new Dictionary<string, string>(),
+            StringComparer.OrdinalIgnoreCase);
+        foreach (var gamePath in normalizedSwaps.Keys)
+            normalizedReplacements.Remove(gamePath);
+
         var snapshotInfo = new SnapshotInfo
         {
             SourceActor = sourceActor,
             SourceWorldId = sourceWorldId,
             LastUpdate = DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture),
             ManipulationString = manipulationString,
-            FileReplacements = fileReplacements
+            FileReplacements = normalizedReplacements,
+            FileSwaps = normalizedSwaps
         };
 
-        if (snapshotInfo.FileReplacements.Any())
+        if (snapshotInfo.FileReplacements.Any() || snapshotInfo.FileSwaps.Any())
         {
             var baseId = Guid.NewGuid().ToString("N");
             snapshotInfo.FileMaps.Add(new FileMapEntry
@@ -24,6 +33,8 @@ public static class SnapshotImportUtil
                 Id = baseId,
                 BaseId = null,
                 Changes = new Dictionary<string, string>(snapshotInfo.FileReplacements,
+                    StringComparer.OrdinalIgnoreCase),
+                FileSwapChanges = new Dictionary<string, string>(snapshotInfo.FileSwaps,
                     StringComparer.OrdinalIgnoreCase),
                 Timestamp = DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture),
                 ManipulationString = snapshotInfo.ManipulationString

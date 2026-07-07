@@ -1,8 +1,5 @@
-using System.Collections.Generic;
 using System.IO.Compression;
 using Newtonsoft.Json.Linq;
-using Snappy.Common.Utilities;
-using Snappy.Models;
 
 namespace Snappy.Features.Packaging;
 

@@ -1,5 +1,4 @@
 using ECommons.GameHelpers;
-using Snappy.Common.Utilities;
 
 namespace Snappy.UI.Windows;
 
@@ -57,7 +56,6 @@ public partial class MainWindow
             return;
         }
 
-        _currentLabel = label;
         _objIdxSelected = objIdx;
         _selectedActorAddress = selectablePlayer.Address;
         UpdateSelectedActorStateIfNeeded(true);

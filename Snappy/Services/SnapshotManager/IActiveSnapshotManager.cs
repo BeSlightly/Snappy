@@ -2,7 +2,6 @@ namespace Snappy.Services.SnapshotManager;
 
 public interface IActiveSnapshotManager
 {
-    IReadOnlyList<ActiveSnapshot> ActiveSnapshots { get; }
     bool HasActiveSnapshots { get; }
     void AddSnapshot(ActiveSnapshot snapshot);
     ActiveSnapshot? GetSnapshotForCharacter(ICharacter character);

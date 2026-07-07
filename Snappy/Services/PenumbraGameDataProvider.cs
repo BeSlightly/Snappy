@@ -1,5 +1,3 @@
-using Dalamud.Plugin;
-using Dalamud.Plugin.Services;
 using Luna;
 using Penumbra.GameData.Data;
 using Penumbra.GameData.DataContainers;

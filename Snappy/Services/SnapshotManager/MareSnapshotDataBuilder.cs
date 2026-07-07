@@ -44,6 +44,7 @@ public sealed class MareSnapshotDataBuilder
         }
 
         var newFileReplacements = new Dictionary<string, string>();
+        var newFileSwaps = new Dictionary<string, string>();
         if (TryGetPlayerDictionaryValue(mareCharaData.GetFoP("FileReplacements"), out var fileReplacements)
             && fileReplacements is IEnumerable fileList)
         {
@@ -51,14 +52,20 @@ public sealed class MareSnapshotDataBuilder
             {
                 var hash = GetStringProperty(fileData, "Hash");
                 if (string.IsNullOrEmpty(hash))
+                {
+                    var swapPath = GetStringProperty(fileData, "FileSwapPath");
+                    if (!string.IsNullOrWhiteSpace(swapPath))
+                        foreach (var path in GetStringEnumerable(fileData.GetFoP("GamePaths")))
+                            newFileSwaps[path] = swapPath;
                     continue;
+                }
 
                 foreach (var path in GetStringEnumerable(fileData.GetFoP("GamePaths")))
                     newFileReplacements[path] = hash;
             }
         }
 
-        return new SnapshotData(newGlamourer, newCustomize, newManipulation, newFileReplacements,
+        return new SnapshotData(newGlamourer, newCustomize, newManipulation, newFileReplacements, newFileSwaps,
             new Dictionary<string, string>());
     }
 

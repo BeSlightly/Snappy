@@ -1,7 +1,6 @@
 using Dalamud.Game.ClientState.Objects.SubKinds;
 using ECommons.ExcelServices;
 using ECommons.GameHelpers;
-using Snappy.Common.Utilities;
 
 namespace Snappy.UI.Windows;
 
@@ -29,7 +28,6 @@ public partial class MainWindow
     private bool _isActorModifiable;
     private bool _isActorSnapshottable;
     private bool _snapshotExistsForActor;
-    private string _currentLabel = string.Empty;
     private int? _objIdxSelected;
     private nint? _selectedActorAddress;
 
@@ -71,7 +69,6 @@ public partial class MainWindow
 
     private void ClearSelectedActorState()
     {
-        _currentLabel = string.Empty;
         _objIdxSelected = null;
         _selectedActorAddress = null;
 

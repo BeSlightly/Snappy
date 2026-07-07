@@ -1,5 +1,3 @@
-using Snappy.Common.Utilities;
-
 namespace Snappy.Services.SnapshotManager;
 
 public sealed class LiveSnapshotDataBuilder
@@ -19,6 +17,7 @@ public sealed class LiveSnapshotDataBuilder
         var newCustomize = _ipcManager.GetCustomizePlusScale(character);
         var newManipulation = _ipcManager.GetMetaManipulations(character.ObjectIndex);
         var newFileReplacements = new Dictionary<string, string>();
+        var newFileSwaps = new Dictionary<string, string>();
         var resolvedPaths = new Dictionary<string, string>();
 
         penumbraReplacements ??= _ipcManager.PenumbraGetGameObjectResourcePaths(character.ObjectIndex);
@@ -26,7 +25,13 @@ public sealed class LiveSnapshotDataBuilder
         foreach (var (resolvedPath, gamePaths) in penumbraReplacements)
         {
             if (!File.Exists(resolvedPath))
+            {
+                if (!Path.IsPathRooted(resolvedPath))
+                    foreach (var gamePath in gamePaths)
+                        if (!string.Equals(gamePath, resolvedPath, StringComparison.OrdinalIgnoreCase))
+                            newFileSwaps[gamePath] = resolvedPath;
                 continue;
+            }
 
             var fileBytes = await File.ReadAllBytesAsync(resolvedPath);
             var hash = PluginUtil.GetFileHash(fileBytes);
@@ -34,6 +39,7 @@ public sealed class LiveSnapshotDataBuilder
             foreach (var gamePath in gamePaths) newFileReplacements[gamePath] = hash;
         }
 
-        return new SnapshotData(newGlamourer, newCustomize, newManipulation, newFileReplacements, resolvedPaths);
+        return new SnapshotData(newGlamourer, newCustomize, newManipulation, newFileReplacements, newFileSwaps,
+            resolvedPaths);
     }
 }

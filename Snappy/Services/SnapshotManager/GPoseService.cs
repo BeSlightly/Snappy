@@ -24,7 +24,6 @@ public class GPoseService : IGPoseService
         _exitGPoseHook?.Dispose();
     }
 
-    public event Action? GPoseEntered;
     public event Action? GPoseExited;
 
     private void OnFrameworkUpdate(IFramework framework)
@@ -36,7 +35,6 @@ public class GPoseService : IGPoseService
         {
             PluginLog.Debug("GPose entered.");
             OnGPoseEntered();
-            GPoseEntered?.Invoke();
         }
 
         _wasInGpose = isInGpose;

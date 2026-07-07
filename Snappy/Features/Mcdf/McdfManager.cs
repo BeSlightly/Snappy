@@ -1,12 +1,5 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Text;
 using LZ4;
 using Snappy.Common;
-using Snappy.Common.Utilities;
-using Snappy.Models;
 using Snappy.Services.SnapshotManager;
 
 namespace Snappy.Features.Mcdf;
@@ -30,7 +23,8 @@ public class McdfManager : IMcdfManager
         try
         {
             using var fileStream = File.OpenRead(filePath);
-            using var lz4Stream = new LZ4Stream(fileStream, LZ4StreamMode.Decompress);
+            using var lz4Stream = new LZ4Stream(fileStream, LZ4StreamMode.Decompress,
+                LZ4StreamFlags.HighCompression);
             using var memoryStream = new MemoryStream();
             lz4Stream.CopyTo(memoryStream);
             memoryStream.Position = 0;
@@ -45,8 +39,11 @@ public class McdfManager : IMcdfManager
             Directory.CreateDirectory(paths.FilesDirectory);
 
             var gamePathToHashMap = ExtractAndHashMapFiles(charaFile, reader, paths.FilesDirectory);
+            var fileSwaps = ExtractFileSwaps(charaFile);
+            foreach (var gamePath in fileSwaps.Keys)
+                gamePathToHashMap.Remove(gamePath); // Brio applies swaps after files, so swaps win on collisions.
 
-            var snapshotInfo = CreateSnapshotInfo(charaFile, snapshotDirName, gamePathToHashMap);
+            var snapshotInfo = CreateSnapshotInfo(charaFile, snapshotDirName, gamePathToHashMap, fileSwaps);
             var customizeHistory = CreateCustomizeHistory(charaFile, snapshotInfo.CurrentFileMapId);
             var customizeData = customizeHistory.Entries.LastOrDefault()?.CustomizeData ?? string.Empty;
             var glamourerHistory = CreateGlamourerHistory(charaFile, snapshotInfo.CurrentFileMapId, customizeData);
@@ -89,11 +86,15 @@ public class McdfManager : IMcdfManager
                                  (customizeHistory.Entries.Count > 0 ? customizeHistory.Entries.Last() : null);
             var fileMapId = glamourerEntry?.FileMapId ?? customizeEntry?.FileMapId ?? snapshotInfo.CurrentFileMapId;
             var resolvedFileMap = FileMapUtil.ResolveFileMapWithEmptyFallback(snapshotInfo, fileMapId);
+            var resolvedFileSwaps = FileMapUtil.ResolveFileSwaps(snapshotInfo, fileMapId);
+            foreach (var gamePath in resolvedFileSwaps.Keys)
+                resolvedFileMap.Remove(gamePath);
             var resolvedManipulations = FileMapUtil.ResolveManipulation(snapshotInfo, fileMapId);
 
             var output = Path.ChangeExtension(outputPath, ".mcdf");
             using var fileStream = new FileStream(output, FileMode.Create, FileAccess.Write, FileShare.None);
-            using var lz4Stream = new LZ4Stream(fileStream, LZ4StreamMode.Compress);
+            using var lz4Stream = new LZ4Stream(fileStream, LZ4StreamMode.Compress,
+                LZ4StreamFlags.HighCompression);
             using var writer = new BinaryWriter(lz4Stream, Encoding.UTF8, false);
 
             var files = BuildMcdfFiles(paths.FilesDirectory, resolvedFileMap, out var fileBytes);
@@ -103,7 +104,8 @@ public class McdfManager : IMcdfManager
                 GlamourerData = glamourerEntry?.GlamourerString ?? string.Empty,
                 CustomizePlusData = ResolveCustomizePlusData(customizeEntry, glamourerEntry),
                 ManipulationData = resolvedManipulations,
-                Files = files
+                Files = files,
+                FileSwaps = BuildMcdfFileSwaps(resolvedFileSwaps)
             });
 
             header.WriteToStream(writer);
@@ -130,13 +132,14 @@ public class McdfManager : IMcdfManager
     }
 
     private static SnapshotInfo CreateSnapshotInfo(McdfHeader charaFile, string snapshotDirName,
-        Dictionary<string, string> gamePathToHashMap)
+        Dictionary<string, string> gamePathToHashMap, Dictionary<string, string> fileSwaps)
     {
         return SnapshotImportUtil.BuildSnapshotInfo(
             Path.GetFileName(snapshotDirName),
             null,
             charaFile.CharaFileData.ManipulationData,
-            gamePathToHashMap);
+            gamePathToHashMap,
+            fileSwaps);
     }
 
     private static GlamourerHistory CreateGlamourerHistory(McdfHeader charaFile, string? fileMapId,
@@ -194,6 +197,22 @@ public class McdfManager : IMcdfManager
         return gamePathToHash;
     }
 
+    private static Dictionary<string, string> ExtractFileSwaps(McdfHeader charaFileHeader)
+    {
+        var fileSwaps = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var swap in charaFileHeader.CharaFileData.FileSwaps ?? [])
+        {
+            if (string.IsNullOrWhiteSpace(swap.FileSwapPath))
+                continue;
+
+            foreach (var gamePath in swap.GamePaths)
+                if (!string.IsNullOrWhiteSpace(gamePath))
+                    fileSwaps[gamePath] = swap.FileSwapPath;
+        }
+
+        return fileSwaps;
+    }
+
     private static List<McdfData.FileData> BuildMcdfFiles(string filesDirectory,
         IReadOnlyDictionary<string, string> resolvedFileMap, out List<byte[]> fileBytes)
     {
@@ -217,11 +236,21 @@ public class McdfManager : IMcdfManager
             }
 
             var data = File.ReadAllBytes(blobPath);
-            files.Add(new McdfData.FileData(gamePaths, data.LongLength, hash));
+            files.Add(new McdfData.FileData(gamePaths, data.Length, hash));
             fileBytes.Add(data);
         }
 
         return files;
+    }
+
+    private static List<McdfData.FileSwap> BuildMcdfFileSwaps(
+        IReadOnlyDictionary<string, string> resolvedFileSwaps)
+    {
+        return resolvedFileSwaps
+            .Where(kvp => !string.IsNullOrWhiteSpace(kvp.Key) && !string.IsNullOrWhiteSpace(kvp.Value))
+            .GroupBy(kvp => kvp.Value, StringComparer.OrdinalIgnoreCase)
+            .Select(group => new McdfData.FileSwap(group.Select(kvp => kvp.Key).ToArray(), group.Key))
+            .ToList();
     }
 
     private static string ResolveCustomizePlusData(CustomizeHistoryEntry? customizeEntry,

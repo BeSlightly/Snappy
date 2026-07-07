@@ -2,7 +2,6 @@ using System.IO.Compression;
 using Newtonsoft.Json.Linq;
 using Snappy.Common;
 using Snappy.Services;
-using Snappy.Services.SnapshotManager;
 
 namespace Snappy;
 

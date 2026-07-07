@@ -78,7 +78,6 @@ public partial class MainWindow
         _pcpSelectedCustomizeEntry = null;
         _pcpPlayerNameOverride = string.Empty;
         _pcpSelectedWorldIdOverride = null;
-        _pcpWorldSearch = string.Empty;
         _pmpChangedItems = null;
         _pmpItemSelection.Clear();
         _pmpSelectedFileMapId = null;

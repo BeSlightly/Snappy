@@ -1,8 +1,3 @@
-using System;
-using System.Globalization;
-using System.Linq;
-using Snappy.Models;
-
 namespace Snappy.Common.Utilities;
 
 public static class FileMapUtil
@@ -23,6 +18,31 @@ public static class FileMapUtil
         return resolved.Count == 0
             ? new Dictionary<string, string>(snapshotInfo.FileReplacements, StringComparer.OrdinalIgnoreCase)
             : resolved;
+    }
+
+    public static Dictionary<string, string> ResolveFileSwaps(SnapshotInfo snapshotInfo, string? fileMapId)
+    {
+        if (TryResolveFileSwaps(snapshotInfo, fileMapId, out var resolved))
+            return resolved;
+
+        return new Dictionary<string, string>(snapshotInfo.FileSwaps
+                                              ?? new Dictionary<string, string>(),
+            StringComparer.OrdinalIgnoreCase);
+    }
+
+    public static bool TryResolveFileSwaps(SnapshotInfo snapshotInfo, string? fileMapId,
+        out Dictionary<string, string> resolved)
+    {
+        resolved = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        if (snapshotInfo.FileMaps == null || snapshotInfo.FileMaps.Count == 0 || string.IsNullOrEmpty(fileMapId))
+            return false;
+
+        var mapIndex = snapshotInfo.FileMaps.ToDictionary(m => m.Id, m => m, StringComparer.OrdinalIgnoreCase);
+        if (!mapIndex.TryGetValue(fileMapId, out var entry))
+            return false;
+
+        resolved = ResolveSwapEntry(entry, mapIndex, 0);
+        return true;
     }
 
     public static string ResolveManipulation(SnapshotInfo snapshotInfo, string? fileMapId)
@@ -75,9 +95,10 @@ public static class FileMapUtil
         return changes;
     }
 
-    public static string CreateBaseMapIfMissing(SnapshotInfo snapshotInfo, IDictionary<string, string> baseMap, DateTime now)
+    public static string CreateBaseMapIfMissing(SnapshotInfo snapshotInfo, IDictionary<string, string> baseMap,
+        IDictionary<string, string> baseFileSwaps, DateTime now)
     {
-        if (snapshotInfo.CurrentFileMapId != null || !baseMap.Any())
+        if (snapshotInfo.CurrentFileMapId != null || (!baseMap.Any() && !baseFileSwaps.Any()))
             return snapshotInfo.CurrentFileMapId ?? string.Empty;
 
         var baseId = Guid.NewGuid().ToString("N");
@@ -86,6 +107,7 @@ public static class FileMapUtil
             Id = baseId,
             BaseId = null,
             Changes = new Dictionary<string, string>(baseMap, StringComparer.OrdinalIgnoreCase),
+            FileSwapChanges = new Dictionary<string, string>(baseFileSwaps, StringComparer.OrdinalIgnoreCase),
             Timestamp = now.ToString("o", CultureInfo.InvariantCulture),
             ManipulationString = snapshotInfo.ManipulationString
         });
@@ -119,5 +141,20 @@ public static class FileMapUtil
             baseMap = ResolveEntry(baseEntry, mapIndex, depth + 1);
 
         return ApplyChanges(baseMap, entry.Changes);
+    }
+
+    private static Dictionary<string, string> ResolveSwapEntry(
+        FileMapEntry entry,
+        IReadOnlyDictionary<string, FileMapEntry> mapIndex,
+        int depth)
+    {
+        if (depth > MaxMapDepth)
+            throw new InvalidOperationException("File swap map resolution exceeded max depth. Possible cycle in FileMaps.");
+
+        Dictionary<string, string> baseMap = new(StringComparer.OrdinalIgnoreCase);
+        if (!string.IsNullOrEmpty(entry.BaseId) && mapIndex.TryGetValue(entry.BaseId, out var baseEntry))
+            baseMap = ResolveSwapEntry(baseEntry, mapIndex, depth + 1);
+
+        return ApplyChanges(baseMap, entry.FileSwapChanges ?? new Dictionary<string, string>());
     }
 }

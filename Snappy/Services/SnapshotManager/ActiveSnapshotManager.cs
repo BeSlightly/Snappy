@@ -1,5 +1,4 @@
 using ECommons.GameHelpers;
-using Snappy.Common;
 using Penumbra.GameData.Structs;
 
 namespace Snappy.Services.SnapshotManager;
@@ -15,8 +14,6 @@ public class ActiveSnapshotManager : IActiveSnapshotManager
         _ipcManager = ipcManager;
         _configuration = configuration;
     }
-
-    public IReadOnlyList<ActiveSnapshot> ActiveSnapshots => _activeSnapshots;
 
     public bool HasActiveSnapshots => _activeSnapshots.Any();
 

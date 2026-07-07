@@ -1,7 +1,5 @@
 using Dalamud.Interface.Colors;
-using Dalamud.Interface.Components;
 using Dalamud.Interface.Windowing;
-using ECommons.Configuration;
 using ECommons.GameHelpers;
 using Snappy.Services;
 using Snappy.Services.SnapshotManager;
