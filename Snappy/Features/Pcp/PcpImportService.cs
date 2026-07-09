@@ -21,6 +21,7 @@ internal sealed class PcpImportService
 
     public void ImportPcp(string filePath)
     {
+        string? snapshotPath = null;
         try
         {
             if (!File.Exists(filePath))
@@ -47,7 +48,7 @@ internal sealed class PcpImportService
             if (modData == null) return;
 
             // Create snapshot
-            var snapshotPath = CreateSnapshotDirectory(metadata.Name);
+            snapshotPath = CreateSnapshotDirectory(metadata.Name);
             var paths = SnapshotPaths.From(snapshotPath);
             Directory.CreateDirectory(paths.FilesDirectory);
 
@@ -71,11 +72,15 @@ internal sealed class PcpImportService
             // Save all data to disk
             _snapshotFileService.SaveSnapshotToDisk(paths.RootPath, snapshotInfo, glamourerHistory, customizeHistory);
 
+            snapshotPath = null;
             _snapshotsUpdatedCallback();
             Notify.Success($"Successfully imported PCP: {metadata.Name}");
         }
         catch (Exception ex)
         {
+            if (snapshotPath != null)
+                RemoveIncompleteSnapshot(snapshotPath);
+
             Notify.Error($"Failed during PCP import for file: {Path.GetFileName(filePath)}\n{ex.Message}");
             PluginLog.Error($"Failed during PCP import for file: {Path.GetFileName(filePath)}: {ex}");
         }
@@ -92,19 +97,22 @@ internal sealed class PcpImportService
     {
         // Convert PCP manipulations to Penumbra Base64 format
         var manipulationString = string.Empty;
-        if (modData.Manipulations.Count > 0)
+        var manipulations = modData.Manipulations ?? [];
+        if (manipulations.Count > 0)
             try
             {
-                manipulationString = ConvertPcpManipulationsToPenumbraFormat(modData.Manipulations);
+                manipulationString = ConvertPcpManipulationsToPenumbraFormat(manipulations);
             }
             catch (Exception ex)
             {
                 PluginLog.Warning($"Failed to process manipulations from PCP: {ex.Message}");
             }
 
-        return SnapshotImportUtil.BuildSnapshotInfo(characterData.Actor.PlayerName, characterData.Actor.HomeWorld,
-            manipulationString, gamePathToHashMap,
-            new Dictionary<string, string>(modData.FileSwaps, StringComparer.OrdinalIgnoreCase));
+        var actor = characterData.Actor ?? new PcpActor();
+        var sourceActor = string.IsNullOrWhiteSpace(actor.PlayerName) ? "PCP Import" : actor.PlayerName;
+        var sourceWorld = actor.HomeWorld is > 0 and < PcpActor.AnyWorld ? actor.HomeWorld : (int?)null;
+        return SnapshotImportUtil.BuildSnapshotInfo(sourceActor, sourceWorld, manipulationString, gamePathToHashMap,
+            NormalizeFileSwaps(modData.FileSwaps));
     }
 
     private static string ConvertPcpManipulationsToPenumbraFormat(List<JObject> pcpManipulations)
@@ -173,31 +181,18 @@ internal sealed class PcpImportService
         if (characterData.CustomizePlus != null)
             try
             {
-                // Parse the CustomizePlus object from PCP
                 var customizePlusObj = JObject.FromObject(characterData.CustomizePlus);
-
-                // Check if this is the new Customize+ PCP format with Template
-                if (customizePlusObj["Template"] != null)
+                var source = customizePlusObj["Template"] ?? customizePlusObj;
+                if (!CustomizePlusUtil.TryNormalizeIpcProfileJson(source.ToString(Formatting.None), out var profileJson))
                 {
-                    // This is the new Customize+ PCP format - extract the Template
-                    var templateJson = JsonConvert.SerializeObject(customizePlusObj["Template"], Formatting.None);
+                    PluginLog.Warning("Failed to convert Customize+ PCP data to an IPC profile.");
+                    return history;
+                }
 
-                    // Convert to Base64 for Snappy's format
-                    var customizeBase64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(templateJson));
-                    var customizeEntry =
-                        CustomizeHistoryEntry.CreateFromBase64(customizeBase64, templateJson, "Imported from PCP",
-                            fileMapId);
-                    history.Entries.Add(customizeEntry);
-                }
-                else
-                {
-                    // This might be an older format or different structure
-                    var customizeJson = JsonConvert.SerializeObject(characterData.CustomizePlus);
-                    var customizeBase64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(customizeJson));
-                    var customizeEntry = CustomizeHistoryEntry.CreateFromBase64(customizeBase64, customizeJson,
-                        "Imported from PCP (Legacy Format)", fileMapId);
-                    history.Entries.Add(customizeEntry);
-                }
+                var customizeBase64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(profileJson));
+                history.Entries.Add(CustomizeHistoryEntry.CreateFromBase64(customizeBase64, profileJson,
+                    customizePlusObj["Template"] == null ? "Imported from PCP (Legacy Format)" : "Imported from PCP",
+                    fileMapId));
             }
             catch (Exception ex)
             {
@@ -210,32 +205,101 @@ internal sealed class PcpImportService
     private static Dictionary<string, string> ExtractFiles(ZipArchive archive, string filesDir, PcpModData modData)
     {
         var gamePathToHashMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var archivePathToHash = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
-        foreach (var (gamePath, archivePath) in modData.Files)
+        foreach (var (rawGamePath, rawArchivePath) in modData.Files ?? [])
         {
-            var entry = archive.GetEntry(archivePath.Replace('\\', '/'));
-            if (entry == null)
+            var gamePath = NormalizeGamePath(rawGamePath);
+            if (string.IsNullOrWhiteSpace(gamePath))
+                continue;
+
+            var archivePath = ArchiveUtil.NormalizeArchivePath(rawArchivePath);
+            if (string.IsNullOrWhiteSpace(archivePath))
             {
-                PluginLog.Warning($"PCP file missing: {archivePath}");
+                PluginLog.Warning($"PCP file path is empty for {gamePath}.");
                 continue;
             }
 
-            var fileName = Path.GetFileName(archivePath);
-            var hash = Path.GetFileNameWithoutExtension(fileName);
-            var existingPath = SnapshotBlobUtil.FindAnyExistingBlobPath(filesDir, hash);
-            var outputPath = existingPath ?? SnapshotBlobUtil.GetPreferredBlobPath(filesDir, hash, gamePath);
-
-            if (!File.Exists(outputPath))
+            if (!archivePathToHash.TryGetValue(archivePath, out var hash))
             {
-                using var entryStream = entry.Open();
-                using var outputStream = File.Create(outputPath);
-                entryStream.CopyTo(outputStream);
+                var entry = ArchiveUtil.FindEntry(archive, archivePath);
+                if (entry == null)
+                {
+                    PluginLog.Warning($"PCP file missing: {rawArchivePath}");
+                    continue;
+                }
+
+                hash = ExtractEntryToBlob(entry, filesDir, gamePath);
+                archivePathToHash[archivePath] = hash;
             }
 
-            // Store the hash for the game path
             gamePathToHashMap[gamePath] = hash;
         }
 
         return gamePathToHashMap;
+    }
+
+    private static string ExtractEntryToBlob(ZipArchiveEntry entry, string filesDir, string gamePath)
+    {
+        var temporaryPath = Path.Combine(filesDir, $".{Guid.NewGuid():N}.tmp");
+        try
+        {
+            using (var entryStream = entry.Open())
+            using (var outputStream = File.Create(temporaryPath))
+                entryStream.CopyTo(outputStream);
+
+            var hash = PluginUtil.GetFileHash(temporaryPath);
+            var existingPath = SnapshotBlobUtil.FindAnyExistingBlobPath(filesDir, hash);
+            var outputPath = existingPath ?? SnapshotBlobUtil.GetPreferredBlobPath(filesDir, hash, gamePath);
+            if (!File.Exists(outputPath))
+                File.Move(temporaryPath, outputPath);
+
+            return hash;
+        }
+        finally
+        {
+            AtomicFileUtil.TryDelete(temporaryPath);
+        }
+    }
+
+    private static Dictionary<string, string> NormalizeFileSwaps(Dictionary<string, string>? fileSwaps)
+    {
+        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        if (fileSwaps == null)
+            return result;
+
+        foreach (var (rawGamePath, swapPath) in fileSwaps)
+        {
+            var gamePath = NormalizeGamePath(rawGamePath);
+            if (!string.IsNullOrWhiteSpace(gamePath) && !string.IsNullOrWhiteSpace(swapPath))
+                result[gamePath] = swapPath.Replace('\\', '/').Trim();
+        }
+
+        return result;
+    }
+
+    private static string NormalizeGamePath(string? gamePath)
+    {
+        if (string.IsNullOrWhiteSpace(gamePath))
+            return string.Empty;
+
+        var normalized = gamePath.Replace('\\', '/').Trim().TrimStart('/');
+        return normalized.Split('/', StringSplitOptions.RemoveEmptyEntries)
+            .Any(segment => segment is "." or "..")
+            ? string.Empty
+            : normalized;
+    }
+
+    private static void RemoveIncompleteSnapshot(string snapshotPath)
+    {
+        try
+        {
+            if (Directory.Exists(snapshotPath))
+                Directory.Delete(snapshotPath, true);
+        }
+        catch (Exception cleanupException)
+        {
+            PluginLog.Warning($"Failed to remove incomplete PCP import '{snapshotPath}': {cleanupException.Message}");
+        }
     }
 }

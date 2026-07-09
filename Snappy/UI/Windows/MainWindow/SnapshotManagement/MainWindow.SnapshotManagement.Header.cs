@@ -152,9 +152,17 @@ public partial class MainWindow
 
                         var ext = Path.GetExtension(selected).ToLowerInvariant();
                         if (ext == ".pcp")
-                            _pcpManager.ImportPcp(selected);
+                            _snappy.ExecuteBackgroundTask(() =>
+                            {
+                                _pcpManager.ImportPcp(selected);
+                                return Task.CompletedTask;
+                            });
                         else if (ext == ".mcdf")
-                            _mcdfManager.ImportMcdf(selected);
+                            _snappy.ExecuteBackgroundTask(() =>
+                            {
+                                _mcdfManager.ImportMcdf(selected);
+                                return Task.CompletedTask;
+                            });
                         else
                             Notify.Error("Unsupported file type. Please select a .mcdf or .pcp file.");
                     },

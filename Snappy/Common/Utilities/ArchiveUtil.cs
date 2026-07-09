@@ -4,6 +4,16 @@ namespace Snappy.Common.Utilities;
 
 public static class ArchiveUtil
 {
+    public static ZipArchiveEntry? FindEntry(ZipArchive archive, string entryName)
+    {
+        var normalizedName = NormalizeArchivePath(entryName);
+        return archive.Entries.FirstOrDefault(entry => string.Equals(NormalizeArchivePath(entry.FullName), normalizedName,
+            StringComparison.OrdinalIgnoreCase));
+    }
+
+    public static string NormalizeArchivePath(string? path)
+        => string.IsNullOrWhiteSpace(path) ? string.Empty : path.Replace('\\', '/').Trim().TrimStart('/');
+
     public static T? ReadJsonEntry<T>(
         ZipArchive archive,
         string entryName,
@@ -11,7 +21,7 @@ public static class ArchiveUtil
         string? missingMessage = null,
         string? parseFailureMessage = null)
     {
-        var entry = archive.GetEntry(entryName);
+        var entry = FindEntry(archive, entryName);
         if (entry == null)
         {
             onError(missingMessage ?? $"Missing archive entry: {entryName}");

@@ -15,6 +15,7 @@ internal sealed class PcpExportService
         string? playerNameOverride,
         int? homeWorldIdOverride)
     {
+        string? temporaryOutput = null;
         try
         {
             var paths = SnapshotPaths.From(snapshotPath);
@@ -38,135 +39,136 @@ internal sealed class PcpExportService
                 resolvedFileMap.Remove(gamePath);
             var resolvedManipulations = FileMapUtil.ResolveManipulation(snapshotInfo, fileMapId);
 
-            using var archive = ZipFile.Open(outputPath, ZipArchiveMode.Create);
-
-            // Resolve actor name and homeworld to use across PCP
-            var actorName = !string.IsNullOrWhiteSpace(playerNameOverride)
-                ? playerNameOverride!
-                : snapshotInfo.SourceActor;
-            var actorHomeWorld = homeWorldIdOverride ?? snapshotInfo.SourceWorldId ?? 40;
-
-            // Create metadata
-            var snapshotName = Path.GetFileName(snapshotPath);
-            var meta = ModMetadataBuilder.BuildSnapshotMetadata(snapshotName);
-
-            ArchiveUtil.WriteJsonEntry(archive, "meta.json", meta);
-
-            // Create character data with proper structure for Penumbra
-            var characterData = new PcpCharacterData
+            var pcpOutputPath = Path.ChangeExtension(outputPath, ".pcp");
+            temporaryOutput = AtomicFileUtil.CreateTemporaryOutputPath(pcpOutputPath);
+            using (var archive = ZipFile.Open(temporaryOutput, ZipArchiveMode.Create))
             {
-                Version = 1,
-                Actor = new PcpActor
-                {
-                    Type = "Player",
-                    PlayerName = actorName,
-                    HomeWorld = actorHomeWorld
-                },
-                Mod = actorName, // Use specified/actor name as mod name
-                Collection = actorName, // Use specified/actor name for collection
-                Time = DateTime.TryParse(snapshotInfo.LastUpdate, CultureInfo.InvariantCulture,
-                    DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out var lastUpdateUtc)
-                    ? lastUpdateUtc
-                    : DateTime.UtcNow,
-                Note = "Exported from Snappy"
-            };
+                // Resolve actor name and homeworld to use across PCP.
+                var actorName = !string.IsNullOrWhiteSpace(playerNameOverride)
+                    ? playerNameOverride!
+                    : snapshotInfo.SourceActor;
+                if (string.IsNullOrWhiteSpace(actorName))
+                    actorName = Path.GetFileName(snapshotPath);
+                var actorHomeWorld = ResolveActorHomeWorld(homeWorldIdOverride ?? snapshotInfo.SourceWorldId);
 
-            // Determine which Glamourer entry to export (prefer selected, otherwise latest if available)
-            var glamourerEntry = selectedGlamourer ??
-                                 (glamourerHistory?.Entries.Count > 0 ? glamourerHistory.Entries.Last() : null);
-            if (glamourerEntry != null)
-                try
+                // Create metadata.
+                var snapshotName = Path.GetFileName(snapshotPath);
+                var meta = ModMetadataBuilder.BuildSnapshotMetadata(snapshotName);
+                ArchiveUtil.WriteJsonEntry(archive, "meta.json", meta);
+
+                var characterData = new PcpCharacterData
                 {
-                    if (GlamourerDesignUtil.TryDecodeDesignJson(glamourerEntry.GlamourerString, out var designObj)
-                        && designObj != null)
+                    Version = 1,
+                    Actor = new PcpActor
                     {
-                        characterData.Glamourer = new JObject
+                        Type = "Player",
+                        PlayerName = actorName,
+                        HomeWorld = actorHomeWorld
+                    },
+                    Mod = actorName,
+                    Collection = actorName,
+                    Time = DateTime.TryParse(snapshotInfo.LastUpdate, CultureInfo.InvariantCulture,
+                        DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out var lastUpdateUtc)
+                        ? lastUpdateUtc
+                        : DateTime.UtcNow,
+                    Note = "Exported from Snappy"
+                };
+
+                var glamourerEntry = selectedGlamourer ?? glamourerHistory.Entries.LastOrDefault();
+                if (glamourerEntry != null)
+                    try
+                    {
+                        if (GlamourerDesignUtil.TryDecodeDesignJson(glamourerEntry.GlamourerString, out var designObj)
+                            && designObj != null)
                         {
-                            ["Version"] = 1,
-                            ["Design"] = designObj
-                        };
-                    }
-                    else
-                    {
-                        throw new Exception("Glamourer data was empty after decoding/decompression.");
-                    }
-                }
-                catch (Exception ex)
-                {
-                    PluginLog.Warning(
-                        $"Failed to export Glamourer data to PCP for snapshot '{snapshotName}': {ex.Message}");
-                }
-
-            // Determine which Customize+ entry to export (prefer selected, otherwise latest if available)
-            var customizeEntry = selectedCustomize ??
-                                 (customizeHistory?.Entries.Count > 0 ? customizeHistory.Entries.Last() : null);
-            if (customizeEntry != null && !string.IsNullOrEmpty(customizeEntry.CustomizeTemplate))
-                try
-                {
-                    var templateJson = CustomizePlusUtil.DecompressTemplateBase64(customizeEntry.CustomizeTemplate);
-                    if (!string.IsNullOrEmpty(templateJson))
-                    {
-                        var templateObj = JObject.Parse(templateJson);
-
-                        if (templateObj["CreationDate"] == null)
-                            templateObj["CreationDate"] = DateTimeOffset.UtcNow;
-                        if (templateObj["ModifiedDate"] == null)
-                            templateObj["ModifiedDate"] = DateTimeOffset.UtcNow;
-                        if (templateObj["UniqueId"] == null)
-                            templateObj["UniqueId"] = Guid.NewGuid();
-                        if (templateObj["Name"] == null)
-                            templateObj["Name"] = $"PCP Template - {actorName}";
-                        if (templateObj["Author"] == null)
-                            templateObj["Author"] = "Snappy Export";
-                        if (templateObj["Description"] == null)
-                            templateObj["Description"] = "Template exported from Snappy";
-                        if (templateObj["Version"] == null)
-                            templateObj["Version"] = 4;
-                        if (templateObj["IsWriteProtected"] == null)
-                            templateObj["IsWriteProtected"] = false;
-
-                        if (templateObj["Bones"] is JObject bones)
-                            foreach (var bone in bones.Properties())
-                                if (bone.Value is JObject boneObj)
-                                {
-                                    if (boneObj["PropagateTranslation"] == null)
-                                        boneObj["PropagateTranslation"] = false;
-                                    if (boneObj["PropagateRotation"] == null)
-                                        boneObj["PropagateRotation"] = false;
-                                    if (boneObj["PropagateScale"] == null)
-                                        boneObj["PropagateScale"] = false;
-                                }
-
-                        characterData.CustomizePlus = new JObject
+                            characterData.Glamourer = new JObject
+                            {
+                                ["Version"] = 1,
+                                ["Design"] = designObj
+                            };
+                        }
+                        else
                         {
-                            ["Template"] = templateObj
-                        };
+                            throw new InvalidDataException("Glamourer data was empty after decoding/decompression.");
+                        }
                     }
-                }
-                catch (Exception ex)
+                    catch (Exception ex)
+                    {
+                        PluginLog.Warning(
+                            $"Failed to export Glamourer data to PCP for snapshot '{snapshotName}': {ex.Message}");
+                    }
+
+                var customizeEntry = selectedCustomize ?? customizeHistory.Entries.LastOrDefault();
+                if (TryCreateCustomizePlusPcpData(customizeEntry, actorName, out var customizePlus))
+                    characterData.CustomizePlus = customizePlus;
+
+                ArchiveUtil.WriteJsonEntry(archive, "character.json", characterData);
+
+                var modData = new PcpModData
                 {
-                    PluginLog.Warning(
-                        $"Failed to export Customize+ data to PCP for snapshot '{snapshotName}': {ex.Message}");
-                }
+                    Manipulations = ModPackageBuilder.BuildManipulations(resolvedManipulations),
+                    FileSwaps = new Dictionary<string, string>(resolvedFileSwaps, StringComparer.OrdinalIgnoreCase)
+                };
+                ModPackageBuilder.AddSnapshotFiles(archive, snapshotInfo, paths.FilesDirectory, modData.Files,
+                    resolvedFileMap);
+                ArchiveUtil.WriteJsonEntry(archive, "default_mod.json", modData);
+            }
 
-            ArchiveUtil.WriteJsonEntry(archive, "character.json", characterData);
-
-            // Create mod data and add files
-            var modData = new PcpModData();
-            modData.Manipulations = ModPackageBuilder.BuildManipulations(resolvedManipulations);
-            modData.FileSwaps = new Dictionary<string, string>(resolvedFileSwaps,
-                StringComparer.OrdinalIgnoreCase);
-            ModPackageBuilder.AddSnapshotFiles(archive, snapshotInfo, paths.FilesDirectory, modData.Files,
-                resolvedFileMap);
-
-            // Add default_mod.json
-            ArchiveUtil.WriteJsonEntry(archive, "default_mod.json", modData);
-
-            Notify.Success($"Successfully exported PCP: {outputPath}");
+            AtomicFileUtil.Complete(temporaryOutput, pcpOutputPath);
+            temporaryOutput = null;
+            Notify.Success($"Successfully exported PCP: {pcpOutputPath}");
         }
         catch (Exception ex)
         {
             Notify.Error($"Failed during PCP export: {ex.Message}");
+            PluginLog.Error($"Failed during PCP export for '{snapshotPath}': {ex}");
+        }
+        finally
+        {
+            if (temporaryOutput != null)
+                AtomicFileUtil.TryDelete(temporaryOutput);
+        }
+    }
+
+    private static int ResolveActorHomeWorld(int? worldId)
+        => worldId is > 0 and <= ushort.MaxValue ? worldId.Value : PcpActor.AnyWorld;
+
+    private static bool TryCreateCustomizePlusPcpData(CustomizeHistoryEntry? entry, string actorName,
+        out JObject? customizePlus)
+    {
+        customizePlus = null;
+        if (entry == null)
+            return false;
+
+        var profileJson = DecodeCustomizeData(entry.CustomizeData);
+        if (string.IsNullOrWhiteSpace(profileJson))
+            profileJson = CustomizePlusUtil.DecompressTemplateBase64(entry.CustomizeTemplate);
+
+        if (!CustomizePlusUtil.TryCreateTemplateJson(profileJson, out var templateJson, $"PCP Template - {actorName}"))
+        {
+            PluginLog.Warning("Failed to convert Customize+ data to a PCP template.");
+            return false;
+        }
+
+        customizePlus = new JObject
+        {
+            ["Template"] = JObject.Parse(templateJson)
+        };
+        return true;
+    }
+
+    private static string DecodeCustomizeData(string customizeData)
+    {
+        if (string.IsNullOrWhiteSpace(customizeData))
+            return string.Empty;
+
+        try
+        {
+            return Encoding.UTF8.GetString(Convert.FromBase64String(customizeData));
+        }
+        catch (FormatException)
+        {
+            return customizeData;
         }
     }
 

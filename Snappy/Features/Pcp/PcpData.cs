@@ -29,6 +29,8 @@ public record PcpCharacterData
 
 public record PcpActor
 {
+    public const int AnyWorld = ushort.MaxValue;
+
     public string Type { get; set; } = "Player";
     public string PlayerName { get; set; } = string.Empty;
     public int HomeWorld { get; set; } = 0;
