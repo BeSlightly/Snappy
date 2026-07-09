@@ -23,7 +23,7 @@ public record McdfHeader(byte Version, McdfData CharaFileData)
     private static (byte Version, int DataLength) ReadHeader(BinaryReader reader)
     {
         var magic = reader.ReadBytes(4);
-        if (magic.Length != 4 || !magic.SequenceEqual("MCDF"u8.ToArray()))
+        if (magic.Length != 4 || !magic.AsSpan().SequenceEqual("MCDF"u8))
             throw new InvalidDataException("Not a Mare Chara File");
 
         var version = reader.ReadByte();
