@@ -272,11 +272,11 @@ public class SnapshotFileService : ISnapshotFileService
     {
         var incomingFileMap = new Dictionary<string, string>(snapshotData.FileReplacements,
             StringComparer.OrdinalIgnoreCase);
-        var mapChanges = FileMapUtil.CalculateChanges(resolvedCurrentMap, incomingFileMap, includeRemovals);
         var incomingFileSwaps = new Dictionary<string, string>(snapshotData.FileSwaps,
             StringComparer.OrdinalIgnoreCase);
         foreach (var gamePath in incomingFileSwaps.Keys)
             incomingFileMap.Remove(gamePath);
+        var mapChanges = FileMapUtil.CalculateChanges(resolvedCurrentMap, incomingFileMap, includeRemovals);
         var fileSwapChanges = FileMapUtil.CalculateChanges(resolvedCurrentFileSwaps, incomingFileSwaps,
             includeRemovals);
         var fileMapChanged = mapChanges.Any() || fileSwapChanges.Any();
