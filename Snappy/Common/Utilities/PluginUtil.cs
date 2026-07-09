@@ -13,8 +13,8 @@ public static class PluginUtil
     public static string GetFileHash(string filePath)
     {
         using var sha1 = SHA1.Create();
-        return BitConverter.ToString(sha1.ComputeHash(File.ReadAllBytes(filePath)))
-            .Replace("-", "", StringComparison.Ordinal);
+        using var stream = File.OpenRead(filePath);
+        return Convert.ToHexString(sha1.ComputeHash(stream));
     }
 
     /// <summary>
@@ -25,7 +25,7 @@ public static class PluginUtil
     public static string GetFileHash(byte[] bytes)
     {
         using var sha1 = SHA1.Create();
-        return BitConverter.ToString(sha1.ComputeHash(bytes)).Replace("-", "", StringComparison.Ordinal);
+        return Convert.ToHexString(sha1.ComputeHash(bytes));
     }
 
     public static bool IsInGpose()

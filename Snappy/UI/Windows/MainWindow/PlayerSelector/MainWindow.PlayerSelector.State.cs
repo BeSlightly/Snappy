@@ -27,6 +27,7 @@ public partial class MainWindow
     private bool _isActorLockedBySnappy;
     private bool _isActorModifiable;
     private bool _isActorSnapshottable;
+    private bool _isSnapshotCaptureInProgress;
     private bool _snapshotExistsForActor;
     private int? _objIdxSelected;
     private nint? _selectedActorAddress;
@@ -296,6 +297,9 @@ public partial class MainWindow
 
     private (string Text, string Tooltip, bool IsDisabled) GetSnapshotButtonState()
     {
+        if (_isSnapshotCaptureInProgress)
+            return ("Saving Snapshot...", "A snapshot is already being saved.", true);
+
         if (!TryGetSelectedActor(out var actor))
             return ("Save Snapshot", "Select an actor to save or update its snapshot.", true);
 

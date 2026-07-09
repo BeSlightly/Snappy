@@ -2,8 +2,7 @@ namespace Snappy.Services.SnapshotManager;
 
 public interface ISnapshotFileService
 {
-    Task<string?> UpdateSnapshotAsync(ICharacter character, bool isLocalPlayer,
-        Dictionary<string, HashSet<string>>? penumbraReplacements);
+    Task<string?> UpdateSnapshotAsync(ICharacter character, bool isLocalPlayer);
 
     void RenameSnapshot(string oldPath, string newName);
 

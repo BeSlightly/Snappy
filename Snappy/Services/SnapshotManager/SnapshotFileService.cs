@@ -33,8 +33,7 @@ public class SnapshotFileService : ISnapshotFileService
         return Path.Combine(workingDirectory, charaName);
     }
 
-    public async Task<string?> UpdateSnapshotAsync(ICharacter character, bool isLocalPlayer,
-        Dictionary<string, HashSet<string>>? penumbraReplacements)
+    public async Task<string?> UpdateSnapshotAsync(ICharacter character, bool isLocalPlayer)
     {
         var now = DateTime.UtcNow;
 
@@ -52,7 +51,7 @@ public class SnapshotFileService : ISnapshotFileService
                                resolvedWorldName);
 
         var useLiveData = _configuration.UseLiveSnapshotData || isLocalPlayer;
-        var snapshotData = await BuildSnapshotDataAsync(character, useLiveData, penumbraReplacements);
+        var snapshotData = await BuildSnapshotDataAsync(character, useLiveData);
 
         if (snapshotData == null) return null;
 
@@ -186,13 +185,12 @@ public class SnapshotFileService : ISnapshotFileService
         return snapshotPath;
     }
 
-    private async Task<SnapshotData?> BuildSnapshotDataAsync(ICharacter character, bool useLiveData,
-        Dictionary<string, HashSet<string>>? penumbraReplacements)
+    private async Task<SnapshotData?> BuildSnapshotDataAsync(ICharacter character, bool useLiveData)
     {
         if (useLiveData)
         {
             return _configuration.UsePenumbraIpcResourcePaths
-                ? await _liveSnapshotDataBuilder.BuildAsync(character, penumbraReplacements)
+                ? await _liveSnapshotDataBuilder.BuildAsync(character)
                 : await _collectionSnapshotDataBuilder.BuildAsync(character);
         }
 

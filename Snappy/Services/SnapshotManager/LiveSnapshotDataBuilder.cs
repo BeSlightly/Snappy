@@ -9,18 +9,18 @@ public sealed class LiveSnapshotDataBuilder
         _ipcManager = ipcManager;
     }
 
-    public async Task<SnapshotData?> BuildAsync(ICharacter character,
-        Dictionary<string, HashSet<string>>? penumbraReplacements)
+    public Task<SnapshotData?> BuildAsync(ICharacter character)
     {
         PluginLog.Debug($"Building snapshot from live data for: {character.Name.TextValue}");
         var newGlamourer = _ipcManager.GetGlamourerState(character);
         var newCustomize = _ipcManager.GetCustomizePlusScale(character);
         var newManipulation = _ipcManager.GetMetaManipulations(character.ObjectIndex);
-        var newFileReplacements = new Dictionary<string, string>();
-        var newFileSwaps = new Dictionary<string, string>();
-        var resolvedPaths = new Dictionary<string, string>();
+        var newFileReplacements = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var newFileSwaps = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var resolvedPaths = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var hashCache = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
-        penumbraReplacements ??= _ipcManager.PenumbraGetGameObjectResourcePaths(character.ObjectIndex);
+        var penumbraReplacements = _ipcManager.PenumbraGetGameObjectResourcePaths(character.ObjectIndex);
 
         foreach (var (resolvedPath, gamePaths) in penumbraReplacements)
         {
@@ -33,13 +33,17 @@ public sealed class LiveSnapshotDataBuilder
                 continue;
             }
 
-            var fileBytes = await File.ReadAllBytesAsync(resolvedPath);
-            var hash = PluginUtil.GetFileHash(fileBytes);
-            resolvedPaths[hash] = resolvedPath;
+            if (!hashCache.TryGetValue(resolvedPath, out var hash))
+            {
+                hash = PluginUtil.GetFileHash(resolvedPath);
+                hashCache[resolvedPath] = hash;
+                resolvedPaths[hash] = resolvedPath;
+            }
+
             foreach (var gamePath in gamePaths) newFileReplacements[gamePath] = hash;
         }
 
-        return new SnapshotData(newGlamourer, newCustomize, newManipulation, newFileReplacements, newFileSwaps,
-            resolvedPaths);
+        return Task.FromResult<SnapshotData?>(new SnapshotData(newGlamourer, newCustomize, newManipulation,
+            newFileReplacements, newFileSwaps, resolvedPaths));
     }
 }

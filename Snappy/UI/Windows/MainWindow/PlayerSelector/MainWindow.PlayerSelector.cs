@@ -122,19 +122,25 @@ public partial class MainWindow
             {
                 var charToSnap = selectedActor;
                 var isLocalPlayer = Player.Object != null && charToSnap.Address == Player.Object.Address;
-                Dictionary<string, HashSet<string>>? penumbraReplacements = null;
-                var useLiveData = _snappy.Configuration.UseLiveSnapshotData || isLocalPlayer;
-                var useIpcResourcePaths = useLiveData && _snappy.Configuration.UsePenumbraIpcResourcePaths;
-                if (useIpcResourcePaths)
-                    penumbraReplacements = _ipcManager.PenumbraGetGameObjectResourcePaths(charToSnap.ObjectIndex);
-
+                _isSnapshotCaptureInProgress = true;
                 Notify.Info($"Snapshotting {GetActorDisplayName(charToSnap)} in the background...");
                 _snappy.ExecuteBackgroundTask(async () =>
                 {
-                    var updatedSnapshotPath =
-                        await _snapshotFileService.UpdateSnapshotAsync(charToSnap, isLocalPlayer, penumbraReplacements);
-                    if (updatedSnapshotPath != null)
-                        _snappy.QueueAction(() => _snappy.InvokeSnapshotsUpdated());
+                    try
+                    {
+                        var updatedSnapshotPath = await _snapshotFileService.UpdateSnapshotAsync(charToSnap, isLocalPlayer);
+                        _snappy.QueueAction(() =>
+                        {
+                            _isSnapshotCaptureInProgress = false;
+                            if (updatedSnapshotPath != null)
+                                _snappy.InvokeSnapshotsUpdated();
+                        });
+                    }
+                    catch
+                    {
+                        _snappy.QueueAction(() => _isSnapshotCaptureInProgress = false);
+                        throw;
+                    }
                 });
             }
         }
