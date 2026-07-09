@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Reflection;
+using System.Threading;
 using Dalamud.Game.Command;
 using Dalamud.Interface.ImGuiFileDialog;
 using Dalamud.Interface.Windowing;
@@ -21,6 +22,7 @@ public sealed partial class Snappy : IDalamudPlugin
 {
     private const string CommandName = "/snappy";
     private readonly ConcurrentQueue<Action> _mainThreadActions = new();
+    private readonly SemaphoreSlim _snapshotRefreshGate = new(1, 1);
     private readonly Luna.ImSharpDalamudContext _imSharpContext;
 
     public Snappy(IDalamudPluginInterface pluginInterface)
@@ -57,8 +59,8 @@ public sealed partial class Snappy : IDalamudPlugin
         SnapshotFileService = new SnapshotFileService(Configuration, IpcManager, SnapshotIndexService);
         SnapshotApplicationService = new SnapshotApplicationService(IpcManager, ActiveSnapshotManager);
 
-        McdfManager = new McdfManager(Configuration, SnapshotFileService, InvokeSnapshotsUpdated);
-        PcpManager = new PcpManager(Configuration, SnapshotFileService, InvokeSnapshotsUpdated);
+        McdfManager = new McdfManager(Configuration, SnapshotFileService, () => QueueAction(InvokeSnapshotsUpdated));
+        PcpManager = new PcpManager(Configuration, SnapshotFileService, () => QueueAction(InvokeSnapshotsUpdated));
         PmpManager = new PmpExportManager(Configuration);
         SnapshotChangedItemService = new SnapshotChangedItemService(Log);
         SnapshotFS = new Luna.BaseFileSystem("SnappySnapshots", Log, false);

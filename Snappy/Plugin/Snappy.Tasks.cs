@@ -26,7 +26,19 @@ public sealed partial class Snappy
 
     public void InvokeSnapshotsUpdated()
     {
-        SnapshotIndexService.RefreshSnapshotIndex();
-        SnapshotsUpdated?.Invoke();
+        ExecuteBackgroundTask(async () =>
+        {
+            await _snapshotRefreshGate.WaitAsync();
+            try
+            {
+                SnapshotIndexService.RefreshSnapshotIndex();
+            }
+            finally
+            {
+                _snapshotRefreshGate.Release();
+            }
+
+            QueueAction(() => SnapshotsUpdated?.Invoke());
+        });
     }
 }

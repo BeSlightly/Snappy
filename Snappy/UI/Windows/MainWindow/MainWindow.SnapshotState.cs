@@ -7,11 +7,7 @@ public partial class MainWindow
 {
     private void OnSnapshotsChanged()
     {
-        LoadSnapshots();
-        if (_selectedSnapshot != null && Directory.Exists(_selectedSnapshot.FullName))
-            _snappy.ExecuteBackgroundTask(LoadHistoryForSelectedSnapshotAsync);
-        if (_objIdxSelected != null || _selectedActorAddress != null)
-            UpdateSelectedActorStateIfNeeded(true);
+        RefreshSnapshotsInBackground();
     }
 
     private void OnSnapshotSelectionChanged(
@@ -28,6 +24,49 @@ public partial class MainWindow
     }
 
     private void LoadSnapshots()
+        => LoadSnapshots(GetSnapshotPaths());
+
+    private void RefreshSnapshotsInBackground()
+    {
+        var refreshVersion = ++_snapshotRefreshVersion;
+        _snappy.ExecuteBackgroundTask(() =>
+        {
+            var snapshotPaths = GetSnapshotPaths();
+            _snappy.QueueAction(() =>
+            {
+                if (refreshVersion != _snapshotRefreshVersion)
+                    return;
+
+                LoadSnapshots(snapshotPaths);
+                if (_selectedSnapshot != null && Directory.Exists(_selectedSnapshot.FullName))
+                    _snappy.ExecuteBackgroundTask(LoadHistoryForSelectedSnapshotAsync);
+                if (_objIdxSelected != null || _selectedActorAddress != null)
+                    UpdateSelectedActorStateIfNeeded(true);
+            });
+            return Task.CompletedTask;
+        });
+    }
+
+    private IReadOnlyList<string> GetSnapshotPaths()
+    {
+        var directory = _snappy.Configuration.WorkingDirectory;
+        if (!Directory.Exists(directory))
+            return [];
+
+        try
+        {
+            return Directory.EnumerateDirectories(directory)
+                .Where(path => File.Exists(Path.Combine(path, Constants.SnapshotFileName)))
+                .ToArray();
+        }
+        catch (Exception ex)
+        {
+            PluginLog.Warning($"Failed to enumerate snapshots in '{directory}': {ex.Message}");
+            return [];
+        }
+    }
+
+    private void LoadSnapshots(IReadOnlyList<string> snapshotPaths)
     {
         var fs = _snappy.SnapshotFS;
         var selectedPath = _selectedSnapshot?.FullName;
@@ -35,18 +74,10 @@ public partial class MainWindow
         foreach (var child in fs.Root.GetChildren(ISortMode.Lexicographical).ToList())
             fs.Delete(child);
 
-        var dir = _snappy.Configuration.WorkingDirectory;
-        if (Directory.Exists(dir))
+        foreach (var snapshotPath in snapshotPaths)
         {
-            var snapshotDirs = new DirectoryInfo(dir)
-                .GetDirectories()
-                .Where(d => File.Exists(Path.Combine(d.FullName, Constants.SnapshotFileName)));
-
-            foreach (var d in snapshotDirs)
-            {
-                var snapshot = new Snapshot(d.FullName);
-                fs.CreateDataNode(fs.Root, snapshot.Name, snapshot);
-            }
+            var snapshot = new Snapshot(snapshotPath);
+            fs.CreateDataNode(fs.Root, snapshot.Name, snapshot);
         }
 
         _snapshotList = fs

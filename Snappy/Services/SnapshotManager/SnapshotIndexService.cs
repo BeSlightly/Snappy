@@ -1,5 +1,6 @@
 using Dalamud.Game.ClientState.Objects.SubKinds;
 using ECommons.ExcelServices;
+using System.Threading;
 using Snappy.Common;
 
 namespace Snappy.Services.SnapshotManager;
@@ -7,7 +8,7 @@ namespace Snappy.Services.SnapshotManager;
 public class SnapshotIndexService : ISnapshotIndexService
 {
     private readonly Configuration _configuration;
-    private readonly Dictionary<string, List<SnapshotIndexEntry>> _snapshotIndex =
+    private Dictionary<string, List<SnapshotIndexEntry>> _snapshotIndex =
         new(StringComparer.OrdinalIgnoreCase);
 
     private sealed record SnapshotIndexEntry(string Path, int? WorldId, string? WorldName, string SourceActor);
@@ -51,13 +52,14 @@ public class SnapshotIndexService : ISnapshotIndexService
 
     public void RefreshSnapshotIndex()
     {
-        _snapshotIndex.Clear();
+        var snapshotIndex = new Dictionary<string, List<SnapshotIndexEntry>>(StringComparer.OrdinalIgnoreCase);
         PluginLog.Debug("Refreshing snapshot index...");
 
         var workingDir = _configuration.WorkingDirectory;
         if (string.IsNullOrEmpty(workingDir) || !Directory.Exists(workingDir))
         {
             PluginLog.Warning("Working directory not set or not found. Snapshot index will be empty.");
+            Volatile.Write(ref _snapshotIndex, snapshotIndex);
             return;
         }
 
@@ -90,10 +92,10 @@ public class SnapshotIndexService : ISnapshotIndexService
                     var worldId = snapshotInfo.SourceWorldId;
 
                     var entry = new SnapshotIndexEntry(dir, worldId, worldName, actorName);
-                    if (!_snapshotIndex.TryGetValue(baseName, out var entries))
+                    if (!snapshotIndex.TryGetValue(baseName, out var entries))
                     {
                         entries = new List<SnapshotIndexEntry>();
-                        _snapshotIndex[baseName] = entries;
+                        snapshotIndex[baseName] = entries;
                     }
 
                     entries.Add(entry);
@@ -110,9 +112,10 @@ public class SnapshotIndexService : ISnapshotIndexService
             PluginLog.Error($"An error occurred while building snapshot index: {ex.Message}");
         }
 
-        var totalEntries = _snapshotIndex.Values.Sum(list => list.Count);
+        Volatile.Write(ref _snapshotIndex, snapshotIndex);
+        var totalEntries = snapshotIndex.Values.Sum(list => list.Count);
         PluginLog.Debug(
-            $"Snapshot index refreshed. Found {totalEntries} snapshots across {_snapshotIndex.Count} actor keys.");
+            $"Snapshot index refreshed. Found {totalEntries} snapshots across {snapshotIndex.Count} actor keys.");
     }
 
     public string? FindSnapshotPathForActor(ICharacter character)
@@ -122,7 +125,8 @@ public class SnapshotIndexService : ISnapshotIndexService
 
         var actorName = character.Name.TextValue;
         var (baseName, _) = SplitActorName(actorName);
-        if (!_snapshotIndex.TryGetValue(baseName, out var entries) || entries.Count == 0)
+        var snapshotIndex = Volatile.Read(ref _snapshotIndex);
+        if (!snapshotIndex.TryGetValue(baseName, out var entries) || entries.Count == 0)
             return null;
 
         if (TryGetWorldId(character, out var worldId))
