@@ -41,7 +41,7 @@ public abstract class IpcSubscriber
         if (!IsPluginLoaded(identifier))
             return false;
 
-        if (!DalamudReflector.TryGetDalamudPlugin(identifier, out var loadedPlugin, true))
+        if (!DalamudReflector.TryGetDalamudPlugin(identifier, out var loadedPlugin, true, true))
             return false;
 
         plugin = loadedPlugin;
