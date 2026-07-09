@@ -141,7 +141,7 @@ public sealed class GlamourerIpc : IpcSubscriber
     private void InitializeReflection()
     {
         if (_reflectionInitialized) return;
-        _reflectionInitialized = true;
+        ResetReflectionState();
 
         try
         {
@@ -171,9 +171,15 @@ public sealed class GlamourerIpc : IpcSubscriber
                     && p[1].IsOut && p[1].ParameterType.GetElementType() == actorStateType);
 
             var ready = _objectsIndexer != null && _getOrCreateMethod != null && _combinationField != null;
-            PluginLog.Debug(ready
-                ? "Glamourer lock key reflection initialized successfully."
-                : "Glamourer lock key reflection incomplete; locked states may be unreadable.");
+            if (!ready)
+            {
+                PluginLog.Debug("Glamourer lock key reflection incomplete; it will be retried.");
+                ResetReflectionState();
+                return;
+            }
+
+            _reflectionInitialized = true;
+            PluginLog.Debug("Glamourer lock key reflection initialized successfully.");
         }
         catch (Exception ex)
         {
