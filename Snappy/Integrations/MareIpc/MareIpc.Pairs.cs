@@ -8,6 +8,15 @@ public sealed partial class MareIpc
 {
     public object? GetCharacterData(ICharacter character)
     {
+        if (Svc.Framework.IsInFrameworkUpdateThread)
+            return GetCharacterDataOnFrameworkThread(character);
+
+        return Svc.Framework.RunOnFrameworkThread(() => GetCharacterDataOnFrameworkThread(character))
+            .GetAwaiter().GetResult();
+    }
+
+    private object? GetCharacterDataOnFrameworkThread(ICharacter character)
+    {
         RefreshPluginAvailability();
 
         var availablePlugins = _marePlugins.Values.Where(p => p.IsAvailable).ToList();
@@ -17,33 +26,30 @@ public sealed partial class MareIpc
             return null;
         }
 
-        return Svc.Framework.RunOnFrameworkThread(() =>
+        InitializeAllPlugins();
+
+        foreach (var marePlugin in availablePlugins)
         {
-            InitializeAllPlugins();
+            var pairObject = GetMarePairFromPlugin(character, marePlugin);
+            if (pairObject == null) continue;
 
-            foreach (var marePlugin in availablePlugins)
+            var characterData = pairObject.GetFoP("LastReceivedCharacterData");
+            if (characterData == null)
             {
-                var pairObject = GetMarePairFromPlugin(character, marePlugin);
-                if (pairObject == null) continue;
-
-                var characterData = pairObject.GetFoP("LastReceivedCharacterData");
-                if (characterData == null)
-                {
-                    var handler = pairObject.GetFoP("Handler");
-                    if (handler != null)
-                        characterData = handler.GetFoP("LastReceivedCharacterData");
-                }
-                if (characterData != null)
-                {
-                    PluginLog.Debug(
-                        $"Successfully retrieved Mare data for {character.Name.TextValue} from {marePlugin.PluginName}");
-                    return characterData;
-                }
+                var handler = pairObject.GetFoP("Handler");
+                if (handler != null)
+                    characterData = handler.GetFoP("LastReceivedCharacterData");
             }
+            if (characterData != null)
+            {
+                PluginLog.Debug(
+                    $"Successfully retrieved Mare data for {character.Name.TextValue} from {marePlugin.PluginName}");
+                return characterData;
+            }
+        }
 
-            PluginLog.Debug($"No Mare pair found for character {character.Name.TextValue} in any available plugin.");
-            return null;
-        }).Result;
+        PluginLog.Debug($"No Mare pair found for character {character.Name.TextValue} in any available plugin.");
+        return null;
     }
 
     private IEnumerable<object> EnumeratePairsFromPlugin(MarePluginInfo pluginInfo)

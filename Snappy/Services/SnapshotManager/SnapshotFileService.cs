@@ -35,8 +35,16 @@ public class SnapshotFileService : ISnapshotFileService
 
     public async Task<string?> UpdateSnapshotAsync(ICharacter character, bool isLocalPlayer)
     {
-        var now = DateTime.UtcNow;
+        var capture = await Svc.Framework.RunOnFrameworkThread(() =>
+            CaptureSnapshotState(character, isLocalPlayer)).ConfigureAwait(false);
+        if (capture == null)
+            return null;
 
+        return await Task.Run(() => UpdateSnapshotFromCaptureAsync(capture)).ConfigureAwait(false);
+    }
+
+    private SnapshotCapture? CaptureSnapshotState(ICharacter character, bool isLocalPlayer)
+    {
         if (!character.IsValid())
         {
             Notify.Error("Invalid character selected for snapshot update.");
@@ -44,36 +52,56 @@ public class SnapshotFileService : ISnapshotFileService
         }
 
         var charaName = character.Name.TextValue;
+        var objectIndex = character.ObjectIndex;
         var (resolvedWorldId, resolvedWorldName) = ResolveHomeWorld(character, charaName);
-
         var snapshotPath = _snapshotIndexService.FindSnapshotPathForActor(character) ??
                            BuildDefaultSnapshotPath(_configuration.WorkingDirectory, charaName, resolvedWorldId,
                                resolvedWorldName);
-
         var useLiveData = _configuration.UseLiveSnapshotData || isLocalPlayer;
-        var snapshotData = await BuildSnapshotDataAsync(character, useLiveData);
+
+        SnapshotLiveState? liveState = null;
+        SnapshotData? mareData = null;
+        if (useLiveData)
+        {
+            liveState = new SnapshotLiveState(charaName, objectIndex, _ipcManager.GetGlamourerState(character),
+                _ipcManager.GetCustomizePlusScale(character), _ipcManager.GetMetaManipulations(objectIndex));
+        }
+        else
+        {
+            mareData = _mareSnapshotDataBuilder.BuildFromMare(character);
+        }
+
+        return new SnapshotCapture(charaName, objectIndex, resolvedWorldId, resolvedWorldName, snapshotPath,
+            useLiveData, !_configuration.UseLiveSnapshotData && !isLocalPlayer, liveState, mareData);
+    }
+
+    private async Task<string?> UpdateSnapshotFromCaptureAsync(SnapshotCapture capture)
+    {
+        var now = DateTime.UtcNow;
+
+        var snapshotData = BuildSnapshotData(capture);
 
         if (snapshotData == null) return null;
 
-        if (!useLiveData)
+        if (!capture.UseLiveData)
         {
-            BackfillSnapshotDataFromPenumbra(character, snapshotData);
+            BackfillSnapshotDataFromPenumbra(capture.ObjectIndex, snapshotData);
         }
 
-        var paths = SnapshotPaths.From(snapshotPath);
+        var paths = SnapshotPaths.From(capture.SnapshotPath);
         Directory.CreateDirectory(paths.RootPath);
         Directory.CreateDirectory(paths.FilesDirectory);
 
         var isNewSnapshot = !File.Exists(paths.SnapshotFile);
 
         var snapshotInfo = await JsonUtil.DeserializeAsync<SnapshotInfo>(paths.SnapshotFile) ??
-                           new SnapshotInfo { SourceActor = charaName };
+                           new SnapshotInfo { SourceActor = capture.CharacterName };
         snapshotInfo.FileMaps ??= new List<FileMapEntry>();
         snapshotInfo.FileSwaps ??= new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
         // Backfill missing per-map manipulation data for older snapshots.
         BackfillManipulationStrings(snapshotInfo);
-        UpdateSourceWorld(snapshotInfo, resolvedWorldId, resolvedWorldName);
+        UpdateSourceWorld(snapshotInfo, capture.WorldId, capture.WorldName);
 
         var glamourerHistory = await JsonUtil.DeserializeAsync<GlamourerHistory>(paths.GlamourerHistoryFile) ??
                                new GlamourerHistory();
@@ -85,11 +113,10 @@ public class SnapshotFileService : ISnapshotFileService
         var resolvedCurrentFileSwaps =
             FileMapUtil.ResolveFileSwapsWithEmptyFallback(snapshotInfo, snapshotInfo.CurrentFileMapId);
 
-        var includeRemovals = !useLiveData || !_configuration.UsePenumbraIpcResourcePaths;
+        var includeRemovals = !capture.UseLiveData || !_configuration.UsePenumbraIpcResourcePaths;
         var mapChanged = UpdateFileMaps(snapshotInfo, snapshotData, resolvedCurrentMap, resolvedCurrentFileSwaps,
             includeRemovals, now);
 
-        var useMareFileCache = !_configuration.UseLiveSnapshotData && !isLocalPlayer;
         foreach (var (gamePath, hash) in snapshotData.FileReplacements)
         {
             snapshotInfo.FileReplacements[gamePath] = hash;
@@ -99,7 +126,7 @@ public class SnapshotFileService : ISnapshotFileService
             if (!File.Exists(hashedFilePath))
             {
                 string? sourceFile = null;
-                if (useMareFileCache)
+                if (capture.UseMareFileCache)
                     sourceFile = _ipcManager.GetMareFileCachePath(hash);
                 if (string.IsNullOrEmpty(sourceFile))
                     snapshotData.ResolvedPaths.TryGetValue(hash, out sourceFile);
@@ -176,26 +203,30 @@ public class SnapshotFileService : ISnapshotFileService
 
         snapshotInfo.LastUpdate = now.ToString("o", CultureInfo.InvariantCulture);
 
-        SaveSnapshotToDisk(snapshotPath, snapshotInfo, glamourerHistory, customizeHistory);
+        SaveSnapshotToDisk(capture.SnapshotPath, snapshotInfo, glamourerHistory, customizeHistory);
 
         if (isNewSnapshot)
-            Notify.Success($"New snapshot for '{charaName}' created successfully.");
+            Notify.Success($"New snapshot for '{capture.CharacterName}' created successfully.");
         else
-            Notify.Success($"Snapshot for '{charaName}' updated successfully.");
+            Notify.Success($"Snapshot for '{capture.CharacterName}' updated successfully.");
 
-        return snapshotPath;
+        return capture.SnapshotPath;
     }
 
-    private async Task<SnapshotData?> BuildSnapshotDataAsync(ICharacter character, bool useLiveData)
+    private SnapshotData? BuildSnapshotData(SnapshotCapture capture)
     {
-        if (useLiveData)
+        if (capture.UseLiveData)
         {
+            if (capture.LiveState == null)
+                return null;
+
+            // Actor state is captured on the framework thread; file enumeration and hashing remain on the worker.
             return _configuration.UsePenumbraIpcResourcePaths
-                ? await _liveSnapshotDataBuilder.BuildAsync(character)
-                : await _collectionSnapshotDataBuilder.BuildAsync(character);
+                ? _liveSnapshotDataBuilder.Build(capture.LiveState)
+                : _collectionSnapshotDataBuilder.Build(capture.LiveState);
         }
 
-        return _mareSnapshotDataBuilder.BuildFromMare(character);
+        return capture.MareData;
     }
 
     private static (int? WorldId, string? WorldName) ResolveHomeWorld(ICharacter character, string charaName)
@@ -321,15 +352,15 @@ public class SnapshotFileService : ISnapshotFileService
         return mapChanged;
     }
 
-    private void BackfillSnapshotDataFromPenumbra(ICharacter character, SnapshotData snapshotData)
+    private void BackfillSnapshotDataFromPenumbra(int objectIndex, SnapshotData snapshotData)
     {
         if (snapshotData.FileReplacements.Count == 0)
             return;
 
-        var resolvedByGamePath = _ipcManager.PenumbraGetCollectionResolvedFiles(character.ObjectIndex);
+        var resolvedByGamePath = _ipcManager.PenumbraGetCollectionResolvedFiles(objectIndex);
         if (resolvedByGamePath.Count == 0)
         {
-            var resourcePaths = _ipcManager.PenumbraGetGameObjectResourcePaths(character.ObjectIndex);
+            var resourcePaths = _ipcManager.PenumbraGetGameObjectResourcePaths(objectIndex);
             if (resourcePaths.Count > 0)
             {
                 resolvedByGamePath = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -438,5 +469,16 @@ public class SnapshotFileService : ISnapshotFileService
         JsonUtil.Serialize(glamourerHistory, paths.GlamourerHistoryFile);
         JsonUtil.Serialize(customizeHistory, paths.CustomizeHistoryFile);
     }
+
+    private sealed record SnapshotCapture(
+        string CharacterName,
+        int ObjectIndex,
+        int? WorldId,
+        string? WorldName,
+        string SnapshotPath,
+        bool UseLiveData,
+        bool UseMareFileCache,
+        SnapshotLiveState? LiveState,
+        SnapshotData? MareData);
 
 }

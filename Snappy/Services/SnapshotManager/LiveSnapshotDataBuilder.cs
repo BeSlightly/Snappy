@@ -9,18 +9,15 @@ public sealed class LiveSnapshotDataBuilder
         _ipcManager = ipcManager;
     }
 
-    public Task<SnapshotData?> BuildAsync(ICharacter character)
+    public SnapshotData Build(SnapshotLiveState state)
     {
-        PluginLog.Debug($"Building snapshot from live data for: {character.Name.TextValue}");
-        var newGlamourer = _ipcManager.GetGlamourerState(character);
-        var newCustomize = _ipcManager.GetCustomizePlusScale(character);
-        var newManipulation = _ipcManager.GetMetaManipulations(character.ObjectIndex);
+        PluginLog.Debug($"Building snapshot from live data for: {state.CharacterName}");
         var newFileReplacements = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         var newFileSwaps = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         var resolvedPaths = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         var hashCache = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
-        var penumbraReplacements = _ipcManager.PenumbraGetGameObjectResourcePaths(character.ObjectIndex);
+        var penumbraReplacements = _ipcManager.PenumbraGetGameObjectResourcePaths(state.ObjectIndex);
 
         foreach (var (resolvedPath, gamePaths) in penumbraReplacements)
         {
@@ -43,7 +40,7 @@ public sealed class LiveSnapshotDataBuilder
             foreach (var gamePath in gamePaths) newFileReplacements[gamePath] = hash;
         }
 
-        return Task.FromResult<SnapshotData?>(new SnapshotData(newGlamourer, newCustomize, newManipulation,
-            newFileReplacements, newFileSwaps, resolvedPaths));
+        return new SnapshotData(state.Glamourer, state.Customize, state.Manipulation, newFileReplacements,
+            newFileSwaps, resolvedPaths);
     }
 }

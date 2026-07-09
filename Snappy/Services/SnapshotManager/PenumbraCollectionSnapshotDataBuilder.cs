@@ -9,14 +9,11 @@ public sealed class PenumbraCollectionSnapshotDataBuilder
         _ipcManager = ipcManager;
     }
 
-    public async Task<SnapshotData?> BuildAsync(ICharacter character)
+    public SnapshotData Build(SnapshotLiveState state)
     {
-        PluginLog.Debug($"Building snapshot from Penumbra collection cache for: {character.Name.TextValue}");
-        var newGlamourer = _ipcManager.GetGlamourerState(character);
-        var newCustomize = _ipcManager.GetCustomizePlusScale(character);
-        var newManipulation = _ipcManager.GetMetaManipulations(character.ObjectIndex);
+        PluginLog.Debug($"Building snapshot from Penumbra collection cache for: {state.CharacterName}");
 
-        var collectionFiles = _ipcManager.PenumbraGetCollectionResolvedFiles(character.ObjectIndex);
+        var collectionFiles = _ipcManager.PenumbraGetCollectionResolvedFiles(state.ObjectIndex);
         var newFileReplacements = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         var newFileSwaps = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         var resolvedPaths = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -45,7 +42,7 @@ public sealed class PenumbraCollectionSnapshotDataBuilder
             newFileReplacements[gamePath] = hash;
         }
 
-        return new SnapshotData(newGlamourer, newCustomize, newManipulation, newFileReplacements, newFileSwaps,
+        return new SnapshotData(state.Glamourer, state.Customize, state.Manipulation, newFileReplacements, newFileSwaps,
             resolvedPaths);
     }
 }
