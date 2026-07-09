@@ -62,7 +62,7 @@ public class PmpExportManager : IPmpExportManager
                                         FileMapUtil.ResolveManipulation(snapshotInfo,
                                             fileMapId ?? snapshotInfo.CurrentFileMapId);
             var resolvedFileSwaps = fileSwapOverride
-                                    ?? FileMapUtil.ResolveFileSwaps(snapshotInfo,
+                                    ?? FileMapUtil.ResolveFileSwapsWithEmptyFallback(snapshotInfo,
                                         fileMapId ?? snapshotInfo.CurrentFileMapId);
             var effectiveFileMap = resolvedFileMap
                 .Where(kvp => !resolvedFileSwaps.ContainsKey(kvp.Key))

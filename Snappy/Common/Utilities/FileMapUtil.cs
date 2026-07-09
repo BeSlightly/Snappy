@@ -30,6 +30,16 @@ public static class FileMapUtil
             StringComparer.OrdinalIgnoreCase);
     }
 
+    public static Dictionary<string, string> ResolveFileSwapsWithEmptyFallback(SnapshotInfo snapshotInfo,
+        string? fileMapId)
+    {
+        var resolved = ResolveFileSwaps(snapshotInfo, fileMapId);
+        return resolved.Count == 0
+            ? new Dictionary<string, string>(snapshotInfo.FileSwaps ?? new Dictionary<string, string>(),
+                StringComparer.OrdinalIgnoreCase)
+            : resolved;
+    }
+
     public static bool TryResolveFileSwaps(SnapshotInfo snapshotInfo, string? fileMapId,
         out Dictionary<string, string> resolved)
     {

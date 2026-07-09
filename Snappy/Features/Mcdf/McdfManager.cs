@@ -95,7 +95,7 @@ public class McdfManager : IMcdfManager
             var customizeEntry = selectedCustomize ?? customizeHistory.Entries.LastOrDefault();
             var fileMapId = glamourerEntry?.FileMapId ?? customizeEntry?.FileMapId ?? snapshotInfo.CurrentFileMapId;
             var resolvedFileMap = FileMapUtil.ResolveFileMapWithEmptyFallback(snapshotInfo, fileMapId);
-            var resolvedFileSwaps = FileMapUtil.ResolveFileSwaps(snapshotInfo, fileMapId);
+            var resolvedFileSwaps = FileMapUtil.ResolveFileSwapsWithEmptyFallback(snapshotInfo, fileMapId);
             foreach (var gamePath in resolvedFileSwaps.Keys)
                 resolvedFileMap.Remove(gamePath);
             var resolvedManipulations = FileMapUtil.ResolveManipulation(snapshotInfo, fileMapId);
