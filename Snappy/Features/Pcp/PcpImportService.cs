@@ -21,6 +21,12 @@ internal sealed class PcpImportService
 
     public void ImportPcp(string filePath)
     {
+        if (!SnapshotImportUtil.TryAcquireImportLock(out var importLease))
+        {
+            Notify.Info("Another snapshot import is already in progress.");
+            return;
+        }
+
         string? snapshotPath = null;
         try
         {
@@ -83,6 +89,10 @@ internal sealed class PcpImportService
 
             Notify.Error($"Failed during PCP import for file: {Path.GetFileName(filePath)}\n{ex.Message}");
             PluginLog.Error($"Failed during PCP import for file: {Path.GetFileName(filePath)}: {ex}");
+        }
+        finally
+        {
+            importLease!.Dispose();
         }
     }
 

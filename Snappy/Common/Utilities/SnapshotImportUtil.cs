@@ -1,9 +1,24 @@
 using Luna;
+using System.Threading;
 
 namespace Snappy.Common.Utilities;
 
 public static class SnapshotImportUtil
 {
+    private static readonly SemaphoreSlim ImportLock = new(1, 1);
+
+    public static bool TryAcquireImportLock(out IDisposable? lease)
+    {
+        if (!ImportLock.Wait(0))
+        {
+            lease = null;
+            return false;
+        }
+
+        lease = new ImportLockLease();
+        return true;
+    }
+
     public static SnapshotInfo BuildSnapshotInfo(string sourceActor, int? sourceWorldId, string manipulationString,
         Dictionary<string, string> fileReplacements, Dictionary<string, string>? fileSwaps = null)
     {
@@ -71,5 +86,16 @@ public static class SnapshotImportUtil
     {
         var fallback = $"{fallbackPrefix}_{DateTime.Now:yyyyMMddHHmmss}";
         return PathSanitizer.SanitizeFileSystemName(name, fallback);
+    }
+
+    private sealed class ImportLockLease : IDisposable
+    {
+        private int _released;
+
+        public void Dispose()
+        {
+            if (Interlocked.Exchange(ref _released, 1) == 0)
+                ImportLock.Release();
+        }
     }
 }

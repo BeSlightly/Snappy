@@ -23,6 +23,12 @@ public class McdfManager : IMcdfManager
 
     public void ImportMcdf(string filePath)
     {
+        if (!SnapshotImportUtil.TryAcquireImportLock(out var importLease))
+        {
+            Notify.Info("Another snapshot import is already in progress.");
+            return;
+        }
+
         string? createdSnapshotPath = null;
         try
         {
@@ -69,6 +75,10 @@ public class McdfManager : IMcdfManager
 
             Notify.Error($"Failed during MCDF extraction for file: {Path.GetFileName(filePath)}\n{ex.Message}");
             PluginLog.Error($"Failed during MCDF extraction for file: {Path.GetFileName(filePath)}: {ex}");
+        }
+        finally
+        {
+            importLease!.Dispose();
         }
     }
 
