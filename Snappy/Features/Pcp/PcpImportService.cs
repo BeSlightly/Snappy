@@ -209,7 +209,7 @@ internal sealed class PcpImportService
 
         foreach (var (rawGamePath, rawArchivePath) in modData.Files ?? [])
         {
-            var gamePath = NormalizeGamePath(rawGamePath);
+            var gamePath = GamePathUtil.Normalize(rawGamePath);
             if (string.IsNullOrWhiteSpace(gamePath))
                 continue;
 
@@ -270,24 +270,13 @@ internal sealed class PcpImportService
 
         foreach (var (rawGamePath, swapPath) in fileSwaps)
         {
-            var gamePath = NormalizeGamePath(rawGamePath);
-            if (!string.IsNullOrWhiteSpace(gamePath) && !string.IsNullOrWhiteSpace(swapPath))
-                result[gamePath] = swapPath.Replace('\\', '/').Trim();
+            var gamePath = GamePathUtil.Normalize(rawGamePath);
+            var normalizedSwapPath = GamePathUtil.Normalize(swapPath);
+            if (!string.IsNullOrWhiteSpace(gamePath) && !string.IsNullOrWhiteSpace(normalizedSwapPath))
+                result[gamePath] = normalizedSwapPath;
         }
 
         return result;
-    }
-
-    private static string NormalizeGamePath(string? gamePath)
-    {
-        if (string.IsNullOrWhiteSpace(gamePath))
-            return string.Empty;
-
-        var normalized = gamePath.Replace('\\', '/').Trim().TrimStart('/');
-        return normalized.Split('/', StringSplitOptions.RemoveEmptyEntries)
-            .Any(segment => segment is "." or "..")
-            ? string.Empty
-            : normalized;
     }
 
     private static void RemoveIncompleteSnapshot(string snapshotPath)

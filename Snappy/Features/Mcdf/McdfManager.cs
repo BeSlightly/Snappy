@@ -196,7 +196,7 @@ public class McdfManager : IMcdfManager
                 continue;
 
             var gamePaths = (fileData.GamePaths ?? [])
-                .Select(NormalizeGamePath)
+                .Select(GamePathUtil.Normalize)
                 .Where(path => !string.IsNullOrWhiteSpace(path))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToArray();
@@ -273,11 +273,15 @@ public class McdfManager : IMcdfManager
             if (string.IsNullOrWhiteSpace(swap.FileSwapPath))
                 continue;
 
+            var fileSwapPath = GamePathUtil.Normalize(swap.FileSwapPath);
+            if (string.IsNullOrWhiteSpace(fileSwapPath))
+                continue;
+
             foreach (var rawGamePath in swap.GamePaths ?? [])
             {
-                var gamePath = NormalizeGamePath(rawGamePath);
+                var gamePath = GamePathUtil.Normalize(rawGamePath);
                 if (!string.IsNullOrWhiteSpace(gamePath))
-                    fileSwaps[gamePath] = swap.FileSwapPath.Replace('\\', '/').Trim();
+                    fileSwaps[gamePath] = fileSwapPath;
             }
         }
 
@@ -359,18 +363,6 @@ public class McdfManager : IMcdfManager
         {
             return customizeData;
         }
-    }
-
-    private static string NormalizeGamePath(string? gamePath)
-    {
-        if (string.IsNullOrWhiteSpace(gamePath))
-            return string.Empty;
-
-        var normalized = gamePath.Replace('\\', '/').Trim().TrimStart('/');
-        return normalized.Split('/', StringSplitOptions.RemoveEmptyEntries)
-            .Any(segment => segment is "." or "..")
-            ? string.Empty
-            : normalized;
     }
 
     private static void RemoveIncompleteSnapshot(string snapshotPath)
