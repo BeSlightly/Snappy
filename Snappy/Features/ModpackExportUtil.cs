@@ -22,47 +22,52 @@ public static class ModpackExportUtil
             return;
         }
 
-        var gamePathsByHash = fileMap
-            .GroupBy(kvp => kvp.Value, StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(g => g.Key, g => g.Select(kvp => kvp.Key).ToList(), StringComparer.OrdinalIgnoreCase);
-
-        var exportedHashes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var file in Directory.GetFiles(sourceFilesDirectory, "*", SearchOption.AllDirectories))
+        var archivePathToHash = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var group in fileMap
+                     .Where(kvp => !string.IsNullOrWhiteSpace(kvp.Key) && !string.IsNullOrWhiteSpace(kvp.Value))
+                     .GroupBy(kvp => kvp.Value, StringComparer.OrdinalIgnoreCase))
         {
-            var fileName = Path.GetFileName(file);
-            var hash = Path.GetFileNameWithoutExtension(fileName);
-
-            if (!gamePathsByHash.TryGetValue(hash, out var gamePaths) || gamePaths.Count == 0)
+            var hash = group.Key;
+            var gamePaths = group.Select(kvp => kvp.Key).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            var sourceFilePath = gamePaths
+                .Select(gamePath => SnapshotBlobUtil.ResolveBlobPath(sourceFilesDirectory, hash, gamePath))
+                .FirstOrDefault(File.Exists);
+            if (sourceFilePath == null)
+            {
+                PluginLog.Warning($"Skipping missing export blob '{hash}' for '{gamePaths[0]}'.");
                 continue;
-            if (!exportedHashes.Add(hash))
-                continue;
+            }
 
-            var archiveFileName = BuildArchiveFileName(hash, fileName, gamePaths);
+            var archiveFileName = BuildArchiveFileName(hash, Path.GetFileName(sourceFilePath), gamePaths);
             var archiveFilePath = $"files/{archiveFileName}";
-            var preferredPath = Path.Combine(sourceFilesDirectory, archiveFileName);
-            var sourceFilePath = File.Exists(preferredPath) ? preferredPath : file;
-            archive.CreateEntryFromFile(sourceFilePath, archiveFilePath);
+            if (archivePathToHash.TryGetValue(archiveFilePath, out var existingHash)
+                && !string.Equals(existingHash, hash, StringComparison.OrdinalIgnoreCase))
+                archiveFilePath = BuildCollisionSafeArchivePath(archiveFilePath, hash, archivePathToHash);
 
-            foreach (var gamePath in gamePaths.Distinct(StringComparer.OrdinalIgnoreCase))
+            archive.CreateEntryFromFile(sourceFilePath, archiveFilePath);
+            archivePathToHash[archiveFilePath] = hash;
+
+            foreach (var gamePath in gamePaths)
                 filesDictionary[gamePath] = archiveFilePath.Replace('/', '\\'); // Penumbra expects backslashes
         }
     }
 
     private static string BuildArchiveFileName(string hash, string existingFileName, IReadOnlyList<string> gamePaths)
     {
+        var safeHash = PathSanitizer.SanitizeFileSystemName(hash, "file");
         var existingExtension = Path.GetExtension(existingFileName);
         if (!string.IsNullOrEmpty(existingExtension)
             && !existingExtension.Equals(Constants.DataFileExtension, StringComparison.OrdinalIgnoreCase))
-            return hash + existingExtension.ToLowerInvariant();
+            return safeHash + existingExtension.ToLowerInvariant();
 
         foreach (var gamePath in gamePaths)
         {
             var extension = SnapshotBlobUtil.GetPreferredExtensionFromGamePath(gamePath);
             if (!extension.Equals(Constants.DataFileExtension, StringComparison.OrdinalIgnoreCase))
-                return hash + extension;
+                return safeHash + extension;
         }
 
-        return hash + (string.IsNullOrEmpty(existingExtension)
+        return safeHash + (string.IsNullOrEmpty(existingExtension)
             ? Constants.DataFileExtension
             : existingExtension.ToLowerInvariant());
     }
@@ -138,6 +143,7 @@ public static class ModpackExportUtil
         var nameWithoutExtension = Path.GetFileNameWithoutExtension(archiveFilePath);
         var extension = Path.GetExtension(archiveFilePath);
         var shortHash = hash.Length > 8 ? hash[..8].ToLowerInvariant() : hash.ToLowerInvariant();
+        shortHash = PathSanitizer.SanitizeFileSystemName(shortHash, "file");
 
         var candidate = $"{directory}/{nameWithoutExtension}__{shortHash}{extension}";
         var counter = 2;

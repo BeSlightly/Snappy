@@ -19,6 +19,11 @@ public static class SnapshotBlobUtil
         if (!Directory.Exists(filesDirectory))
             return null;
 
+        // Old snapshots stored blobs without an extension. Keep those snapshots loadable.
+        var extensionlessPath = Path.Combine(filesDirectory, hash);
+        if (File.Exists(extensionlessPath))
+            return extensionlessPath;
+
         return Directory.EnumerateFiles(filesDirectory, hash + ".*").FirstOrDefault();
     }
 

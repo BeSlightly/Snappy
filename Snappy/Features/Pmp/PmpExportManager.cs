@@ -1,4 +1,5 @@
 using System.IO.Compression;
+using System.Threading;
 using Snappy.Common;
 using Snappy.Features.Pmp.Models;
 using Snappy.Features.Packaging;
@@ -8,13 +9,14 @@ namespace Snappy.Features.Pmp;
 public class PmpExportManager : IPmpExportManager
 {
     private readonly Configuration _configuration;
+    private int _isExporting;
 
     public PmpExportManager(Configuration configuration)
     {
         _configuration = configuration;
     }
 
-    public bool IsExporting { get; private set; }
+    public bool IsExporting => Volatile.Read(ref _isExporting) != 0;
 
     public Task SnapshotToPMPAsync(string snapshotPath, string? outputPath = null, string? fileMapId = null)
         => SnapshotToPMPAsync(snapshotPath, outputPath, fileMapId, null, null, null, false);
@@ -24,13 +26,13 @@ public class PmpExportManager : IPmpExportManager
         IReadOnlyDictionary<string, string>? fileSwapOverride, string? manipulationOverride,
         bool useReadableArchivePaths = false)
     {
-        if (IsExporting)
+        if (Interlocked.CompareExchange(ref _isExporting, 1, 0) != 0)
         {
             Notify.Warning("An export is already in progress.");
             return;
         }
 
-        IsExporting = true;
+        string? temporaryOutput = null;
         try
         {
             PluginLog.Debug($"Operating on {snapshotPath}");
@@ -50,6 +52,8 @@ public class PmpExportManager : IPmpExportManager
             else
                 pmpOutputPath = Path.ChangeExtension(pmpOutputPath, ".pmp");
 
+            temporaryOutput = AtomicFileUtil.CreateTemporaryOutputPath(pmpOutputPath);
+
             var resolvedFileMap = fileMapOverride
                                   ?? FileMapUtil.ResolveFileMapWithEmptyFallback(snapshotInfo,
                                       fileMapId ?? snapshotInfo.CurrentFileMapId);
@@ -64,22 +68,25 @@ public class PmpExportManager : IPmpExportManager
                 .Where(kvp => !resolvedFileSwaps.ContainsKey(kvp.Key))
                 .ToDictionary(kvp => kvp.Key, kvp => kvp.Value, StringComparer.OrdinalIgnoreCase);
 
-            using var fileStream = new FileStream(pmpOutputPath, FileMode.Create, FileAccess.Write, FileShare.None);
-            using var archive = new ZipArchive(fileStream, ZipArchiveMode.Create);
+            using (var fileStream = new FileStream(temporaryOutput, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+            using (var archive = new ZipArchive(fileStream, ZipArchiveMode.Create))
+            {
+                var metadata = ModMetadataBuilder.BuildSnapshotMetadata(snapshotName);
+                ArchiveUtil.WriteJsonEntry(archive, "meta.json", metadata);
 
-            var metadata = ModMetadataBuilder.BuildSnapshotMetadata(snapshotName);
-            ArchiveUtil.WriteJsonEntry(archive, "meta.json", metadata);
+                var modData = new PmpDefaultMod
+                {
+                    Manipulations = ModPackageBuilder.BuildManipulations(resolvedManipulations),
+                    FileSwaps = new Dictionary<string, string>(resolvedFileSwaps, StringComparer.OrdinalIgnoreCase)
+                };
+                ModPackageBuilder.AddSnapshotFiles(archive, snapshotInfo, paths.FilesDirectory, modData.Files,
+                    effectiveFileMap, useReadableArchivePaths);
 
-            // Create default_mod.json entry
-            var modData = new PmpDefaultMod();
-            modData.Manipulations = ModPackageBuilder.BuildManipulations(resolvedManipulations);
-            modData.FileSwaps = new Dictionary<string, string>(resolvedFileSwaps,
-                StringComparer.OrdinalIgnoreCase);
-            ModPackageBuilder.AddSnapshotFiles(archive, snapshotInfo, paths.FilesDirectory, modData.Files,
-                effectiveFileMap, useReadableArchivePaths);
+                ArchiveUtil.WriteJsonEntry(archive, "default_mod.json", modData);
+            }
 
-            ArchiveUtil.WriteJsonEntry(archive, "default_mod.json", modData);
-
+            AtomicFileUtil.Complete(temporaryOutput, pmpOutputPath);
+            temporaryOutput = null;
             Notify.Success($"Successfully exported {snapshotName} to {pmpOutputPath}");
         }
         catch (Exception e)
@@ -89,7 +96,9 @@ public class PmpExportManager : IPmpExportManager
         }
         finally
         {
-            IsExporting = false;
+            if (temporaryOutput != null)
+                AtomicFileUtil.TryDelete(temporaryOutput);
+            Volatile.Write(ref _isExporting, 0);
         }
     }
 
