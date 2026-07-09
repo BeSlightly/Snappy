@@ -45,7 +45,7 @@ public static class CustomizePlusUtil
 
         var normalized = new JObject
         {
-            ["Bones"] = CreateIpcBones(bones)
+            ["Bones"] = CreateBones(bones, "ChildScaleIndependent", "ChildScalingIndependent")
         };
         normalizedProfileJson = normalized.ToString(Formatting.None);
         return true;
@@ -72,7 +72,7 @@ public static class CustomizePlusUtil
             ["CreationDate"] = now,
             ["ModifiedDate"] = now,
             ["Name"] = name,
-            ["Bones"] = CreateTemplateBones(bones),
+            ["Bones"] = CreateBones(bones, "ChildScalingIndependent", "ChildScaleIndependent"),
             ["IsWriteProtected"] = false
         };
 
@@ -133,7 +133,8 @@ public static class CustomizePlusUtil
         }
     }
 
-    private static JObject CreateIpcBones(JObject sourceBones)
+    private static JObject CreateBones(JObject sourceBones, string childScalePropertyName,
+        string fallbackChildScalePropertyName)
     {
         var result = new JObject();
         foreach (var bone in sourceBones.Properties())
@@ -150,33 +151,8 @@ public static class CustomizePlusUtil
                 ["PropagateTranslation"] = GetValueOrDefault(sourceBone, "PropagateTranslation", false),
                 ["PropagateRotation"] = GetValueOrDefault(sourceBone, "PropagateRotation", false),
                 ["PropagateScale"] = GetValueOrDefault(sourceBone, "PropagateScale", false),
-                ["ChildScaleIndependent"] = GetValueOrDefault(sourceBone, "ChildScaleIndependent",
-                    "ChildScalingIndependent", false)
-            };
-        }
-
-        return result;
-    }
-
-    private static JObject CreateTemplateBones(JObject sourceBones)
-    {
-        var result = new JObject();
-        foreach (var bone in sourceBones.Properties())
-        {
-            if (bone.Value is not JObject sourceBone)
-                continue;
-
-            result[bone.Name] = new JObject
-            {
-                ["Translation"] = GetValueOrDefault(sourceBone, "Translation", Vector3.Zero),
-                ["Rotation"] = GetValueOrDefault(sourceBone, "Rotation", Vector3.Zero),
-                ["Scaling"] = GetValueOrDefault(sourceBone, "Scaling", Vector3.One),
-                ["ChildScaling"] = GetValueOrDefault(sourceBone, "ChildScaling", Vector3.One),
-                ["PropagateTranslation"] = GetValueOrDefault(sourceBone, "PropagateTranslation", false),
-                ["PropagateRotation"] = GetValueOrDefault(sourceBone, "PropagateRotation", false),
-                ["PropagateScale"] = GetValueOrDefault(sourceBone, "PropagateScale", false),
-                ["ChildScalingIndependent"] = GetValueOrDefault(sourceBone, "ChildScalingIndependent",
-                    "ChildScaleIndependent", false)
+                [childScalePropertyName] = GetValueOrDefault(sourceBone, childScalePropertyName,
+                    fallbackChildScalePropertyName, false)
             };
         }
 
