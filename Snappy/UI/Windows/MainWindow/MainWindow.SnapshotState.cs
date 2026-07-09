@@ -20,7 +20,7 @@ public partial class MainWindow
             return;
 
         _selectedSnapshot = newSnapshot;
-        _snappy.ExecuteBackgroundTask(LoadHistoryForSelectedSnapshotAsync);
+        BeginLoadHistoryForSelectedSnapshot();
     }
 
     private void LoadSnapshots()
@@ -39,7 +39,7 @@ public partial class MainWindow
 
                 LoadSnapshots(snapshotPaths);
                 if (_selectedSnapshot != null && Directory.Exists(_selectedSnapshot.FullName))
-                    _snappy.ExecuteBackgroundTask(LoadHistoryForSelectedSnapshotAsync);
+                    BeginLoadHistoryForSelectedSnapshot();
                 if (_objIdxSelected != null || _selectedActorAddress != null)
                     UpdateSelectedActorStateIfNeeded(true);
             });
@@ -100,7 +100,19 @@ public partial class MainWindow
         ClearSelectedActorState();
     }
 
-    private async Task LoadHistoryForSelectedSnapshotAsync()
+    private void BeginLoadHistoryForSelectedSnapshot()
+    {
+        var snapshotPath = _selectedSnapshot?.FullName;
+        var loadVersion = ++_historyLoadVersion;
+        ResetSelectedSnapshotHistory();
+
+        if (string.IsNullOrEmpty(snapshotPath))
+            return;
+
+        _snappy.ExecuteBackgroundTask(() => LoadHistoryForSelectedSnapshotAsync(snapshotPath, loadVersion));
+    }
+
+    private void ResetSelectedSnapshotHistory()
     {
         _glamourerHistory = new GlamourerHistory();
         _customizeHistory = new CustomizeHistory();
@@ -119,33 +131,52 @@ public partial class MainWindow
         _pmpBuildError = null;
         _pmpNeedsRebuild = true;
         _pmpBuildToken++;
+    }
 
-        if (_selectedSnapshot == null)
-            return;
-
-        var paths = SnapshotPaths.From(_selectedSnapshot.FullName);
+    private async Task LoadHistoryForSelectedSnapshotAsync(string snapshotPath, int loadVersion)
+    {
+        var paths = SnapshotPaths.From(snapshotPath);
 
         try
         {
-            _selectedSnapshotInfo = await JsonUtil.DeserializeAsync<SnapshotInfo>(paths.SnapshotFile);
-            _glamourerHistory = await JsonUtil.DeserializeAsync<GlamourerHistory>(paths.GlamourerHistoryFile) ??
-                                new GlamourerHistory();
-            _customizeHistory = await JsonUtil.DeserializeAsync<CustomizeHistory>(paths.CustomizeHistoryFile) ??
-                                new CustomizeHistory();
+            var snapshotInfo = await JsonUtil.DeserializeAsync<SnapshotInfo>(paths.SnapshotFile);
+            var glamourerHistory = await JsonUtil.DeserializeAsync<GlamourerHistory>(paths.GlamourerHistoryFile) ??
+                                   new GlamourerHistory();
+            var customizeHistory = await JsonUtil.DeserializeAsync<CustomizeHistory>(paths.CustomizeHistoryFile) ??
+                                   new CustomizeHistory();
 
-            // Initialize PCP overrides from snapshot info
-            if (_selectedSnapshotInfo != null)
+            _snappy.QueueAction(() =>
             {
-                _pcpPlayerNameOverride = _selectedSnapshotInfo.SourceActor ?? string.Empty;
-                _pcpSelectedWorldIdOverride = _selectedSnapshotInfo.SourceWorldId;
-            }
+                if (!IsCurrentHistoryLoad(snapshotPath, loadVersion))
+                    return;
+
+                _selectedSnapshotInfo = snapshotInfo;
+                _glamourerHistory = glamourerHistory;
+                _customizeHistory = customizeHistory;
+                if (snapshotInfo != null)
+                {
+                    _pcpPlayerNameOverride = snapshotInfo.SourceActor ?? string.Empty;
+                    _pcpSelectedWorldIdOverride = snapshotInfo.SourceWorldId;
+                }
+            });
         }
         catch (Exception e)
         {
-            Notify.Error($"Failed to load history for {_selectedSnapshot.Name}\n{e.Message}");
-            PluginLog.Error($"Failed to load history for {_selectedSnapshot.Name}: {e}");
+            _snappy.QueueAction(() =>
+            {
+                if (!IsCurrentHistoryLoad(snapshotPath, loadVersion))
+                    return;
+
+                var snapshotName = _selectedSnapshot?.Name ?? Path.GetFileName(snapshotPath);
+                Notify.Error($"Failed to load history for {snapshotName}\n{e.Message}");
+                PluginLog.Error($"Failed to load history for {snapshotName}: {e}");
+            });
         }
     }
+
+    private bool IsCurrentHistoryLoad(string snapshotPath, int loadVersion)
+        => loadVersion == _historyLoadVersion
+           && string.Equals(_selectedSnapshot?.FullName, snapshotPath, StringComparison.OrdinalIgnoreCase);
 
     private void SaveHistory()
     {

@@ -43,6 +43,7 @@ public partial class MainWindow : Window, IDisposable
     private string? _pmpSelectedGlamourerBase64;
     private bool _pmpIsBuilding;
     private int _pmpBuildToken;
+    private int _historyLoadVersion;
     private int _snapshotRefreshVersion;
     private bool _pmpNeedsRebuild;
     private string? _pmpBuildError;
