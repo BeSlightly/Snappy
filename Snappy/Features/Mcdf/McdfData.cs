@@ -16,7 +16,8 @@ public record McdfData
 
     public static McdfData FromByteArray(byte[] data)
     {
-        return JsonConvert.DeserializeObject<McdfData>(Encoding.UTF8.GetString(data))!;
+        return JsonConvert.DeserializeObject<McdfData>(Encoding.UTF8.GetString(data))
+               ?? throw new InvalidDataException("MCDF metadata is empty or invalid.");
     }
 
     public record FileData(IEnumerable<string> GamePaths, int Length, string Hash = "");

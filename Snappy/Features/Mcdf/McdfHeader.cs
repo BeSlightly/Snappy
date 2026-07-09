@@ -3,6 +3,7 @@
 public record McdfHeader(byte Version, McdfData CharaFileData)
 {
     public static readonly byte CurrentVersion = 1;
+    private const int MaxHeaderDataLength = 32 * 1024 * 1024;
 
     public byte Version { get; set; } = Version;
     public McdfData CharaFileData { get; set; } = CharaFileData;
@@ -21,31 +22,29 @@ public record McdfHeader(byte Version, McdfData CharaFileData)
 
     private static (byte Version, int DataLength) ReadHeader(BinaryReader reader)
     {
-        var chars = new string(reader.ReadChars(4));
-        if (chars != "MCDF") throw new Exception("Not a Mare Chara File");
+        var magic = reader.ReadBytes(4);
+        if (magic.Length != 4 || !magic.SequenceEqual("MCDF"u8.ToArray()))
+            throw new InvalidDataException("Not a Mare Chara File");
 
         var version = reader.ReadByte();
         if (version == 1)
         {
             var dataLength = reader.ReadInt32();
+            if (dataLength is < 0 or > MaxHeaderDataLength)
+                throw new InvalidDataException($"Invalid MCDF header length: {dataLength}.");
             return (version, dataLength);
         }
 
-        throw new Exception($"Unsupported MCDF version: {version}");
+        throw new InvalidDataException($"Unsupported MCDF version: {version}");
     }
 
-    public static McdfHeader FromBinaryReader(string path, BinaryReader reader)
+    public static McdfHeader FromBinaryReader(BinaryReader reader)
     {
-        var initialPosition = reader.BaseStream.Position;
-        try
-        {
-            var (version, dataLength) = ReadHeader(reader);
-            return new McdfHeader(version, McdfData.FromByteArray(reader.ReadBytes(dataLength)));
-        }
-        catch (Exception)
-        {
-            reader.BaseStream.Position = initialPosition;
-            throw;
-        }
+        var (version, dataLength) = ReadHeader(reader);
+        var data = reader.ReadBytes(dataLength);
+        if (data.Length != dataLength)
+            throw new EndOfStreamException("MCDF header ended before all metadata could be read.");
+
+        return new McdfHeader(version, McdfData.FromByteArray(data));
     }
 }
