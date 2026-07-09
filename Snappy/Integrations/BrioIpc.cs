@@ -40,7 +40,7 @@ public sealed class BrioIpc : IpcSubscriber
             if (!result) return null;
 
             var brioEntity = parameters[1];
-            if (brioEntity == null || brioEntity.GetType() != _brioActorEntityType) return null;
+            if (brioEntity == null || !_brioActorEntityType!.IsInstanceOfType(brioEntity)) return null;
 
             var rawName = _brioActorEntityRawNameField!.GetValue(brioEntity) as string;
             return string.IsNullOrEmpty(rawName) ? null : rawName;
