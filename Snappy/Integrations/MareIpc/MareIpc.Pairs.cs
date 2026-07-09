@@ -87,7 +87,7 @@ public sealed partial class MareIpc
         if (address == character.Address)
             return true;
 
-        var handlerName = pairObject.GetFoP("PlayerName") as string;
+        var handlerName = GetPairName(pairObject);
         return !string.IsNullOrEmpty(handlerName)
             && string.Equals(handlerName, character.Name.TextValue, StringComparison.Ordinal);
     }
@@ -112,6 +112,27 @@ public sealed partial class MareIpc
 
     private static nint GetPairAddress(object pairObject)
     {
+        var directAddress = GetAddressFromObject(pairObject);
+        if (directAddress != nint.Zero)
+            return directAddress;
+
+        // Snowcloak keeps the address on the pair's private cached handler.
+        foreach (var memberName in new[] { "CachedPlayer", "Handler" })
+        {
+            var handler = pairObject.GetFoP(memberName);
+            if (handler == null || ReferenceEquals(handler, pairObject))
+                continue;
+
+            var handlerAddress = GetAddressFromObject(handler);
+            if (handlerAddress != nint.Zero)
+                return handlerAddress;
+        }
+
+        return nint.Zero;
+    }
+
+    private static nint GetAddressFromObject(object pairObject)
+    {
         foreach (var propertyName in new[] { "PlayerCharacter", "Address" })
         {
             var addrObj = pairObject.GetFoP(propertyName);
@@ -122,6 +143,26 @@ public sealed partial class MareIpc
         }
 
         return nint.Zero;
+    }
+
+    private static string? GetPairName(object pairObject)
+    {
+        if (pairObject.GetFoP("PlayerName") is string playerName)
+            return playerName;
+
+        try
+        {
+            var getPlayerName = pairObject.GetType().GetMethod("GetPlayerName",
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+                null,
+                Type.EmptyTypes,
+                null);
+            return getPlayerName?.Invoke(pairObject, null) as string;
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     private static bool IsVisibleConnectedPairObject(object pairObject)

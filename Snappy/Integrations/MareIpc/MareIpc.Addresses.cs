@@ -36,16 +36,8 @@ public sealed partial class MareIpc
         foreach (var addr in GetCurrentLightlessAddresses())
             pairedAddresses.Add(addr);
 
-        if (_snowcloakSyncHandledAddresses?.HasFunction == true)
-            try
-            {
-                var addresses = _snowcloakSyncHandledAddresses.InvokeFunc();
-                foreach (var addr in addresses) pairedAddresses.Add(addr);
-            }
-            catch (Exception ex)
-            {
-                PluginLog.Debug($"Failed to get SnowcloakSync handled addresses: {ex.Message}");
-            }
+        foreach (var addr in GetCurrentSnowcloakAddresses())
+            pairedAddresses.Add(addr);
 
         foreach (var addr in GetCurrentPlayerSyncAddresses())
             pairedAddresses.Add(addr);
@@ -60,25 +52,7 @@ public sealed partial class MareIpc
 
     public bool IsAddressHandledBySnowcloak(nint address)
     {
-        if (!IsPluginActive(SnowcloakPluginKey)) return false;
-
-        try
-        {
-            // Prefer explicit Snowcloak label first
-            if (_snowcloakSyncHandledAddresses?.HasFunction == true)
-            {
-                var addresses = _snowcloakSyncHandledAddresses.InvokeFunc();
-                if (addresses.Contains(address)) return true;
-            }
-
-            // Do not read Mare label to avoid ambiguity
-        }
-        catch (Exception ex)
-        {
-            PluginLog.Debug($"Failed Snowcloak address check: {ex.Message}");
-        }
-
-        return false;
+        return GetCurrentSnowcloakAddresses().Contains(address);
     }
 
     public bool IsAddressHandledByPlayerSync(nint address)
@@ -123,6 +97,27 @@ public sealed partial class MareIpc
         var handledAddresses = GetHandledAddressesFromIpc(_playerSyncHandledAddresses, "PlayerSync");
         var visibleAddresses = _marePlugins.TryGetValue(MareSempiternePluginKey, out var playerSyncPlugin)
             ? GetVisiblePairedAddressesViaPairs(playerSyncPlugin)
+            : null;
+
+        if (visibleAddresses != null)
+        {
+            if (handledAddresses != null)
+                visibleAddresses.IntersectWith(handledAddresses);
+
+            return visibleAddresses;
+        }
+
+        return handledAddresses ?? [];
+    }
+
+    private HashSet<nint> GetCurrentSnowcloakAddresses()
+    {
+        if (!IsPluginActive(SnowcloakPluginKey))
+            return [];
+
+        var handledAddresses = GetHandledAddressesFromIpc(_snowcloakSyncHandledAddresses, "Snowcloak");
+        var visibleAddresses = _marePlugins.TryGetValue(SnowcloakPluginKey, out var snowcloakPlugin)
+            ? GetVisiblePairedAddressesViaPairs(snowcloakPlugin)
             : null;
 
         if (visibleAddresses != null)
