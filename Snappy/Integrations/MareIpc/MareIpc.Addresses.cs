@@ -152,7 +152,7 @@ public sealed partial class MareIpc
         try
         {
             if (!pluginInfo.IsAvailable)
-                return [];
+                return null;
 
             if (pluginInfo.Plugin == null || pluginInfo.PairManager == null)
                 InitializeAllPlugins();
@@ -160,8 +160,11 @@ public sealed partial class MareIpc
             if (pluginInfo.PairManager == null)
                 return null;
 
+            if (!TryEnumeratePairsFromPlugin(pluginInfo, out var pairs))
+                return null;
+
             var results = new HashSet<nint>();
-            foreach (var pair in EnumeratePairsFromPlugin(pluginInfo))
+            foreach (var pair in pairs)
             {
                 if (!IsVisibleConnectedPairObject(pair))
                     continue;

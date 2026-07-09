@@ -58,6 +58,24 @@ public sealed partial class MareIpc
                 yield return pair;
     }
 
+    private bool TryEnumeratePairsFromPlugin(MarePluginInfo pluginInfo, out IReadOnlyList<object> pairs)
+    {
+        var results = new List<object>();
+        var successfullyEnumerated = false;
+        foreach (var probe in GetPairProbeOrder(pluginInfo))
+        {
+            var probeResult = InvokePairProbe(pluginInfo.PairManager!, pluginInfo.PluginName, probe);
+            if (!CanEnumeratePairs(probeResult))
+                continue;
+
+            successfullyEnumerated = true;
+            results.AddRange(EnumeratePairsFromResult(probeResult));
+        }
+
+        pairs = results;
+        return successfullyEnumerated;
+    }
+
     private object? GetMarePairFromPlugin(ICharacter character, MarePluginInfo pluginInfo)
     {
         try
@@ -109,6 +127,9 @@ public sealed partial class MareIpc
             ? GetAllClientPairsField(pairManager, pluginName)
             : InvokePairManagerMethod(pairManager, probeName);
     }
+
+    private static bool CanEnumeratePairs(object? pairsContainer)
+        => pairsContainer is IDictionary || pairsContainer is IEnumerable and not string;
 
     private static nint GetPairAddress(object pairObject)
     {
