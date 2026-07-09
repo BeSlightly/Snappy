@@ -1,21 +1,13 @@
-﻿using System.IO.Compression;
+using System.IO.Compression;
+using Newtonsoft.Json.Linq;
 
 namespace Snappy.Common.Utilities;
 
-public record BoneTransformSanitizer
-{
-    public Vector3? Rotation;
-    public Vector3? Scaling;
-    public Vector3? Translation;
-}
-
-public record ProfileSanitizer
-{
-    public Dictionary<string, BoneTransformSanitizer> Bones { get; init; } = new();
-}
-
 public static class CustomizePlusUtil
 {
+    // Customize+ currently writes version 6 templates. Older versions remain readable by C+.
+    private const byte TemplateVersion = 6;
+
     public static string DecompressTemplateBase64(string base64Template)
     {
         try
@@ -28,17 +20,11 @@ public static class CustomizePlusUtil
 
             gzipStream.CopyTo(resultStream);
             var decompressedBytes = resultStream.ToArray();
+            if (decompressedBytes.Length <= 1)
+                return string.Empty;
 
-            // Skip the version byte (first byte)
-            if (decompressedBytes.Length > 1)
-            {
-                var versionByte = decompressedBytes[0];
-                PluginLog.Debug($"Decompressing C+ template version: {versionByte}");
-                var jsonBytes = decompressedBytes[1..];
-                return Encoding.UTF8.GetString(jsonBytes);
-            }
-
-            return string.Empty;
+            PluginLog.Debug($"Decompressing C+ template version: {decompressedBytes[0]}");
+            return Encoding.UTF8.GetString(decompressedBytes, 1, decompressedBytes.Length - 1);
         }
         catch (Exception ex)
         {
@@ -47,40 +33,68 @@ public static class CustomizePlusUtil
         }
     }
 
+    /// <summary>
+    /// Convert either an IPC profile or a PCP template to the profile shape accepted by
+    /// Customize+'s SetTemporaryProfileOnCharacter IPC.
+    /// </summary>
+    public static bool TryNormalizeIpcProfileJson(string profileJson, out string normalizedProfileJson)
+    {
+        normalizedProfileJson = string.Empty;
+        if (!TryGetBones(profileJson, out var bones))
+            return false;
+
+        var normalized = new JObject
+        {
+            ["Bones"] = CreateIpcBones(bones)
+        };
+        normalizedProfileJson = normalized.ToString(Formatting.None);
+        return true;
+    }
+
+    /// <summary>
+    /// Create a current Customize+ template from either an IPC profile or a template payload.
+    /// </summary>
+    public static bool TryCreateTemplateJson(string profileJson, out string templateJson, string? templateName = null)
+    {
+        templateJson = string.Empty;
+        if (!TryGetBones(profileJson, out var bones, out var source))
+            return false;
+
+        var now = DateTimeOffset.UtcNow;
+        var sourceName = source["Name"]?.Value<string>();
+        var name = string.IsNullOrWhiteSpace(templateName)
+            ? string.IsNullOrWhiteSpace(sourceName) ? "Snappy Template" : sourceName
+            : templateName;
+        var template = new JObject
+        {
+            ["Version"] = TemplateVersion,
+            ["UniqueId"] = Guid.NewGuid(),
+            ["CreationDate"] = now,
+            ["ModifiedDate"] = now,
+            ["Name"] = name,
+            ["Bones"] = CreateTemplateBones(bones),
+            ["IsWriteProtected"] = false
+        };
+
+        templateJson = template.ToString(Formatting.None);
+        return true;
+    }
+
     public static string CreateCustomizePlusTemplate(string profileJson)
     {
-        const byte templateVersionByte = 4;
         try
         {
-            var sanitizedProfile = JsonConvert.DeserializeObject<ProfileSanitizer>(profileJson);
-            if (sanitizedProfile?.Bones == null)
+            if (!TryCreateTemplateJson(profileJson, out var templateJson))
             {
-                PluginLog.Warning($"Could not deserialize C+ profile or it has no bones. JSON: {profileJson}");
+                PluginLog.Warning("Could not deserialize Customize+ profile or it has no bones.");
                 return string.Empty;
             }
 
-            var finalBones = new Dictionary<string, object>();
-            foreach (var (key, value) in sanitizedProfile.Bones)
-                finalBones[key] = new
-                {
-                    Translation = value.Translation ?? Vector3.Zero,
-                    Rotation = value.Rotation ?? Vector3.Zero,
-                    Scaling = value.Scaling ?? Vector3.One
-                };
-
-            var finalTemplate = new
-            {
-                Version = templateVersionByte,
-                Bones = finalBones,
-                IsWriteProtected = false
-            };
-            var templateJson = JsonConvert.SerializeObject(finalTemplate, Formatting.None);
             var templateBytes = Encoding.UTF8.GetBytes(templateJson);
-
             using var compressedStream = new MemoryStream();
             using (var zipStream = new GZipStream(compressedStream, CompressionMode.Compress))
             {
-                zipStream.WriteByte(templateVersionByte);
+                zipStream.WriteByte(TemplateVersion);
                 zipStream.Write(templateBytes, 0, templateBytes.Length);
             }
 
@@ -92,4 +106,89 @@ public static class CustomizePlusUtil
             return string.Empty;
         }
     }
+
+    private static bool TryGetBones(string json, out JObject bones)
+        => TryGetBones(json, out bones, out _);
+
+    private static bool TryGetBones(string json, out JObject bones, out JObject source)
+    {
+        bones = null!;
+        source = null!;
+        if (string.IsNullOrWhiteSpace(json))
+            return false;
+
+        try
+        {
+            source = JObject.Parse(json);
+            if (source["Bones"] is not JObject parsedBones)
+                return false;
+
+            bones = parsedBones;
+            return true;
+        }
+        catch (Exception ex)
+        {
+            PluginLog.Debug($"Failed to parse Customize+ profile data: {ex.Message}");
+            return false;
+        }
+    }
+
+    private static JObject CreateIpcBones(JObject sourceBones)
+    {
+        var result = new JObject();
+        foreach (var bone in sourceBones.Properties())
+        {
+            if (bone.Value is not JObject sourceBone)
+                continue;
+
+            result[bone.Name] = new JObject
+            {
+                ["Translation"] = GetValueOrDefault(sourceBone, "Translation", Vector3.Zero),
+                ["Rotation"] = GetValueOrDefault(sourceBone, "Rotation", Vector3.Zero),
+                ["Scaling"] = GetValueOrDefault(sourceBone, "Scaling", Vector3.One),
+                ["ChildScaling"] = GetValueOrDefault(sourceBone, "ChildScaling", Vector3.One),
+                ["PropagateTranslation"] = GetValueOrDefault(sourceBone, "PropagateTranslation", false),
+                ["PropagateRotation"] = GetValueOrDefault(sourceBone, "PropagateRotation", false),
+                ["PropagateScale"] = GetValueOrDefault(sourceBone, "PropagateScale", false),
+                ["ChildScaleIndependent"] = GetValueOrDefault(sourceBone, "ChildScaleIndependent",
+                    "ChildScalingIndependent", false)
+            };
+        }
+
+        return result;
+    }
+
+    private static JObject CreateTemplateBones(JObject sourceBones)
+    {
+        var result = new JObject();
+        foreach (var bone in sourceBones.Properties())
+        {
+            if (bone.Value is not JObject sourceBone)
+                continue;
+
+            result[bone.Name] = new JObject
+            {
+                ["Translation"] = GetValueOrDefault(sourceBone, "Translation", Vector3.Zero),
+                ["Rotation"] = GetValueOrDefault(sourceBone, "Rotation", Vector3.Zero),
+                ["Scaling"] = GetValueOrDefault(sourceBone, "Scaling", Vector3.One),
+                ["ChildScaling"] = GetValueOrDefault(sourceBone, "ChildScaling", Vector3.One),
+                ["PropagateTranslation"] = GetValueOrDefault(sourceBone, "PropagateTranslation", false),
+                ["PropagateRotation"] = GetValueOrDefault(sourceBone, "PropagateRotation", false),
+                ["PropagateScale"] = GetValueOrDefault(sourceBone, "PropagateScale", false),
+                ["ChildScalingIndependent"] = GetValueOrDefault(sourceBone, "ChildScalingIndependent",
+                    "ChildScaleIndependent", false)
+            };
+        }
+
+        return result;
+    }
+
+    private static JToken GetValueOrDefault(JObject source, string propertyName, object defaultValue)
+        => source[propertyName]?.DeepClone() ?? JToken.FromObject(defaultValue);
+
+    private static JToken GetValueOrDefault(JObject source, string propertyName, string fallbackPropertyName,
+        object defaultValue)
+        => source[propertyName]?.DeepClone()
+           ?? source[fallbackPropertyName]?.DeepClone()
+           ?? JToken.FromObject(defaultValue);
 }

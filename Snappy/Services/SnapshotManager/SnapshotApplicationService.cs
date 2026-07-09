@@ -85,6 +85,9 @@ public class SnapshotApplicationService : ISnapshotApplicationService
                     cplusJson = plan.CustomizeDataToApply;
                 }
 
+                if (CustomizePlusUtil.TryNormalizeIpcProfileJson(cplusJson, out var normalizedProfileJson))
+                    cplusJson = normalizedProfileJson;
+
                 cplusProfileId = _ipcManager.SetCustomizePlusScale(characterApplyTo.Address, cplusJson);
             }
             else if (isOnLocalPlayer)
