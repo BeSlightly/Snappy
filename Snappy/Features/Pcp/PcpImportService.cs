@@ -221,23 +221,18 @@ internal sealed class PcpImportService
         {
             var gamePath = GamePathUtil.Normalize(rawGamePath);
             if (string.IsNullOrWhiteSpace(gamePath))
-                continue;
+                throw new InvalidDataException($"PCP contains an invalid game path: '{rawGamePath}'.");
 
             var archivePath = ArchiveUtil.NormalizeArchivePath(rawArchivePath);
             if (string.IsNullOrWhiteSpace(archivePath))
-            {
-                PluginLog.Warning($"PCP file path is empty for {gamePath}.");
-                continue;
-            }
+                throw new InvalidDataException($"PCP file path is empty for '{gamePath}'.");
 
             if (!archivePathToHash.TryGetValue(archivePath, out var hash))
             {
                 var entry = ArchiveUtil.FindEntry(archive, archivePath);
                 if (entry == null)
-                {
-                    PluginLog.Warning($"PCP file missing: {rawArchivePath}");
-                    continue;
-                }
+                    throw new InvalidDataException(
+                        $"PCP archive entry '{rawArchivePath}' for '{gamePath}' is missing.");
 
                 hash = ExtractEntryToBlob(entry, filesDir, gamePath);
                 archivePathToHash[archivePath] = hash;
