@@ -111,21 +111,26 @@ public sealed class PenumbraIpc : IpcSubscriber
         }
     }
 
-    public void RemoveTemporaryCollection(int objIdx)
+    public bool RemoveTemporaryCollection(int objIdx)
     {
-        if (!IsReady()) return;
+        if (!IsReady()) return false;
 
         if (!_tempCollectionGuids.TryGetValue(objIdx, out var guid))
         {
             PluginLog.Debug($"[Penumbra] No temporary collection GUID found for object index '{objIdx}' to remove.");
-            return;
+            return true;
         }
 
         PluginLog.Information($"[Penumbra] Deleting temporary collection for object index {objIdx} (Guid: {guid})");
-        var ret = _deleteTempCollection.Invoke(guid);
-        PluginLog.Debug("[Penumbra] DeleteTemporaryCollection returned: " + ret);
+        if (!TryDeleteCollection(guid, out var ret))
+        {
+            PluginLog.Warning($"[Penumbra] Failed to delete temporary collection {guid}: {ret}");
+            return false;
+        }
 
+        PluginLog.Debug("[Penumbra] DeleteTemporaryCollection returned: " + ret);
         _tempCollectionGuids.Remove(objIdx);
+        return true;
     }
 
     public void Redraw(int objIdx)
@@ -138,30 +143,73 @@ public sealed class PenumbraIpc : IpcSubscriber
         return IsReady() ? _getMeta.Invoke(objIdx) : string.Empty;
     }
 
-    public void SetTemporaryMods(ICharacter character, int? idx, Dictionary<string, string> mods, string manips)
+    public bool SetTemporaryMods(ICharacter character, int? idx, Dictionary<string, string> mods, string manips)
     {
-        if (!IsReady() || idx == null) return;
+        if (!IsReady() || idx == null) return false;
 
-        var name = $"Snap_{character.Name.TextValue}_{idx.Value}";
-        var result = _createTempCollection.Invoke("Snappy", name, out var collection);
-        PluginLog.Verbose($"Created temp collection: {result}, GUID: {collection}");
-
-        if (result != PenumbraApiEc.Success)
+        var collection = Guid.Empty;
+        try
         {
-            PluginLog.Error($"Failed to create temporary collection: {result}");
-            return;
+            var name = $"Snap_{character.Name.TextValue}_{idx.Value}";
+            var result = _createTempCollection.Invoke("Snappy", name, out collection);
+            PluginLog.Verbose($"Created temp collection: {result}, GUID: {collection}");
+
+            if (result != PenumbraApiEc.Success)
+            {
+                PluginLog.Error($"Failed to create temporary collection: {result}");
+                return false;
+            }
+
+            foreach (var m in mods)
+                PluginLog.Verbose(m.Key + " => " + m.Value);
+
+            var addModResult = _addTempMod.Invoke("Snap", collection, mods, manips, 0);
+            PluginLog.Verbose("Set temp mods result: " + addModResult);
+            if (addModResult != PenumbraApiEc.Success)
+            {
+                PluginLog.Error($"Failed to add temporary mod: {addModResult}");
+                TryDeleteCollection(collection, out _);
+                return false;
+            }
+
+            var assign = _assignTempCollection.Invoke(collection, idx.Value);
+            PluginLog.Verbose("Assigned temp collection: " + assign);
+            if (assign != PenumbraApiEc.Success)
+            {
+                PluginLog.Error($"Failed to assign temporary collection: {assign}");
+                TryDeleteCollection(collection, out _);
+                return false;
+            }
+
+            if (_tempCollectionGuids.TryGetValue(idx.Value, out var oldCollection) && oldCollection != collection
+                && !TryDeleteCollection(oldCollection, out var deleteResult))
+                PluginLog.Warning($"[Penumbra] Failed to delete replaced collection {oldCollection}: {deleteResult}");
+
+            _tempCollectionGuids[idx.Value] = collection;
+            return true;
         }
+        catch (Exception ex)
+        {
+            if (collection != Guid.Empty)
+                TryDeleteCollection(collection, out _);
+            PluginLog.Error($"Failed to apply Penumbra temporary collection: {ex}");
+            return false;
+        }
+    }
 
-        _tempCollectionGuids[idx.Value] = collection;
-
-        var assign = _assignTempCollection.Invoke(collection, idx.Value);
-        PluginLog.Verbose("Assigned temp collection: " + assign);
-
-        foreach (var m in mods)
-            PluginLog.Verbose(m.Key + " => " + m.Value);
-
-        var addModResult = _addTempMod.Invoke("Snap", collection, mods, manips, 0);
-        PluginLog.Verbose("Set temp mods result: " + addModResult);
+    private bool TryDeleteCollection(Guid collection, out PenumbraApiEc result)
+    {
+        try
+        {
+            result = _deleteTempCollection.Invoke(collection);
+            return result is PenumbraApiEc.Success or PenumbraApiEc.CollectionMissing;
+        }
+        catch (Exception ex)
+        {
+            result = PenumbraApiEc.UnknownError;
+            PluginLog.Error($"[Penumbra] Failed to delete temporary collection {collection}: {ex}");
+            return false;
+        }
     }
 
     public override bool IsReady()

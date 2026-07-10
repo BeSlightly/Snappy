@@ -49,7 +49,11 @@ public class SnapshotApplicationService : ISnapshotApplicationService
             return false;
         }
 
-        ApplyLoadPlan(characterApplyTo, objIdx, isOnLocalPlayer, plan);
+        if (!ApplyLoadPlan(characterApplyTo, objIdx, isOnLocalPlayer, plan))
+        {
+            Notify.Error("Could not load snapshot: Penumbra rejected the temporary collection.");
+            return false;
+        }
 
         var snapshotName = Path.GetFileName(path);
         Notify.Success($"Loaded snapshot '{snapshotName}' onto {characterApplyTo.Name.TextValue}.");
@@ -57,13 +61,22 @@ public class SnapshotApplicationService : ISnapshotApplicationService
         return true;
     }
 
-    private void ApplyLoadPlan(ICharacter characterApplyTo, int objIdx, bool isOnLocalPlayer, SnapshotLoadPlan plan)
+    private bool ApplyLoadPlan(ICharacter characterApplyTo, int objIdx, bool isOnLocalPlayer, SnapshotLoadPlan plan)
     {
+        var appliedPenumbraCollection = false;
         if (plan.ApplyFiles)
         {
-            _ipcManager.PenumbraRemoveTemporaryCollection(characterApplyTo.ObjectIndex);
             if (plan.ModdedPaths.Any() || !string.IsNullOrEmpty(plan.ResolvedManipulations))
-                _ipcManager.PenumbraSetTempMods(characterApplyTo, objIdx, plan.ModdedPaths, plan.ResolvedManipulations);
+            {
+                appliedPenumbraCollection = _ipcManager.PenumbraSetTempMods(characterApplyTo, objIdx,
+                    plan.ModdedPaths, plan.ResolvedManipulations);
+                if (!appliedPenumbraCollection)
+                    return false;
+            }
+            else if (!_ipcManager.PenumbraRemoveTemporaryCollection(characterApplyTo.ObjectIndex))
+            {
+                return false;
+            }
         }
 
         var existingSnapshot = _activeSnapshotManager.GetSnapshotForCharacter(characterApplyTo);
@@ -110,7 +123,9 @@ public class SnapshotApplicationService : ISnapshotApplicationService
         if (shouldRedraw)
             _ipcManager.PenumbraRedraw(objIdx);
 
-        var hasPenumbraCollection = plan.ApplyFiles || existingSnapshot?.HasPenumbraCollection == true;
+        var hasPenumbraCollection = plan.ApplyFiles
+            ? appliedPenumbraCollection
+            : existingSnapshot?.HasPenumbraCollection == true;
         var hasGlamourerState = appliedGlamourerState || existingSnapshot?.HasGlamourerState == true;
         var isGlamourerLocked = appliedGlamourerState
             ? true
@@ -124,6 +139,7 @@ public class SnapshotApplicationService : ISnapshotApplicationService
             hasGlamourerState));
         PluginLog.Debug(
             $"Snapshot loaded for index {characterApplyTo.ObjectIndex}. 'IsOnLocalPlayer' flag set to: {isOnLocalPlayer}.");
+        return true;
     }
 
     private bool TryBuildLoadPlan(

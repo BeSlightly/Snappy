@@ -2,13 +2,13 @@ namespace Snappy.Services;
 
 public interface IIpcManager : IDisposable
 {
-    void PenumbraRemoveTemporaryCollection(int objIdx);
+    bool PenumbraRemoveTemporaryCollection(int objIdx);
     void PenumbraRedraw(int objIdx);
     string GetMetaManipulations(int objIdx);
     Dictionary<string, HashSet<string>> PenumbraGetGameObjectResourcePaths(int objIdx);
     Dictionary<string, string> PenumbraGetCollectionResolvedFiles(int objIdx);
     bool PenumbraHasTemporaryCollection(int objIdx);
-    void PenumbraSetTempMods(ICharacter character, int? idx, Dictionary<string, string> mods, string manips);
+    bool PenumbraSetTempMods(ICharacter character, int? idx, Dictionary<string, string> mods, string manips);
     string GetGlamourerState(ICharacter c);
     void ApplyGlamourerState(string? base64, ICharacter c);
     void UnlockGlamourerState(IGameObject c);

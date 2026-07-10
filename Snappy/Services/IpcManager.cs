@@ -28,9 +28,9 @@ public class IpcManager : IIpcManager, IDisposable
     }
 
     // Penumbra passthroughs
-    public void PenumbraRemoveTemporaryCollection(int objIdx)
+    public bool PenumbraRemoveTemporaryCollection(int objIdx)
     {
-        _penumbra.RemoveTemporaryCollection(objIdx);
+        return _penumbra.RemoveTemporaryCollection(objIdx);
     }
 
     public void PenumbraRedraw(int objIdx)
@@ -58,9 +58,9 @@ public class IpcManager : IIpcManager, IDisposable
         return _penumbra.HasTemporaryCollection(objIdx);
     }
 
-    public void PenumbraSetTempMods(ICharacter character, int? idx, Dictionary<string, string> mods, string manips)
+    public bool PenumbraSetTempMods(ICharacter character, int? idx, Dictionary<string, string> mods, string manips)
     {
-        _penumbra.SetTemporaryMods(character, idx, mods, manips);
+        return _penumbra.SetTemporaryMods(character, idx, mods, manips);
     }
 
     // Glamourer passthroughs
