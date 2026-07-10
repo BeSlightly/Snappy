@@ -152,7 +152,7 @@ public class SnapshotFileService : ISnapshotFileService
                     snapshotData.ResolvedPaths.TryGetValue(hash, out sourceFile);
 
                 if (!string.IsNullOrEmpty(sourceFile) && File.Exists(sourceFile))
-                    await Task.Run(() => File.Copy(sourceFile, hashedFilePath, true));
+                    File.Copy(sourceFile, hashedFilePath, true);
                 else
                     throw new FileNotFoundException(
                         $"Could not find source file for '{gamePath}' (hash: {hash}).");
