@@ -126,7 +126,9 @@ public sealed partial class Snappy
                 if (snapshotInfo != null)
                 {
                     snapshotInfo.FormatVersion = 1;
-                    JsonUtil.Serialize(snapshotInfo, paths.SnapshotFile);
+                    if (!JsonUtil.Serialize(snapshotInfo, paths.SnapshotFile))
+                        throw new IOException("Failed to save the updated snapshot format version.");
+
                     updatedCount++;
                     PluginLog.Debug($"Updated {Path.GetFileName(dir)} to include format version.");
                 }

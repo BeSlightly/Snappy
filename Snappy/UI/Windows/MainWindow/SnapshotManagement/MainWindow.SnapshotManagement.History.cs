@@ -6,8 +6,15 @@ public partial class MainWindow
 {
     private void SetHistoryEntryDescription(HistoryEntryBase entry, string newDescription)
     {
+        var previousDescription = entry.Description;
         entry.Description = newDescription;
-        SaveHistory();
+        if (!SaveHistory())
+        {
+            entry.Description = previousDescription;
+            Notify.Error("Failed to save the renamed history entry.");
+            return;
+        }
+
         Notify.Success("History entry renamed.");
         _historyEntryToRename = null;
     }

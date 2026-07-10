@@ -178,14 +178,14 @@ public partial class MainWindow
         => loadVersion == _historyLoadVersion
            && string.Equals(_selectedSnapshot?.FullName, snapshotPath, StringComparison.OrdinalIgnoreCase);
 
-    private void SaveHistory()
+    private bool SaveHistory()
     {
         if (_selectedSnapshot == null)
-            return;
+            return false;
 
         var paths = SnapshotPaths.From(_selectedSnapshot.FullName);
-        JsonUtil.Serialize(_glamourerHistory, paths.GlamourerHistoryFile);
-        JsonUtil.Serialize(_customizeHistory, paths.CustomizeHistoryFile);
+        return JsonUtil.Serialize(_glamourerHistory, paths.GlamourerHistoryFile)
+               & JsonUtil.Serialize(_customizeHistory, paths.CustomizeHistoryFile);
     }
 
     private void SaveSourceActorName()
@@ -197,27 +197,20 @@ public partial class MainWindow
         )
             return;
 
-        _selectedSnapshotInfo.SourceActor = _tempSourceActorName;
-
         var paths = SnapshotPaths.From(_selectedSnapshot.FullName);
-        try
+        var previousSourceActor = _selectedSnapshotInfo.SourceActor;
+        _selectedSnapshotInfo.SourceActor = _tempSourceActorName;
+        if (!JsonUtil.Serialize(_selectedSnapshotInfo, paths.SnapshotFile))
         {
-            JsonUtil.Serialize(_selectedSnapshotInfo, paths.SnapshotFile);
-            PluginLog.Debug(
-                $"Updated SourceActor for snapshot '{_selectedSnapshot.Name}' to '{_tempSourceActorName}'."
-            );
-            Notify.Success("Source player name updated successfully.");
-        }
-        catch (Exception e)
-        {
-            Notify.Error(
-                $"Failed to save updated snapshot info for '{_selectedSnapshot.Name}'\n{e.Message}"
-            );
-            PluginLog.Error(
-                $"Failed to save updated snapshot info for '{_selectedSnapshot.Name}': {e}"
-            );
+            _selectedSnapshotInfo.SourceActor = previousSourceActor;
+            Notify.Error($"Failed to save updated snapshot info for '{_selectedSnapshot.Name}'.");
+            return;
         }
 
+        PluginLog.Debug(
+            $"Updated SourceActor for snapshot '{_selectedSnapshot.Name}' to '{_tempSourceActorName}'."
+        );
+        Notify.Success("Source player name updated successfully.");
         _snappy.InvokeSnapshotsUpdated();
     }
 }

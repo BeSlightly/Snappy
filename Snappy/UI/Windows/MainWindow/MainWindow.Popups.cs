@@ -37,12 +37,32 @@ public partial class MainWindow
                 ImGui.Separator();
                 if (Im.Button("Yes, Delete", new Vector2(120, 0)))
                 {
+                    Action? restoreEntry = null;
                     if (_historyEntryToDelete is GlamourerHistoryEntry gEntry)
-                        _glamourerHistory.Entries.Remove(gEntry);
+                    {
+                        var index = _glamourerHistory.Entries.IndexOf(gEntry);
+                        if (index >= 0)
+                        {
+                            _glamourerHistory.Entries.RemoveAt(index);
+                            restoreEntry = () => _glamourerHistory.Entries.Insert(index, gEntry);
+                        }
+                    }
                     else if (_historyEntryToDelete is CustomizeHistoryEntry cEntry)
-                        _customizeHistory.Entries.Remove(cEntry);
+                    {
+                        var index = _customizeHistory.Entries.IndexOf(cEntry);
+                        if (index >= 0)
+                        {
+                            _customizeHistory.Entries.RemoveAt(index);
+                            restoreEntry = () => _customizeHistory.Entries.Insert(index, cEntry);
+                        }
+                    }
 
-                    SaveHistory();
+                    if (restoreEntry == null || !SaveHistory())
+                    {
+                        restoreEntry?.Invoke();
+                        Notify.Error("Failed to delete the history entry.");
+                        return;
+                    }
 
                     Notify.Success("History entry deleted.");
                     _historyEntryToDelete = null;

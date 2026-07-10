@@ -76,9 +76,11 @@ public static class SnapshotMigrator
                 Directory.Delete(dir, true);
             }
 
-            JsonUtil.Serialize(newInfo, paths.SnapshotFile);
-            JsonUtil.Serialize(glamourerHistory, paths.GlamourerHistoryFile);
-            JsonUtil.Serialize(customizeHistory, paths.CustomizeHistoryFile);
+            var snapshotSaved = JsonUtil.Serialize(newInfo, paths.SnapshotFile);
+            var glamourerSaved = JsonUtil.Serialize(glamourerHistory, paths.GlamourerHistoryFile);
+            var customizeSaved = JsonUtil.Serialize(customizeHistory, paths.CustomizeHistoryFile);
+            if (!snapshotSaved || !glamourerSaved || !customizeSaved)
+                throw new IOException("Failed to save all migrated snapshot state files.");
 
             await File.Create(paths.MigrationMarker).DisposeAsync();
 
