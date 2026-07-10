@@ -116,13 +116,9 @@ public class SnapshotFileService : ISnapshotFileService
             FileMapUtil.ResolveFileSwaps(snapshotInfo, snapshotInfo.CurrentFileMapId);
 
         var includeRemovals = !capture.UseLiveData || !_configuration.UsePenumbraIpcResourcePaths;
-        var mapChanged = UpdateFileMaps(snapshotInfo, snapshotData, resolvedCurrentMap, resolvedCurrentFileSwaps,
-            includeRemovals, now);
 
         foreach (var (gamePath, hash) in snapshotData.FileReplacements)
         {
-            snapshotInfo.FileReplacements[gamePath] = hash;
-
             var existingFilePath = paths.FindAnyExistingHashedFilePath(hash);
             var hashedFilePath = existingFilePath ?? paths.GetPreferredHashedFilePath(hash, gamePath);
             if (!File.Exists(hashedFilePath))
@@ -136,9 +132,13 @@ public class SnapshotFileService : ISnapshotFileService
                 if (!string.IsNullOrEmpty(sourceFile) && File.Exists(sourceFile))
                     await Task.Run(() => File.Copy(sourceFile, hashedFilePath, true));
                 else
-                    PluginLog.Warning($"Could not find source file for {gamePath} (hash: {hash}).");
+                    throw new FileNotFoundException(
+                        $"Could not find source file for '{gamePath}' (hash: {hash}).");
             }
         }
+
+        var mapChanged = UpdateFileMaps(snapshotInfo, snapshotData, resolvedCurrentMap, resolvedCurrentFileSwaps,
+            includeRemovals, now);
 
         snapshotInfo.ManipulationString = snapshotData.Manipulation;
 
