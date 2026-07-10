@@ -32,7 +32,8 @@ public static class FileMapUtil
         if (!mapIndex.TryGetValue(fileMapId, out var entry))
             return false;
 
-        if (!HasFileSwapHistory(entry, mapIndex, 0))
+        var (hasHistory, hasChanges) = GetFileSwapHistoryState(entry, mapIndex, 0);
+        if (!hasHistory || (!hasChanges && snapshotInfo.FileSwaps?.Count > 0))
             return false;
 
         resolved = ResolveSwapEntry(entry, mapIndex, 0);
@@ -161,7 +162,7 @@ public static class FileMapUtil
         return ApplyChanges(baseMap, entry.FileSwapChanges ?? new Dictionary<string, string>(), true);
     }
 
-    private static bool HasFileSwapHistory(
+    private static (bool HasHistory, bool HasChanges) GetFileSwapHistoryState(
         FileMapEntry entry,
         IReadOnlyDictionary<string, FileMapEntry> mapIndex,
         int depth)
@@ -169,11 +170,12 @@ public static class FileMapUtil
         if (depth > MaxMapDepth)
             throw new InvalidOperationException("File swap map resolution exceeded max depth. Possible cycle in FileMaps.");
 
-        if (entry.FileSwapChanges != null)
-            return true;
+        var hasHistory = entry.FileSwapChanges != null;
+        var hasChanges = entry.FileSwapChanges?.Count > 0;
+        if (string.IsNullOrEmpty(entry.BaseId) || !mapIndex.TryGetValue(entry.BaseId, out var baseEntry))
+            return (hasHistory, hasChanges);
 
-        return !string.IsNullOrEmpty(entry.BaseId)
-               && mapIndex.TryGetValue(entry.BaseId, out var baseEntry)
-               && HasFileSwapHistory(baseEntry, mapIndex, depth + 1);
+        var baseState = GetFileSwapHistoryState(baseEntry, mapIndex, depth + 1);
+        return (hasHistory || baseState.HasHistory, hasChanges || baseState.HasChanges);
     }
 }
