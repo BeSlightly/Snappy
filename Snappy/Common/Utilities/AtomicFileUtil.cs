@@ -11,7 +11,23 @@ public static class AtomicFileUtil
     }
 
     public static void Complete(string temporaryPath, string outputPath)
-        => File.Move(temporaryPath, outputPath, true);
+    {
+        var fullOutputPath = Path.GetFullPath(outputPath);
+        if (File.Exists(fullOutputPath))
+        {
+            File.Replace(temporaryPath, fullOutputPath, null, true);
+            return;
+        }
+
+        try
+        {
+            File.Move(temporaryPath, fullOutputPath);
+        }
+        catch (IOException) when (File.Exists(fullOutputPath))
+        {
+            File.Replace(temporaryPath, fullOutputPath, null, true);
+        }
+    }
 
     public static void TryDelete(string path)
     {
