@@ -281,7 +281,7 @@ public class ActiveSnapshotManager : IActiveSnapshotManager
                 $"Reverting state for actor '{target.Name}' at index {target.ObjectIndex} (original index: {snapshot.ObjectIndex}).");
 
             if (snapshot.HasPenumbraCollection)
-                _ipcManager.PenumbraRemoveTemporaryCollection(snapshot.ObjectIndex);
+                _ipcManager.PenumbraRemoveTemporaryCollection(target.ObjectIndex);
 
             if (snapshot.CustomizePlusProfileId.HasValue)
                 _ipcManager.RevertCustomizePlusScale(snapshot.CustomizePlusProfileId.Value);
