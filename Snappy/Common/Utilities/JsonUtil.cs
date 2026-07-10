@@ -4,9 +4,11 @@ namespace Snappy.Common.Utilities;
 
 public static class JsonUtil
 {
-    public static void Serialize(object? obj, string filePath)
+    public static bool Serialize(object? obj, string filePath)
     {
-        if (obj == null) return;
+        if (obj == null)
+            return false;
+
         try
         {
             var json = JsonConvert.SerializeObject(obj, Formatting.Indented);
@@ -14,10 +16,12 @@ public static class JsonUtil
             if (dir != null) Directory.CreateDirectory(dir);
 
             FilesystemUtil.WriteAllTextSafe(filePath, json);
+            return true;
         }
         catch (Exception ex)
         {
             PluginLog.Error($"Failed to serialize {obj.GetType().Name} to {filePath}: {ex}");
+            return false;
         }
     }
 

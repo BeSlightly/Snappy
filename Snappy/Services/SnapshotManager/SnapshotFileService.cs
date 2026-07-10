@@ -465,9 +465,11 @@ public class SnapshotFileService : ISnapshotFileService
         CustomizeHistory customizeHistory)
     {
         var paths = SnapshotPaths.From(snapshotPath);
-        JsonUtil.Serialize(info, paths.SnapshotFile);
-        JsonUtil.Serialize(glamourerHistory, paths.GlamourerHistoryFile);
-        JsonUtil.Serialize(customizeHistory, paths.CustomizeHistoryFile);
+        var snapshotSaved = JsonUtil.Serialize(info, paths.SnapshotFile);
+        var glamourerSaved = JsonUtil.Serialize(glamourerHistory, paths.GlamourerHistoryFile);
+        var customizeSaved = JsonUtil.Serialize(customizeHistory, paths.CustomizeHistoryFile);
+        if (!snapshotSaved || !glamourerSaved || !customizeSaved)
+            throw new IOException($"Failed to save all snapshot state files in '{snapshotPath}'.");
     }
 
     private sealed record SnapshotCapture(
