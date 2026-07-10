@@ -55,31 +55,12 @@ public class ActorService : IActorService
             selectableActors = selectableActors.UnionBy(tempCollectionActors, p => p.Address);
         }
 
-        if (_configuration.AllowOutsideGpose && _configuration.AllowOutsideGposeOwnedPets)
-        {
-            var ownedPets = Svc.Objects
-                .OfType<ICharacter>()
-                .Where(c => c.IsValid() && ActorOwnershipUtil.IsSelfOwnedPet(c));
-
-            selectableActors = selectableActors.UnionBy(ownedPets, p => p.Address);
-        }
-
         var localAddress = Player.Object?.Address ?? IntPtr.Zero;
-        var allowOwnedPets = _configuration.AllowOutsideGpose && _configuration.AllowOutsideGposeOwnedPets;
 
         return selectableActors
-            .OrderBy(p => GetActorSortKey(p, localAddress, allowOwnedPets))
+            .OrderBy(p => p.Address == localAddress ? 0 : 1)
             .ThenBy(p => p.Name.ToString(), StringComparer.OrdinalIgnoreCase)
             .Select(p => (ICharacter)p)
             .ToList();
-    }
-
-    private static int GetActorSortKey(ICharacter actor, IntPtr localAddress, bool allowOwnedPets)
-    {
-        if (actor.Address == localAddress)
-            return 0;
-        if (allowOwnedPets && ActorOwnershipUtil.IsSelfOwnedPet(actor))
-            return 1;
-        return 2;
     }
 }

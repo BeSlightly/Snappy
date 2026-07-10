@@ -58,19 +58,6 @@ public sealed class ConfigWindow : Window
                 _configuration.AllowOutsideGpose = allowOutside;
                 _configuration.Save();
             }
-
-            ImGui.Indent();
-            using (var d2 = ImRaii.Disabled(!allowOutside))
-            {
-                var allowOwnedPets = _configuration.AllowOutsideGposeOwnedPets;
-                if (Im.Checkbox("Allow loading to your own pets outside of GPose", ref allowOwnedPets))
-                {
-                    _configuration.AllowOutsideGposeOwnedPets = allowOwnedPets;
-                    _configuration.Save();
-                }
-                Im.Tooltip.OnHover("Also shows your pets in the actor list.");
-            }
-            ImGui.Unindent();
         }
 
         ImGui.Unindent();

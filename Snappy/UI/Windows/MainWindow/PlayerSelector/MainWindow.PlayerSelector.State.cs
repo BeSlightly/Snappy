@@ -120,8 +120,7 @@ public partial class MainWindow
                 continue;
 
             var isLocalPlayer = Player.Object != null && actor.Address == Player.Object.Address;
-            var isOwnedPet = ActorOwnershipUtil.IsSelfOwnedPet(actor);
-            var youSuffix = (isLocalPlayer || isOwnedPet) ? " (You)" : string.Empty;
+            var youSuffix = isLocalPlayer ? " (You)" : string.Empty;
 
             string displayName;
             if (nameCount.GetValueOrDefault(baseName) > 1)
@@ -226,11 +225,10 @@ public partial class MainWindow
         {
             var isLocalPlayer = actor.ObjectIndex == Player.Object?.ObjectIndex;
             var allowOutside = _snappy.Configuration.AllowOutsideGpose;
-            var allowOwnedPets = allowOutside && _snappy.Configuration.AllowOutsideGposeOwnedPets;
-            var isOwnedPet = allowOwnedPets && ActorOwnershipUtil.IsSelfOwnedPet(actor);
             _isActorModifiable =
                 _snappy.Configuration.DisableAutomaticRevert
-                && ((isLocalPlayer && allowOutside) || isOwnedPet);
+                && isLocalPlayer
+                && allowOutside;
         }
 
         // --- Update snapshottable state ---
