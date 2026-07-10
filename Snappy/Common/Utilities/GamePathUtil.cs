@@ -7,11 +7,15 @@ public static class GamePathUtil
         if (string.IsNullOrWhiteSpace(gamePath))
             return string.Empty;
 
-        var normalized = gamePath.Replace('\\', '/').Trim().TrimStart('/');
-        return normalized.Split('/', StringSplitOptions.RemoveEmptyEntries)
-            .Any(segment => segment is "." or "..")
-            ? string.Empty
-            : normalized;
+        var segments = gamePath.Replace('\\', '/').Trim().TrimStart('/')
+            .Split('/', StringSplitOptions.RemoveEmptyEntries);
+        if (segments.Length == 0
+            || segments.Any(segment => segment is "." or ".."
+                                       || segment.Contains(':')
+                                       || segment.Any(char.IsControl)))
+            return string.Empty;
+
+        return string.Join('/', segments);
     }
 
     public static Dictionary<string, string> NormalizeFileMap(
