@@ -97,8 +97,8 @@ public class SnapshotFileService : ISnapshotFileService
 
         var isNewSnapshot = !File.Exists(paths.SnapshotFile);
 
-        var snapshotInfo = await JsonUtil.DeserializeAsync<SnapshotInfo>(paths.SnapshotFile) ??
-                           new SnapshotInfo { SourceActor = capture.CharacterName };
+        var snapshotInfo = await LoadExistingStateAsync<SnapshotInfo>(paths.SnapshotFile)
+                           ?? new SnapshotInfo { SourceActor = capture.CharacterName };
         snapshotInfo.FileMaps ??= new List<FileMapEntry>();
         snapshotInfo.FileSwaps ??= new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
@@ -106,9 +106,9 @@ public class SnapshotFileService : ISnapshotFileService
         BackfillManipulationStrings(snapshotInfo);
         UpdateSourceWorld(snapshotInfo, capture.WorldId, capture.WorldName);
 
-        var glamourerHistory = await JsonUtil.DeserializeAsync<GlamourerHistory>(paths.GlamourerHistoryFile) ??
+        var glamourerHistory = await LoadExistingStateAsync<GlamourerHistory>(paths.GlamourerHistoryFile) ??
                                new GlamourerHistory();
-        var customizeHistory = await JsonUtil.DeserializeAsync<CustomizeHistory>(paths.CustomizeHistoryFile) ??
+        var customizeHistory = await LoadExistingStateAsync<CustomizeHistory>(paths.CustomizeHistoryFile) ??
                                new CustomizeHistory();
 
         var resolvedCurrentMap =
@@ -214,6 +214,15 @@ public class SnapshotFileService : ISnapshotFileService
             Notify.Success($"Snapshot for '{capture.CharacterName}' updated successfully.");
 
         return capture.SnapshotPath;
+    }
+
+    private static async Task<T?> LoadExistingStateAsync<T>(string filePath) where T : class
+    {
+        if (!File.Exists(filePath))
+            return null;
+
+        return await JsonUtil.DeserializeAsync<T>(filePath)
+               ?? throw new InvalidDataException($"Existing snapshot state file '{filePath}' could not be read.");
     }
 
     private SnapshotData? BuildSnapshotData(SnapshotCapture capture)
