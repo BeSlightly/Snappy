@@ -22,7 +22,6 @@ public class IpcManager : IIpcManager, IDisposable
 
         _allSubscribers = new List<IpcSubscriber> { _penumbra, _glamourer, _customize, _brio, _mare };
 
-        // Subscribe to plugin list changes (from PR 2330)
         Svc.PluginInterface.ActivePluginsChanged += OnActivePluginsChanged;
         PluginLog.Information("[IpcManager] Subscribed to plugin list change events");
     }
@@ -197,7 +196,6 @@ public class IpcManager : IIpcManager, IDisposable
             PluginLog.Debug(
                 $"[IpcManager] Plugin list changed: {args.Kind}, affected plugins: {string.Join(", ", args.AffectedInternalNames)}");
 
-            // Notify all IPC subscribers about the plugin list change
             foreach (var subscriber in _allSubscribers) subscriber.HandlePluginListChanged(args.AffectedInternalNames);
         }
         catch (Exception ex)

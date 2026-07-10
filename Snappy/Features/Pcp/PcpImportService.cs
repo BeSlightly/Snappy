@@ -38,44 +38,35 @@ internal sealed class PcpImportService
 
             using var archive = ZipFile.OpenRead(filePath);
 
-            // Read metadata
             var metadata = ArchiveUtil.ReadJsonEntry<PcpMetadata>(archive, "meta.json", Notify.Error,
                 "Invalid PCP file: missing meta.json", "Failed to parse meta.json from PCP file.");
             if (metadata == null) return;
 
-            // Read character data
             var characterData = ArchiveUtil.ReadJsonEntry<PcpCharacterData>(archive, "character.json", Notify.Error,
                 "Invalid PCP file: missing character.json", "Failed to parse character.json from PCP file.");
             if (characterData == null) return;
 
-            // Read mod data
             var modData = ArchiveUtil.ReadJsonEntry<PcpModData>(archive, "default_mod.json", Notify.Error,
                 "Invalid PCP file: missing default_mod.json", "Failed to parse default_mod.json from PCP file.");
             if (modData == null) return;
 
-            // Create snapshot
             snapshotPath = CreateSnapshotDirectory(metadata.Name);
             var paths = SnapshotPaths.From(snapshotPath);
             Directory.CreateDirectory(paths.FilesDirectory);
 
-            // Extract files
             var gamePathToHashMap = ExtractFiles(archive, paths.FilesDirectory, modData);
 
-            // Create snapshot info
             var snapshotInfo = CreateSnapshotInfo(characterData, gamePathToHashMap, modData);
 
-            // Create Customize+ history
             var customizeHistory = new CustomizeHistory();
             if (characterData.CustomizePlus != null)
                 customizeHistory = CreateCustomizeHistory(characterData, snapshotInfo.CurrentFileMapId);
             var customizeData = customizeHistory.Entries.LastOrDefault()?.CustomizeData ?? string.Empty;
 
-            // Create Glamourer history
             var glamourerHistory = new GlamourerHistory();
             if (characterData.Glamourer != null)
                 glamourerHistory = CreateGlamourerHistory(characterData, snapshotInfo.CurrentFileMapId, customizeData);
 
-            // Save all data to disk
             _snapshotFileService.SaveSnapshotToDisk(paths.RootPath, snapshotInfo, glamourerHistory, customizeHistory);
 
             snapshotPath = null;
@@ -105,7 +96,6 @@ internal sealed class PcpImportService
     private static SnapshotInfo CreateSnapshotInfo(PcpCharacterData characterData,
         Dictionary<string, string> gamePathToHashMap, PcpModData modData)
     {
-        // Convert PCP manipulations to Penumbra Base64 format
         var manipulationString = string.Empty;
         var manipulations = modData.Manipulations ?? [];
         if (manipulations.Count > 0)
@@ -127,19 +117,14 @@ internal sealed class PcpImportService
 
     private static string ConvertPcpManipulationsToPenumbraFormat(List<JObject> pcpManipulations)
     {
-        // Convert PCP manipulations to Penumbra's expected format
-        // Penumbra expects: Base64(GZip(VersionByte + Data))
-
-        // For now, we'll use version 0 format (JSON)
+        // Penumbra manipulation v0 is Base64(GZip(version byte + JSON)).
         var manipulationsJson = JsonConvert.SerializeObject(pcpManipulations);
         var jsonBytes = Encoding.UTF8.GetBytes(manipulationsJson);
 
         using var resultStream = new MemoryStream();
         using (var gzipStream = new GZipStream(resultStream, CompressionMode.Compress))
         {
-            // Write version byte (0 for JSON format)
             gzipStream.WriteByte(0);
-            // Write the JSON data
             gzipStream.Write(jsonBytes, 0, jsonBytes.Length);
         }
 
@@ -153,13 +138,10 @@ internal sealed class PcpImportService
         if (characterData.Glamourer != null)
             try
             {
-                // Parse the Glamourer object from PCP
                 var glamourerObj = JObject.FromObject(characterData.Glamourer);
 
-                // Check if this is the new Glamourer PCP format with Version and Design
                 if (glamourerObj["Version"]?.ToObject<int>() == 1 && glamourerObj["Design"] is JObject designObj)
                 {
-                    // This is the new Glamourer PCP format - convert the Design to Base64
                     if (GlamourerDesignUtil.TryEncodeDesignJson(designObj, out var designBase64))
                         history.Entries.Add(GlamourerHistoryEntry.Create(designBase64, "Imported from PCP", fileMapId,
                             customizeData));
@@ -168,7 +150,6 @@ internal sealed class PcpImportService
                 }
                 else
                 {
-                    // This might be an older format or different structure, attempt to import as legacy data.
                     PluginLog.Debug("PCP Glamourer data is not in V1 format, attempting to import as legacy data.");
                     if (GlamourerDesignUtil.TryEncodeDesignJson(glamourerObj, out var designBase64))
                         history.Entries.Add(GlamourerHistoryEntry.Create(designBase64,

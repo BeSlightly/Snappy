@@ -5,11 +5,7 @@ namespace Snappy.Common.Utilities;
 
 public static class PluginUtil
 {
-    /// <summary>
-    ///     Computes SHA-1 hash for compatibility with Mare file identification.
-    ///     Uses the exact same implementation as Mare's Crypto.GetFileHash() method.
-    ///     DO NOT change this implementation as it would break Mare interoperability.
-    /// </summary>
+    /// <summary>Computes the SHA-1 identifier expected by Mare.</summary>
     public static string GetFileHash(string filePath)
     {
         using var sha1 = SHA1.Create();
@@ -17,11 +13,7 @@ public static class PluginUtil
         return Convert.ToHexString(sha1.ComputeHash(stream));
     }
 
-    /// <summary>
-    ///     Computes SHA-1 hash for compatibility with Mare file identification.
-    ///     Uses the exact same implementation as Mare's Crypto.GetFileHash() method.
-    ///     DO NOT change this implementation as it would break Mare interoperability.
-    /// </summary>
+    /// <summary>Computes the SHA-1 identifier expected by Mare.</summary>
     public static string GetFileHash(byte[] bytes)
     {
         using var sha1 = SHA1.Create();

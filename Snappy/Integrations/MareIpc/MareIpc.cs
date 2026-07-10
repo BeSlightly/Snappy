@@ -18,7 +18,6 @@ public sealed partial class MareIpc : IpcSubscriber
 
     private bool _isUiOpen;
 
-    // Multi-Mare support
     private readonly Dictionary<string, MarePluginInfo> _marePlugins = new()
     {
         { LightlessSyncPluginKey, new MarePluginInfo(LightlessSyncPluginKey, LightlessSyncPluginKey) },
@@ -45,7 +44,6 @@ public sealed partial class MareIpc : IpcSubscriber
 
     public MareIpc() : base(LightlessSyncPluginKey)
     {
-        // Initialize manual IPC subscribers
         _lightlessSyncHandledAddresses =
             Svc.PluginInterface.GetIpcSubscriber<List<nint>>(LightlessHandledAddressesIpc);
         _snowcloakSyncHandledAddresses =
@@ -54,7 +52,6 @@ public sealed partial class MareIpc : IpcSubscriber
             Svc.PluginInterface.GetIpcSubscriber<List<nint>>(PlayerSyncHandledAddressesIpc);
     }
 
-    // Manual IPC subscribers for different plugins
     private ICallGateSubscriber<List<nint>>? _lightlessSyncHandledAddresses;
     private ICallGateSubscriber<List<nint>>? _snowcloakSyncHandledAddresses;
     private ICallGateSubscriber<List<nint>>? _playerSyncHandledAddresses;
@@ -156,7 +153,6 @@ public sealed partial class MareIpc : IpcSubscriber
 
     public override void HandlePluginListChanged(IEnumerable<string> affectedPluginNames)
     {
-        // Check if any of the plugins we manage (LightlessSync, Snowcloak, Player Sync) were affected
         foreach (var name in affectedPluginNames)
         {
             if (_marePlugins.TryGetValue(name, out var info))
@@ -173,8 +169,6 @@ public sealed partial class MareIpc : IpcSubscriber
             {
                 PluginLog.Information(
                     $"[{string.Join("/", _marePlugins.Keys)} IPC] A managed plugin's state changed via plugin list event: {_wasAvailable} -> {isAvailable}");
-                // OnPluginStateChanged calls ResetAll, but strictly speaking we only need to update the availability flag here
-                // since we already reset the specific plugin info above.
                 _wasAvailable = isAvailable;
             }
         }
@@ -184,7 +178,6 @@ public sealed partial class MareIpc : IpcSubscriber
     {
         PluginLog.Information($"[Mare IPC] Plugin state changed: {wasAvailable} -> {isAvailable}. Resetting cache.");
 
-        // Reset all plugin states
         foreach (var pluginInfo in _marePlugins.Values)
         {
             ResetPluginInfo(pluginInfo);

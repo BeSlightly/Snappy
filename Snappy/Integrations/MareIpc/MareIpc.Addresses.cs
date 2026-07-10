@@ -11,7 +11,6 @@ public sealed partial class MareIpc
 
         var pairedAddresses = GetCurrentPairedAddresses();
 
-        // Convert to ICharacter objects
         var result = pairedAddresses
             .Select(addr => Svc.Objects.FirstOrDefault(obj => obj.Address == addr))
             .OfType<ICharacter>()

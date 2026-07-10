@@ -23,10 +23,8 @@ public static class CharacterFactory
     {
         if (actor == null || actor.Address == IntPtr.Zero) return null;
 
-        // Most objects that are characters will implement this interface.
         if (actor is ICharacter character) return character;
 
-        // Fallback for certain NPC types that are character-like but don't expose the interface directly.
         return actor.ObjectKind switch
         {
             ObjectKind.BattleNpc or ObjectKind.Companion or ObjectKind.Retainer or ObjectKind.EventNpc => Character(

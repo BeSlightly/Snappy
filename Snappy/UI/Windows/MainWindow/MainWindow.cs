@@ -92,13 +92,11 @@ public partial class MainWindow : Window, IDisposable
         _snapshotCombo = new SnapshotCombo(() => _snapshotList);
         _snapshotCombo.SelectionChanged += OnSnapshotSelectionChanged;
 
-        // Configure world selectors
         _pcpWorldSelector.EmptyName = "Use snapshot's world";
         _pcpWorldSelector.DisplayCurrent = false;
         _renameSourceWorldSelector.EmptyName = "No world / clear";
         _renameSourceWorldSelector.DisplayCurrent = false;
 
-        // Load snapshots immediately when the window is created
         LoadSnapshots();
 
         Svc.Framework.Update += OnFrameworkUpdate;

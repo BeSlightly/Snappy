@@ -7,11 +7,9 @@ public partial class MainWindow
 {
     private void DrawCharacterExportTab()
     {
-        // Content container (use default styling similar to Penumbra Effective Changes)
         using var _pcpChild = Im.Child.Begin("CharacterExportContent", new Vector2(0, -1), false, WindowFlags.None);
         if (!_pcpChild)
             return;
-        // Instruction (subtle helper text)
         using (var _pcpTextGrey = ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.DalamudGrey))
         {
             Im.Text(
@@ -20,13 +18,11 @@ public partial class MainWindow
 
         ImGui.Separator();
 
-        // Two columns for selectors
         if (ImGui.BeginTable("PcpExportSelectors", 2, ImGuiTableFlags.SizingStretchProp))
         {
             ImGui.TableSetupColumn("Left", ImGuiTableColumnFlags.WidthStretch, 0.5f);
             ImGui.TableSetupColumn("Right", ImGuiTableColumnFlags.WidthStretch, 0.5f);
 
-            // Glamourer selector
             ImGui.TableNextColumn();
             ImGui.AlignTextToFramePadding();
             Im.Text("Glamourer Entry"u8);
@@ -59,7 +55,6 @@ public partial class MainWindow
             Im.Tooltip.OnHover(
                 "Pick a specific Glamourer design to include in the export. If not selected, the latest design will be used.");
 
-            // Customize+ selector
             ImGui.TableNextColumn();
             ImGui.AlignTextToFramePadding();
             Im.Text("Customize+ Entry"u8);
@@ -99,13 +94,11 @@ public partial class MainWindow
         ImGui.Separator();
         ImGui.Spacing();
 
-        // PCP player details overrides
         if (ImGui.BeginTable("PcpExportPlayerDetails", 2, ImGuiTableFlags.SizingStretchProp))
         {
             ImGui.TableSetupColumn("Left", ImGuiTableColumnFlags.WidthStretch, 0.5f);
             ImGui.TableSetupColumn("Right", ImGuiTableColumnFlags.WidthStretch, 0.5f);
 
-            // Player Name input
             ImGui.TableNextColumn();
             ImGui.AlignTextToFramePadding();
             Im.Text("Player Name"u8);
@@ -119,13 +112,11 @@ public partial class MainWindow
             Im.Tooltip.OnHover(
                 "Name written to PCP's character.json Actor.PlayerName. Defaults to snapshot's Source Actor."u8);
 
-            // Homeworld selection (reusing searchable combo pattern)
             ImGui.TableNextColumn();
             ImGui.AlignTextToFramePadding();
             Im.Text("Homeworld"u8);
             ImGui.Spacing();
 
-            // Use Lifestream-style WorldSelector grouped by Region/Data Center
             var tmpWorldId = _pcpSelectedWorldIdOverride ?? 0; // 0 means 'use snapshot'
             var snapWorldName = _selectedSnapshotInfo?.SourceWorldId is { } swid2
                 ? ExcelWorldHelper.GetName((uint)swid2)
@@ -176,11 +167,9 @@ public partial class MainWindow
             var textWidth = Im.Font.CalculateSize(warningText).X;
             var availableWidth = ImGui.GetContentRegionAvail().X;
 
-            // Calculate the starting X position to center the text
             var cursorPosX = (availableWidth - textWidth) * 0.5f;
             if (cursorPosX > 0) ImGui.SetCursorPosX(ImGui.GetCursorPosX() + cursorPosX);
 
-            // Keep centered text drawing consistent with the warning style.
             Im.Text(warningText);
         }
     }

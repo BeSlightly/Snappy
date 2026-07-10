@@ -197,11 +197,9 @@ public class ActiveSnapshotManager : IActiveSnapshotManager
         if (localPlayer == null)
             return false;
 
-        // If snapshot is on GPose actor, check if the character is the player
         if (snapshot.ObjectIndex == ObjectIndex.GPosePlayer.Index && character.Address == localPlayer.Address)
             return true;
 
-        // If we are not in GPose, check if the character is the player
         if (!PluginUtil.IsInGpose() && character.Address == localPlayer.Address)
             return true;
 

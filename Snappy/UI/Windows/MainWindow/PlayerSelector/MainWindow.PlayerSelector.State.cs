@@ -272,7 +272,6 @@ public partial class MainWindow
 
         try
         {
-            // Cast to IPlayerCharacter to access HomeWorld (regular players only, not GPose actors)
             if (actor is IPlayerCharacter playerCharacter)
             {
                 var homeWorldId = playerCharacter.HomeWorld.RowId;

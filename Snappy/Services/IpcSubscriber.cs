@@ -53,13 +53,8 @@ public abstract class IpcSubscriber
         return IsPluginLoaded();
     }
 
-
-    /// <summary>
-    ///     Called when a plugin list change event is received
-    /// </summary>
     public virtual void HandlePluginListChanged(IEnumerable<string> affectedPluginNames)
     {
-        // Check if our target plugin was affected
         if (affectedPluginNames.Contains(_identifier))
         {
             var isAvailable = IsReady();
@@ -73,12 +68,7 @@ public abstract class IpcSubscriber
         }
     }
 
-    /// <summary>
-    ///     Called when the plugin's availability state changes
-    ///     Override this to reset cached data when plugins are reloaded
-    /// </summary>
     protected virtual void OnPluginStateChanged(bool isAvailable, bool wasAvailable)
     {
-        // Default implementation does nothing
     }
 }

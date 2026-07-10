@@ -242,7 +242,6 @@ public sealed class PenumbraIpc : IpcSubscriber
     {
         if (!isAvailable && wasAvailable)
         {
-            // Plugin was unloaded, clear temporary collections
             PluginLog.Information("[Penumbra] Plugin unloaded, clearing temporary collections");
             _tempCollectionGuids.Clear();
             _persistentCollectionIds.Clear();

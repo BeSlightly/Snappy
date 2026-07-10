@@ -43,7 +43,6 @@ internal sealed class PcpExportService
             temporaryOutput = AtomicFileUtil.CreateTemporaryOutputPath(pcpOutputPath);
             using (var archive = ZipFile.Open(temporaryOutput, ZipArchiveMode.Create))
             {
-                // Resolve actor name and homeworld to use across PCP.
                 var actorName = !string.IsNullOrWhiteSpace(playerNameOverride)
                     ? playerNameOverride!
                     : snapshotInfo.SourceActor;
@@ -51,7 +50,6 @@ internal sealed class PcpExportService
                     actorName = Path.GetFileName(snapshotPath);
                 var actorHomeWorld = ResolveActorHomeWorld(homeWorldIdOverride ?? snapshotInfo.SourceWorldId);
 
-                // Create metadata.
                 var snapshotName = Path.GetFileName(snapshotPath);
                 var meta = ModMetadataBuilder.BuildSnapshotMetadata(snapshotName);
                 ArchiveUtil.WriteJsonEntry(archive, "meta.json", meta);
