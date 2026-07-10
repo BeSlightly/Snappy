@@ -459,7 +459,14 @@ public class SnapshotFileService : ISnapshotFileService
         try
         {
             var parent = Path.GetDirectoryName(oldPath)!;
-            var newPath = Path.Combine(parent, newName);
+            var sanitizedName = PathSanitizer.SanitizeFileSystemName(newName, string.Empty);
+            if (!string.Equals(sanitizedName, newName, StringComparison.Ordinal))
+            {
+                Notify.Error("Snapshot names cannot contain path separators or invalid filename characters.");
+                return;
+            }
+
+            var newPath = Path.CombineSafely(parent, sanitizedName);
             if (Directory.Exists(newPath))
             {
                 Notify.Error("A directory with that name already exists.");
