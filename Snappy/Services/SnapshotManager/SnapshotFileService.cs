@@ -18,8 +18,8 @@ public class SnapshotFileService : ISnapshotFileService
     {
         _configuration = configuration;
         _ipcManager = ipcManager;
-        _collectionSnapshotDataBuilder = new PenumbraCollectionSnapshotDataBuilder(ipcManager);
-        _liveSnapshotDataBuilder = new LiveSnapshotDataBuilder(ipcManager);
+        _collectionSnapshotDataBuilder = new PenumbraCollectionSnapshotDataBuilder();
+        _liveSnapshotDataBuilder = new LiveSnapshotDataBuilder();
         _mareSnapshotDataBuilder = new MareSnapshotDataBuilder(ipcManager);
         _snapshotIndexService = snapshotIndexService;
     }
@@ -64,7 +64,7 @@ public class SnapshotFileService : ISnapshotFileService
         SnapshotData? mareData = null;
         if (useLiveData)
         {
-            liveState = new SnapshotLiveState(charaName, objectIndex, _ipcManager.GetGlamourerState(character),
+            liveState = new SnapshotLiveState(charaName, _ipcManager.GetGlamourerState(character),
                 _ipcManager.GetCustomizePlusScale(character), _ipcManager.GetMetaManipulations(objectIndex));
         }
         else
@@ -72,8 +72,29 @@ public class SnapshotFileService : ISnapshotFileService
             mareData = _mareSnapshotDataBuilder.BuildFromMare(character);
         }
 
+        var penumbraPaths = CapturePenumbraPaths(objectIndex, useLiveData);
+
         return new SnapshotCapture(charaName, objectIndex, resolvedWorldId, resolvedWorldName, snapshotPath,
-            useLiveData, !_configuration.UseLiveSnapshotData && !isLocalPlayer, liveState, mareData);
+            useLiveData, !_configuration.UseLiveSnapshotData && !isLocalPlayer, liveState, mareData, penumbraPaths);
+    }
+
+    private PenumbraPathState CapturePenumbraPaths(int objectIndex, bool useLiveData)
+    {
+        var resourcePaths = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+        var collectionFiles = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        if (useLiveData && _configuration.UsePenumbraIpcResourcePaths)
+        {
+            resourcePaths = _ipcManager.PenumbraGetGameObjectResourcePaths(objectIndex);
+        }
+        else
+        {
+            collectionFiles = _ipcManager.PenumbraGetCollectionResolvedFiles(objectIndex);
+            if (!useLiveData && collectionFiles.Count == 0)
+                resourcePaths = _ipcManager.PenumbraGetGameObjectResourcePaths(objectIndex);
+        }
+
+        return new PenumbraPathState(resourcePaths, collectionFiles);
     }
 
     private async Task<string?> UpdateSnapshotFromCaptureAsync(SnapshotCapture capture)
@@ -86,7 +107,7 @@ public class SnapshotFileService : ISnapshotFileService
 
         if (!capture.UseLiveData)
         {
-            BackfillSnapshotDataFromPenumbra(capture.ObjectIndex, snapshotData);
+            BackfillSnapshotDataFromPenumbra(snapshotData, capture.PenumbraPaths);
         }
 
         snapshotData = NormalizeSnapshotData(snapshotData);
@@ -223,10 +244,10 @@ public class SnapshotFileService : ISnapshotFileService
             if (capture.LiveState == null)
                 return null;
 
-            // Actor state is captured on the framework thread; file enumeration and hashing remain on the worker.
+            // Penumbra maps and actor state are frozen together; file enumeration and hashing remain on the worker.
             return _configuration.UsePenumbraIpcResourcePaths
-                ? _liveSnapshotDataBuilder.Build(capture.LiveState)
-                : _collectionSnapshotDataBuilder.Build(capture.LiveState);
+                ? _liveSnapshotDataBuilder.Build(capture.LiveState, capture.PenumbraPaths.ResourcePaths)
+                : _collectionSnapshotDataBuilder.Build(capture.LiveState, capture.PenumbraPaths.CollectionFiles);
         }
 
         return capture.MareData;
@@ -372,19 +393,18 @@ public class SnapshotFileService : ISnapshotFileService
         return mapChanged;
     }
 
-    private void BackfillSnapshotDataFromPenumbra(int objectIndex, SnapshotData snapshotData)
+    private static void BackfillSnapshotDataFromPenumbra(SnapshotData snapshotData, PenumbraPathState penumbraPaths)
     {
         if (snapshotData.FileReplacements.Count == 0)
             return;
 
-        var resolvedByGamePath = _ipcManager.PenumbraGetCollectionResolvedFiles(objectIndex);
+        var resolvedByGamePath = penumbraPaths.CollectionFiles;
         if (resolvedByGamePath.Count == 0)
         {
-            var resourcePaths = _ipcManager.PenumbraGetGameObjectResourcePaths(objectIndex);
-            if (resourcePaths.Count > 0)
+            if (penumbraPaths.ResourcePaths.Count > 0)
             {
                 resolvedByGamePath = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-                foreach (var (resolvedPath, gamePaths) in resourcePaths)
+                foreach (var (resolvedPath, gamePaths) in penumbraPaths.ResourcePaths)
                 {
                     foreach (var gamePath in gamePaths)
                     {
@@ -508,6 +528,7 @@ public class SnapshotFileService : ISnapshotFileService
         bool UseLiveData,
         bool UseMareFileCache,
         SnapshotLiveState? LiveState,
-        SnapshotData? MareData);
+        SnapshotData? MareData,
+        PenumbraPathState PenumbraPaths);
 
 }

@@ -2,18 +2,10 @@ namespace Snappy.Services.SnapshotManager;
 
 public sealed class PenumbraCollectionSnapshotDataBuilder
 {
-    private readonly IIpcManager _ipcManager;
-
-    public PenumbraCollectionSnapshotDataBuilder(IIpcManager ipcManager)
-    {
-        _ipcManager = ipcManager;
-    }
-
-    public SnapshotData Build(SnapshotLiveState state)
+    public SnapshotData Build(SnapshotLiveState state, IReadOnlyDictionary<string, string> collectionFiles)
     {
         PluginLog.Debug($"Building snapshot from Penumbra collection cache for: {state.CharacterName}");
 
-        var collectionFiles = _ipcManager.PenumbraGetCollectionResolvedFiles(state.ObjectIndex);
         var newFileReplacements = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         var newFileSwaps = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         var resolvedPaths = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);

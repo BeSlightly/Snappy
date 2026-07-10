@@ -53,7 +53,20 @@ public sealed class PenumbraIpc : IpcSubscriber
         try
         {
             var result = _getResourcePaths.Invoke((ushort)objIdx);
-            return result.FirstOrDefault() ?? new Dictionary<string, HashSet<string>>();
+            var capturedPaths = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+            foreach (var (resolvedPath, gamePaths) in result.FirstOrDefault()
+                                                       ?? new Dictionary<string, HashSet<string>>())
+            {
+                if (!capturedPaths.TryGetValue(resolvedPath, out var capturedGamePaths))
+                {
+                    capturedGamePaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    capturedPaths[resolvedPath] = capturedGamePaths;
+                }
+
+                capturedGamePaths.UnionWith(gamePaths);
+            }
+
+            return capturedPaths;
         }
         catch (Exception e)
         {

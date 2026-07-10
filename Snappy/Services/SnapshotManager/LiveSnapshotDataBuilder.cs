@@ -2,14 +2,7 @@ namespace Snappy.Services.SnapshotManager;
 
 public sealed class LiveSnapshotDataBuilder
 {
-    private readonly IIpcManager _ipcManager;
-
-    public LiveSnapshotDataBuilder(IIpcManager ipcManager)
-    {
-        _ipcManager = ipcManager;
-    }
-
-    public SnapshotData Build(SnapshotLiveState state)
+    public SnapshotData Build(SnapshotLiveState state, IReadOnlyDictionary<string, HashSet<string>> resourcePaths)
     {
         PluginLog.Debug($"Building snapshot from live data for: {state.CharacterName}");
         var newFileReplacements = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -17,9 +10,7 @@ public sealed class LiveSnapshotDataBuilder
         var resolvedPaths = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         var hashCache = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
-        var penumbraReplacements = _ipcManager.PenumbraGetGameObjectResourcePaths(state.ObjectIndex);
-
-        foreach (var (resolvedPath, gamePaths) in penumbraReplacements)
+        foreach (var (resolvedPath, gamePaths) in resourcePaths)
         {
             if (!File.Exists(resolvedPath))
             {

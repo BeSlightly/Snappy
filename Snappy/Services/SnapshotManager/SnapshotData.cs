@@ -2,10 +2,13 @@ namespace Snappy.Services.SnapshotManager;
 
 public record SnapshotLiveState(
     string CharacterName,
-    int ObjectIndex,
     string Glamourer,
     string Customize,
     string Manipulation);
+
+public record PenumbraPathState(
+    Dictionary<string, HashSet<string>> ResourcePaths,
+    Dictionary<string, string> CollectionFiles);
 
 public record SnapshotData(
     string Glamourer,
