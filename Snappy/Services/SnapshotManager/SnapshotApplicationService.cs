@@ -146,9 +146,25 @@ public class SnapshotApplicationService : ISnapshotApplicationService
             ? cplusProfileId
             : existingSnapshot?.CustomizePlusProfileId;
 
+        var appliedGlamourer = plan.AppliedGlamourerTimestamp != null;
+        var appliedCustomizeTracked = plan.CustomizePlusAvailable && plan.AppliedCustomizeTimestamp != null;
         _activeSnapshotManager.AddSnapshot(new ActiveSnapshot(characterApplyTo.ObjectIndex, finalCplusProfileId,
             isOnLocalPlayer, characterApplyTo.Name.TextValue, isGlamourerLocked, hasPenumbraCollection,
-            hasGlamourerState));
+            hasGlamourerState)
+        {
+            GlamourerSnapshotPath = appliedGlamourer
+                ? plan.SnapshotPath
+                : existingSnapshot?.GlamourerSnapshotPath,
+            GlamourerHistoryTimestamp = appliedGlamourer
+                ? plan.AppliedGlamourerTimestamp
+                : existingSnapshot?.GlamourerHistoryTimestamp,
+            CustomizeSnapshotPath = plan.CustomizePlusAvailable
+                ? appliedCustomizeTracked ? plan.SnapshotPath : null
+                : existingSnapshot?.CustomizeSnapshotPath,
+            CustomizeHistoryTimestamp = plan.CustomizePlusAvailable
+                ? plan.AppliedCustomizeTimestamp
+                : existingSnapshot?.CustomizeHistoryTimestamp
+        });
         PluginLog.Debug(
             $"Snapshot loaded for index {characterApplyTo.ObjectIndex}. 'IsOnLocalPlayer' flag set to: {isOnLocalPlayer}.");
         return true;
@@ -186,21 +202,33 @@ public class SnapshotApplicationService : ISnapshotApplicationService
 
         var glamourerToApply = applyGlamourer ? glamourerOverride ?? glamourerHistory.Entries.LastOrDefault() : null;
         string? customizeDataToApply = null;
+        CustomizeHistoryEntry? customizeEntryApplied = null;
         if (applyCustomize)
         {
             if (customizeOverride != null)
+            {
+                customizeEntryApplied = customizeOverride;
                 customizeDataToApply = customizeOverride.CustomizeData;
+            }
             else if (applyGlamourer && glamourerToApply != null)
             {
                 if (glamourerToApply.CustomizeData != null)
+                {
                     customizeDataToApply = glamourerToApply.CustomizeData;
+                    customizeEntryApplied =
+                        FindCustomizeEntryByData(customizeHistory.Entries, glamourerToApply.CustomizeData);
+                }
                 else
-                    customizeDataToApply = FindClosestCustomizeEntry(customizeHistory.Entries, glamourerToApply)
-                        ?.CustomizeData;
+                {
+                    customizeEntryApplied =
+                        FindClosestCustomizeEntry(customizeHistory.Entries, glamourerToApply);
+                    customizeDataToApply = customizeEntryApplied?.CustomizeData;
+                }
             }
             else
             {
-                customizeDataToApply = customizeHistory.Entries.LastOrDefault()?.CustomizeData;
+                customizeEntryApplied = customizeHistory.Entries.LastOrDefault();
+                customizeDataToApply = customizeEntryApplied?.CustomizeData;
             }
         }
 
@@ -258,8 +286,14 @@ public class SnapshotApplicationService : ISnapshotApplicationService
                 if (!string.IsNullOrWhiteSpace(gamePath) && !string.IsNullOrWhiteSpace(swapPath))
                     moddedPaths[gamePath] = swapPath;
 
+        string? appliedGlamourerTimestamp = applyGlamourer && glamourerToApply != null
+            ? glamourerToApply.Timestamp
+            : null;
+        string? appliedCustomizeTimestamp = applyCustomize ? customizeEntryApplied?.Timestamp : null;
+
         plan = new SnapshotLoadPlan(glamourerToApply, customizeDataToApply, moddedPaths, resolvedManipulations,
-            applyFiles, applyGlamourer, customizePlusAvailable, missingFileCount);
+            applyFiles, applyGlamourer, customizePlusAvailable, missingFileCount, Path.GetFullPath(path),
+            appliedGlamourerTimestamp, appliedCustomizeTimestamp);
         return true;
     }
 
@@ -271,7 +305,10 @@ public class SnapshotApplicationService : ISnapshotApplicationService
         bool ApplyFiles,
         bool ApplyGlamourer,
         bool CustomizePlusAvailable,
-        int MissingFileCount);
+        int MissingFileCount,
+        string SnapshotPath,
+        string? AppliedGlamourerTimestamp,
+        string? AppliedCustomizeTimestamp);
 
     private static CustomizeHistoryEntry? FindClosestCustomizeEntry(IReadOnlyList<CustomizeHistoryEntry> entries,
         GlamourerHistoryEntry glamourerEntry)
@@ -298,6 +335,18 @@ public class SnapshotApplicationService : ISnapshotApplicationService
         }
 
         return closest ?? entries.LastOrDefault();
+    }
+
+    private static CustomizeHistoryEntry? FindCustomizeEntryByData(IReadOnlyList<CustomizeHistoryEntry> entries,
+        string customizeData)
+    {
+        for (var i = entries.Count - 1; i >= 0; i--)
+        {
+            if (string.Equals(entries[i].CustomizeData, customizeData, StringComparison.Ordinal))
+                return entries[i];
+        }
+
+        return null;
     }
 
 }

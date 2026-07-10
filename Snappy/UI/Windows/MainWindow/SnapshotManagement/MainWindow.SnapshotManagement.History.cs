@@ -1,3 +1,4 @@
+using Dalamud.Interface.Colors;
 using Snappy.Services.SnapshotManager;
 
 namespace Snappy.UI.Windows;
@@ -49,6 +50,10 @@ public partial class MainWindow
 
         var rowHeight = ImGui.GetFrameHeight() + 20f * ImGuiHelpers.GlobalScale;
         var totalEntries = entries.Count;
+        var activeSnapshot = TryGetSelectedActor(out var selectedActor)
+            ? _activeSnapshotManager.GetSnapshotForCharacter(selectedActor)
+            : null;
+        var selectedSnapshotPath = _selectedSnapshot == null ? null : Path.GetFullPath(_selectedSnapshot.FullName);
         var clipper = new ImGuiListClipper();
         clipper.Begin(totalEntries, rowHeight);
         while (clipper.Step())
@@ -82,14 +87,15 @@ public partial class MainWindow
 
                 var buttonHeight = ImGui.GetFrameHeight();
                 ImGui.SetCursorPosY(ImGui.GetCursorPosY() + (rowHeight - buttonHeight) / 2f);
-                DrawHistoryEntryControls(type, entry);
+                DrawHistoryEntryControls(type, entry, activeSnapshot, selectedSnapshotPath);
             }
         }
 
         clipper.End();
     }
 
-    private void DrawHistoryEntryControls<T>(string type, T entry)
+    private void DrawHistoryEntryControls<T>(string type, T entry, ActiveSnapshot? activeSnapshot,
+        string? selectedSnapshotPath)
         where T : HistoryEntryBase
     {
         if (_historyEntryToRename == entry)
@@ -107,14 +113,24 @@ public partial class MainWindow
         var startX = ImGui.GetCursorPosX() + Math.Max(0, available - totalWidth);
         ImGui.SetCursorPosX(startX);
 
-        if (
-            UiHelpers.IconButton(
-                FontAwesomeIcon.Download,
-                "Load this entry",
-                default,
-                !_isActorModifiable
-            )
-        )
+        var isApplied = IsHistoryEntryApplied(entry, activeSnapshot, selectedSnapshotPath);
+        var loadTooltip = isApplied
+            ? "Currently applied to the selected actor. Click to reapply this entry."
+            : "Load this entry";
+        var loadClicked = false;
+        if (isApplied)
+        {
+            using var appliedColor = ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.HealerGreen);
+            loadClicked = UiHelpers.IconButton(FontAwesomeIcon.CheckCircle, loadTooltip, default,
+                !_isActorModifiable);
+        }
+        else
+        {
+            loadClicked = UiHelpers.IconButton(FontAwesomeIcon.Download, loadTooltip, default,
+                !_isActorModifiable);
+        }
+
+        if (loadClicked)
         {
             var selectedSnapshot = _selectedSnapshot;
             if (TryGetSelectedActor(out var selectedActor) && _objIdxSelected != null && selectedSnapshot != null)
@@ -200,6 +216,26 @@ public partial class MainWindow
         ImGui.SameLine();
 
         if (UiHelpers.IconButton(FontAwesomeIcon.Trash, "Delete Entry", default)) _historyEntryToDelete = entry;
+    }
+
+    private static bool IsHistoryEntryApplied(HistoryEntryBase entry, ActiveSnapshot? activeSnapshot,
+        string? selectedSnapshotPath)
+    {
+        if (activeSnapshot == null || selectedSnapshotPath == null)
+            return false;
+
+        return entry switch
+        {
+            GlamourerHistoryEntry => string.Equals(activeSnapshot.GlamourerSnapshotPath, selectedSnapshotPath,
+                                         StringComparison.OrdinalIgnoreCase)
+                                     && string.Equals(activeSnapshot.GlamourerHistoryTimestamp, entry.Timestamp,
+                                         StringComparison.Ordinal),
+            CustomizeHistoryEntry => string.Equals(activeSnapshot.CustomizeSnapshotPath, selectedSnapshotPath,
+                                         StringComparison.OrdinalIgnoreCase)
+                                     && string.Equals(activeSnapshot.CustomizeHistoryTimestamp, entry.Timestamp,
+                                         StringComparison.Ordinal),
+            _ => false
+        };
     }
 
 }

@@ -142,15 +142,7 @@ public class ActiveSnapshotManager : IActiveSnapshotManager
         {
             _activeSnapshots.Remove(localPlayerSnapshot);
 
-            var gposeSnapshot = new ActiveSnapshot(
-                ObjectIndex.GPosePlayer.Index,
-                localPlayerSnapshot.CustomizePlusProfileId,
-                localPlayerSnapshot.IsOnLocalPlayer,
-                localPlayerSnapshot.CharacterName,
-                localPlayerSnapshot.IsGlamourerLocked,
-                localPlayerSnapshot.HasPenumbraCollection,
-                localPlayerSnapshot.HasGlamourerState
-            );
+            var gposeSnapshot = localPlayerSnapshot with { ObjectIndex = ObjectIndex.GPosePlayer.Index };
             _activeSnapshots.Add(gposeSnapshot);
 
             PluginLog.Debug(
@@ -167,15 +159,7 @@ public class ActiveSnapshotManager : IActiveSnapshotManager
         {
             _activeSnapshots.Remove(gposeSnapshot);
 
-            var regularSnapshot = new ActiveSnapshot(
-                localPlayer.ObjectIndex,
-                gposeSnapshot.CustomizePlusProfileId,
-                gposeSnapshot.IsOnLocalPlayer,
-                gposeSnapshot.CharacterName,
-                gposeSnapshot.IsGlamourerLocked,
-                gposeSnapshot.HasPenumbraCollection,
-                gposeSnapshot.HasGlamourerState
-            );
+            var regularSnapshot = gposeSnapshot with { ObjectIndex = localPlayer.ObjectIndex };
             _activeSnapshots.Add(regularSnapshot);
 
             PluginLog.Debug(
@@ -338,4 +322,10 @@ public record ActiveSnapshot(
     bool IsGlamourerLocked,
     bool HasPenumbraCollection,
     bool HasGlamourerState
-);
+)
+{
+    public string? GlamourerSnapshotPath { get; init; }
+    public string? GlamourerHistoryTimestamp { get; init; }
+    public string? CustomizeSnapshotPath { get; init; }
+    public string? CustomizeHistoryTimestamp { get; init; }
+}
