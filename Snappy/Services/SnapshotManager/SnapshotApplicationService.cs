@@ -59,16 +59,9 @@ public class SnapshotApplicationService : ISnapshotApplicationService
         }
 
         var snapshotName = Path.GetFileName(path);
-        if (plan.MissingFileCount > 0)
-        {
-            var fileLabel = plan.MissingFileCount == 1 ? "file was" : "files were";
-            Notify.Warning(
-                $"Loaded snapshot '{snapshotName}' onto {characterApplyTo.Name.TextValue}, but {plan.MissingFileCount} referenced {fileLabel} unavailable and skipped.");
-        }
-        else
-        {
-            Notify.Success($"Loaded snapshot '{snapshotName}' onto {characterApplyTo.Name.TextValue}.");
-        }
+        // Missing blobs are already omitted from the load plan and logged at Debug/Warning.
+        // Do not toast about them — load success is enough (e.g. intentionally incomplete Mare captures).
+        Notify.Success($"Loaded snapshot '{snapshotName}' onto {characterApplyTo.Name.TextValue}.");
 
         return true;
     }

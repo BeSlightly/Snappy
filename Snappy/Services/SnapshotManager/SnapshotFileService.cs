@@ -139,24 +139,38 @@ public class SnapshotFileService : ISnapshotFileService
 
         var includeRemovals = !capture.UseLiveData || !_configuration.UsePenumbraIpcResourcePaths;
 
-        foreach (var (gamePath, hash) in snapshotData.FileReplacements)
+        // Mare users often pause sounds/animations/emotes; those hashes stay in character data
+        // but are absent from the local cache. Skip them instead of aborting the whole capture.
+        var skippedMissingFiles = new List<string>();
+        foreach (var (gamePath, hash) in snapshotData.FileReplacements.ToList())
         {
             var existingFilePath = paths.FindAnyExistingHashedFilePath(hash);
             var hashedFilePath = existingFilePath ?? paths.GetPreferredHashedFilePath(hash, gamePath);
-            if (!File.Exists(hashedFilePath))
-            {
-                string? sourceFile = null;
-                if (capture.UseMareFileCache)
-                    sourceFile = _ipcManager.GetMareFileCachePath(hash);
-                if (string.IsNullOrEmpty(sourceFile))
-                    snapshotData.ResolvedPaths.TryGetValue(hash, out sourceFile);
+            if (File.Exists(hashedFilePath))
+                continue;
 
-                if (!string.IsNullOrEmpty(sourceFile) && File.Exists(sourceFile))
-                    File.Copy(sourceFile, hashedFilePath, true);
-                else
-                    throw new FileNotFoundException(
-                        $"Could not find source file for '{gamePath}' (hash: {hash}).");
+            string? sourceFile = null;
+            if (capture.UseMareFileCache)
+                sourceFile = _ipcManager.GetMareFileCachePath(hash);
+            if (string.IsNullOrEmpty(sourceFile))
+                snapshotData.ResolvedPaths.TryGetValue(hash, out sourceFile);
+
+            if (!string.IsNullOrEmpty(sourceFile) && File.Exists(sourceFile))
+            {
+                File.Copy(sourceFile, hashedFilePath, true);
+                continue;
             }
+
+            snapshotData.FileReplacements.Remove(gamePath);
+            skippedMissingFiles.Add(gamePath);
+            PluginLog.Warning(
+                $"Skipping missing source file for '{gamePath}' (hash: {hash}); not present in Mare cache or Penumbra backfill.");
+        }
+
+        if (skippedMissingFiles.Count > 0)
+        {
+            PluginLog.Warning(
+                $"[Snappy] Skipped {skippedMissingFiles.Count} missing file(s) while capturing '{capture.CharacterName}'.");
         }
 
         var mapChanged = UpdateFileMaps(snapshotInfo, snapshotData, resolvedCurrentMap, resolvedCurrentFileSwaps,
@@ -233,6 +247,16 @@ public class SnapshotFileService : ISnapshotFileService
             Notify.Success($"New snapshot for '{capture.CharacterName}' created successfully.");
         else
             Notify.Success($"Snapshot for '{capture.CharacterName}' updated successfully.");
+
+        if (skippedMissingFiles.Count > 0)
+        {
+            var example = skippedMissingFiles[0];
+            var more = skippedMissingFiles.Count > 1
+                ? $" (+{skippedMissingFiles.Count - 1} more)"
+                : string.Empty;
+            Notify.Warning(
+                $"Skipped {skippedMissingFiles.Count} missing file(s) (paused Mare downloads / not cached), e.g. '{example}'{more}. Snapshot still saved.");
+        }
 
         return capture.SnapshotPath;
     }
