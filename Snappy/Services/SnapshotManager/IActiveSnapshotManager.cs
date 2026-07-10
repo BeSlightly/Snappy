@@ -6,7 +6,7 @@ public interface IActiveSnapshotManager
     void AddSnapshot(ActiveSnapshot snapshot);
     ActiveSnapshot? GetSnapshotForCharacter(ICharacter character);
     void RemoveAllSnapshotsForCharacter(ICharacter character);
-    void RevertAllSnapshots();
+    void RevertAllSnapshots(bool notify = true);
     void RevertAllSnapshotsOnGposeExit();
     void RevertSnapshotForCharacter(ICharacter character);
     bool IsActorLockedBySnappy(ICharacter character);

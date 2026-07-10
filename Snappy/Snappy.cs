@@ -116,6 +116,21 @@ public sealed partial class Snappy : IDalamudPlugin
 
     public void Dispose()
     {
+        // Revert while Penumbra/Glamourer/C+ IPC is still available. Otherwise
+        // temp collections and locks would stick around after disable/update.
+        try
+        {
+            if (ActiveSnapshotManager.HasActiveSnapshots)
+            {
+                PluginLog.Information("Plugin unloading: reverting active snapshots.");
+                ActiveSnapshotManager.RevertAllSnapshots(notify: false);
+            }
+        }
+        catch (Exception ex)
+        {
+            PluginLog.Error($"Failed to revert active snapshots during unload: {ex}");
+        }
+
         WindowSystem.RemoveAllWindows();
         Svc.Commands.RemoveHandler(CommandName);
         MainWindow.Dispose();

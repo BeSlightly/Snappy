@@ -32,10 +32,15 @@ public class ActiveSnapshotManager : IActiveSnapshotManager
         _activeSnapshots.RemoveAll(s => IsSnapshotForCharacter(s, character));
     }
 
-    public void RevertAllSnapshots()
+    public void RevertAllSnapshots(bool notify = true)
     {
-        PluginLog.Debug("Manual 'Revert All' triggered. Reverting all snapshots regardless of config.");
+        PluginLog.Debug(notify
+            ? "Manual 'Revert All' triggered. Reverting all snapshots regardless of config."
+            : "Silent revert-all (plugin unload/cleanup). Reverting all snapshots.");
         var revertedCount = RevertInternal(false);
+        if (!notify)
+            return;
+
         if (revertedCount > 0)
             Notify.Success($"Reverted {revertedCount} active snapshot(s).");
         else
