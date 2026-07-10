@@ -22,11 +22,9 @@ public static class SnapshotImportUtil
     public static SnapshotInfo BuildSnapshotInfo(string sourceActor, int? sourceWorldId, string manipulationString,
         Dictionary<string, string> fileReplacements, Dictionary<string, string>? fileSwaps = null)
     {
-        var normalizedReplacements = new Dictionary<string, string>(fileReplacements,
-            StringComparer.OrdinalIgnoreCase);
-        var normalizedSwaps = new Dictionary<string, string>(fileSwaps
-                                                              ?? new Dictionary<string, string>(),
-            StringComparer.OrdinalIgnoreCase);
+        var normalizedReplacements = GamePathUtil.NormalizeFileMap(fileReplacements);
+        var normalizedSwaps = GamePathUtil.NormalizeFileSwaps(fileSwaps
+                                                              ?? new Dictionary<string, string>());
         foreach (var gamePath in normalizedSwaps.Keys)
             normalizedReplacements.Remove(gamePath);
 

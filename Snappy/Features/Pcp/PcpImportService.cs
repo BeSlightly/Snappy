@@ -122,7 +122,7 @@ internal sealed class PcpImportService
         var sourceActor = string.IsNullOrWhiteSpace(actor.PlayerName) ? "PCP Import" : actor.PlayerName;
         var sourceWorld = actor.HomeWorld is > 0 and < PcpActor.AnyWorld ? actor.HomeWorld : (int?)null;
         return SnapshotImportUtil.BuildSnapshotInfo(sourceActor, sourceWorld, manipulationString, gamePathToHashMap,
-            NormalizeFileSwaps(modData.FileSwaps));
+            GamePathUtil.NormalizeFileSwaps(modData.FileSwaps ?? new Dictionary<string, string>()));
     }
 
     private static string ConvertPcpManipulationsToPenumbraFormat(List<JObject> pcpManipulations)
@@ -265,23 +265,6 @@ internal sealed class PcpImportService
         {
             AtomicFileUtil.TryDelete(temporaryPath);
         }
-    }
-
-    private static Dictionary<string, string> NormalizeFileSwaps(Dictionary<string, string>? fileSwaps)
-    {
-        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        if (fileSwaps == null)
-            return result;
-
-        foreach (var (rawGamePath, swapPath) in fileSwaps)
-        {
-            var gamePath = GamePathUtil.Normalize(rawGamePath);
-            var normalizedSwapPath = GamePathUtil.Normalize(swapPath);
-            if (!string.IsNullOrWhiteSpace(gamePath) && !string.IsNullOrWhiteSpace(normalizedSwapPath))
-                result[gamePath] = normalizedSwapPath;
-        }
-
-        return result;
     }
 
     private static void RemoveIncompleteSnapshot(string snapshotPath)

@@ -88,6 +88,8 @@ public class SnapshotFileService : ISnapshotFileService
             BackfillSnapshotDataFromPenumbra(capture.ObjectIndex, snapshotData);
         }
 
+        snapshotData = NormalizeSnapshotData(snapshotData);
+
         var paths = SnapshotPaths.From(capture.SnapshotPath);
         Directory.CreateDirectory(paths.RootPath);
         Directory.CreateDirectory(paths.FilesDirectory);
@@ -227,6 +229,20 @@ public class SnapshotFileService : ISnapshotFileService
         }
 
         return capture.MareData;
+    }
+
+    private static SnapshotData NormalizeSnapshotData(SnapshotData snapshotData)
+    {
+        var fileReplacements = GamePathUtil.NormalizeFileMap(snapshotData.FileReplacements);
+        var fileSwaps = GamePathUtil.NormalizeFileSwaps(snapshotData.FileSwaps);
+        foreach (var gamePath in fileSwaps.Keys)
+            fileReplacements.Remove(gamePath);
+
+        return snapshotData with
+        {
+            FileReplacements = fileReplacements,
+            FileSwaps = fileSwaps
+        };
     }
 
     private static (int? WorldId, string? WorldName) ResolveHomeWorld(ICharacter character, string charaName)

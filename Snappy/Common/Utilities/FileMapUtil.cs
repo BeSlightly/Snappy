@@ -9,7 +9,7 @@ public static class FileMapUtil
         if (TryResolveFileMap(snapshotInfo, fileMapId, out var resolved))
             return resolved;
 
-        return new Dictionary<string, string>(snapshotInfo.FileReplacements, StringComparer.OrdinalIgnoreCase);
+        return GamePathUtil.NormalizeFileMap(snapshotInfo.FileReplacements);
     }
 
     public static Dictionary<string, string> ResolveFileSwaps(SnapshotInfo snapshotInfo, string? fileMapId)
@@ -17,9 +17,8 @@ public static class FileMapUtil
         if (TryResolveFileSwaps(snapshotInfo, fileMapId, out var resolved))
             return resolved;
 
-        return new Dictionary<string, string>(snapshotInfo.FileSwaps
-                                              ?? new Dictionary<string, string>(),
-            StringComparer.OrdinalIgnoreCase);
+        return GamePathUtil.NormalizeFileSwaps(snapshotInfo.FileSwaps
+                                               ?? new Dictionary<string, string>());
     }
 
     public static bool TryResolveFileSwaps(SnapshotInfo snapshotInfo, string? fileMapId,
@@ -112,14 +111,23 @@ public static class FileMapUtil
 
     private static Dictionary<string, string> ApplyChanges(
         IReadOnlyDictionary<string, string> baseMap,
-        IReadOnlyDictionary<string, string> changes)
+        IReadOnlyDictionary<string, string> changes,
+        bool normalizeValues = false)
     {
         var result = new Dictionary<string, string>(baseMap, StringComparer.OrdinalIgnoreCase);
-        foreach (var (gamePath, hash) in changes)
-            if (string.IsNullOrEmpty(hash))
+        foreach (var (rawGamePath, rawValue) in changes)
+        {
+            var gamePath = GamePathUtil.Normalize(rawGamePath);
+            if (string.IsNullOrEmpty(gamePath))
+                continue;
+
+            var value = normalizeValues ? GamePathUtil.Normalize(rawValue) : rawValue?.Trim();
+            if (string.IsNullOrEmpty(value))
                 result.Remove(gamePath);
             else
-                result[gamePath] = hash;
+                result[gamePath] = value;
+        }
+
         return result;
     }
 
@@ -150,7 +158,7 @@ public static class FileMapUtil
         if (!string.IsNullOrEmpty(entry.BaseId) && mapIndex.TryGetValue(entry.BaseId, out var baseEntry))
             baseMap = ResolveSwapEntry(baseEntry, mapIndex, depth + 1);
 
-        return ApplyChanges(baseMap, entry.FileSwapChanges ?? new Dictionary<string, string>());
+        return ApplyChanges(baseMap, entry.FileSwapChanges ?? new Dictionary<string, string>(), true);
     }
 
     private static bool HasFileSwapHistory(
