@@ -39,6 +39,15 @@ public sealed class PenumbraIpc : IpcSubscriber
 
     public Dictionary<string, HashSet<string>> GetGameObjectResourcePaths(int objIdx)
     {
+        if (Svc.Framework.IsInFrameworkUpdateThread)
+            return GetGameObjectResourcePathsOnFrameworkThread(objIdx);
+
+        return Svc.Framework.RunOnFrameworkThread(() => GetGameObjectResourcePathsOnFrameworkThread(objIdx))
+            .GetAwaiter().GetResult();
+    }
+
+    private Dictionary<string, HashSet<string>> GetGameObjectResourcePathsOnFrameworkThread(int objIdx)
+    {
         if (!IsReady()) return new Dictionary<string, HashSet<string>>();
 
         try
@@ -55,18 +64,21 @@ public sealed class PenumbraIpc : IpcSubscriber
 
     public Dictionary<string, string> GetCollectionResolvedFiles(int objIdx)
     {
+        if (Svc.Framework.IsInFrameworkUpdateThread)
+            return GetCollectionResolvedFilesOnFrameworkThread(objIdx);
+
+        return Svc.Framework.RunOnFrameworkThread(() => GetCollectionResolvedFilesOnFrameworkThread(objIdx))
+            .GetAwaiter().GetResult();
+    }
+
+    private Dictionary<string, string> GetCollectionResolvedFilesOnFrameworkThread(int objIdx)
+    {
         if (!IsReady()) return new Dictionary<string, string>();
 
         try
         {
-            object? resolvedFiles = null;
-            var fetched = Svc.Framework.RunOnFrameworkThread(() =>
-            {
-                resolvedFiles = TryGetResolvedFilesForObject(objIdx);
-                return resolvedFiles != null;
-            }).Result;
-
-            if (!fetched || resolvedFiles == null)
+            var resolvedFiles = TryGetResolvedFilesForObject(objIdx);
+            if (resolvedFiles == null)
                 return new Dictionary<string, string>();
 
             return ConvertResolvedFiles(resolvedFiles);
