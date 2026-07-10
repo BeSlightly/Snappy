@@ -18,9 +18,6 @@ public sealed class CustomizePlusIpc : IpcSubscriber
     private readonly ICallGateSubscriber<ushort, string, (int, Guid?)> _setTempProfile;
 
     private bool _reflectionSearched;
-    private FieldInfo? _servicesField;
-    private PropertyInfo? _serviceProviderProperty;
-    private object? _serviceProvider;
     private object? _profileManager;
     private object? _gameObjectService;
     private FieldInfo? _gameObjectServiceActorManagerField;
@@ -252,18 +249,17 @@ public sealed class CustomizePlusIpc : IpcSubscriber
             var pluginType = plugin.GetType();
             var pluginAssembly = pluginType.Assembly;
 
-            _servicesField = pluginType.GetField("_services", BindingFlags.Instance | BindingFlags.NonPublic);
-            var serviceManager = _servicesField?.GetValue(plugin);
+            var servicesField = pluginType.GetField("_services", BindingFlags.Instance | BindingFlags.NonPublic);
+            var serviceManager = servicesField?.GetValue(plugin);
             if (serviceManager == null)
             {
                 _reflectionSearched = true;
                 return;
             }
 
-            _serviceProviderProperty = serviceManager.GetType().GetProperty("Provider",
+            var serviceProviderProperty = serviceManager.GetType().GetProperty("Provider",
                 BindingFlags.Instance | BindingFlags.Public);
-            _serviceProvider = _serviceProviderProperty?.GetValue(serviceManager);
-            if (_serviceProvider is not IServiceProvider serviceProvider)
+            if (serviceProviderProperty?.GetValue(serviceManager) is not IServiceProvider serviceProvider)
             {
                 _reflectionSearched = true;
                 return;
@@ -303,9 +299,6 @@ public sealed class CustomizePlusIpc : IpcSubscriber
 
     private void ResetReflectionState()
     {
-        _servicesField = null;
-        _serviceProviderProperty = null;
-        _serviceProvider = null;
         _profileManager = null;
         _gameObjectService = null;
         _gameObjectServiceActorManagerField = null;
