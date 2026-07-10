@@ -122,8 +122,9 @@ public partial class MainWindow
             {
                 var charToSnap = selectedActor;
                 var isLocalPlayer = Player.Object != null && charToSnap.Address == Player.Object.Address;
+                var actorDisplayName = GetActorDisplayName(charToSnap);
                 _isSnapshotCaptureInProgress = true;
-                Notify.Info($"Snapshotting {GetActorDisplayName(charToSnap)} in the background...");
+                Notify.Info($"Snapshotting {actorDisplayName} in the background...");
                 _snappy.ExecuteBackgroundTask(async () =>
                 {
                     try
@@ -136,10 +137,14 @@ public partial class MainWindow
                                 _snappy.InvokeSnapshotsUpdated();
                         });
                     }
-                    catch
+                    catch (Exception ex)
                     {
-                        _snappy.QueueAction(() => _isSnapshotCaptureInProgress = false);
-                        throw;
+                        PluginLog.Error($"Failed to capture snapshot for {actorDisplayName}: {ex}");
+                        _snappy.QueueAction(() =>
+                        {
+                            _isSnapshotCaptureInProgress = false;
+                            Notify.Error($"Failed to snapshot {actorDisplayName}.\n{ex.Message}");
+                        });
                     }
                 });
             }
