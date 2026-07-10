@@ -9,6 +9,7 @@ public static class FileMapUtil
         if (TryResolveFileMap(snapshotInfo, fileMapId, out var resolved))
             return resolved;
 
+        ValidateFileMap(snapshotInfo.FileReplacements);
         return GamePathUtil.NormalizeFileMap(snapshotInfo.FileReplacements);
     }
 
@@ -17,8 +18,9 @@ public static class FileMapUtil
         if (TryResolveFileSwaps(snapshotInfo, fileMapId, out var resolved))
             return resolved;
 
-        return GamePathUtil.NormalizeFileSwaps(snapshotInfo.FileSwaps
-                                               ?? new Dictionary<string, string>());
+        var fileSwaps = snapshotInfo.FileSwaps ?? new Dictionary<string, string>();
+        ValidateFileSwaps(fileSwaps);
+        return GamePathUtil.NormalizeFileSwaps(fileSwaps);
     }
 
     public static bool TryResolveFileSwaps(SnapshotInfo snapshotInfo, string? fileMapId,
@@ -120,9 +122,15 @@ public static class FileMapUtil
         {
             var gamePath = GamePathUtil.Normalize(rawGamePath);
             if (string.IsNullOrEmpty(gamePath))
-                continue;
+                throw new InvalidDataException($"File-map history contains an invalid game path: '{rawGamePath}'.");
 
             var value = normalizeValues ? GamePathUtil.Normalize(rawValue) : rawValue?.Trim();
+            if (!normalizeValues && !string.IsNullOrEmpty(value)
+                                 && !SnapshotBlobUtil.TryNormalizeBlobId(value, out value))
+                throw new InvalidDataException($"File-map history contains an invalid content hash for '{gamePath}'.");
+            if (normalizeValues && !string.IsNullOrWhiteSpace(rawValue) && string.IsNullOrEmpty(value))
+                throw new InvalidDataException($"File-map history contains an invalid swap path for '{gamePath}'.");
+
             if (string.IsNullOrEmpty(value))
                 result.Remove(gamePath);
             else
@@ -141,8 +149,12 @@ public static class FileMapUtil
             throw new InvalidOperationException("File map resolution exceeded max depth. Possible cycle in FileMaps.");
 
         Dictionary<string, string> baseMap = new(StringComparer.OrdinalIgnoreCase);
-        if (!string.IsNullOrEmpty(entry.BaseId) && mapIndex.TryGetValue(entry.BaseId, out var baseEntry))
+        if (!string.IsNullOrEmpty(entry.BaseId))
+        {
+            if (!mapIndex.TryGetValue(entry.BaseId, out var baseEntry))
+                throw new InvalidDataException($"File-map history base '{entry.BaseId}' is missing.");
             baseMap = ResolveEntry(baseEntry, mapIndex, depth + 1);
+        }
 
         return ApplyChanges(baseMap, entry.Changes);
     }
@@ -156,8 +168,12 @@ public static class FileMapUtil
             throw new InvalidOperationException("File swap map resolution exceeded max depth. Possible cycle in FileMaps.");
 
         Dictionary<string, string> baseMap = new(StringComparer.OrdinalIgnoreCase);
-        if (!string.IsNullOrEmpty(entry.BaseId) && mapIndex.TryGetValue(entry.BaseId, out var baseEntry))
+        if (!string.IsNullOrEmpty(entry.BaseId))
+        {
+            if (!mapIndex.TryGetValue(entry.BaseId, out var baseEntry))
+                throw new InvalidDataException($"File-map history base '{entry.BaseId}' is missing.");
             baseMap = ResolveSwapEntry(baseEntry, mapIndex, depth + 1);
+        }
 
         return ApplyChanges(baseMap, entry.FileSwapChanges ?? new Dictionary<string, string>(), true);
     }
@@ -172,10 +188,29 @@ public static class FileMapUtil
 
         var hasHistory = entry.FileSwapChanges != null;
         var hasChanges = entry.FileSwapChanges?.Count > 0;
-        if (string.IsNullOrEmpty(entry.BaseId) || !mapIndex.TryGetValue(entry.BaseId, out var baseEntry))
+        if (string.IsNullOrEmpty(entry.BaseId))
             return (hasHistory, hasChanges);
+
+        if (!mapIndex.TryGetValue(entry.BaseId, out var baseEntry))
+            throw new InvalidDataException($"File-map history base '{entry.BaseId}' is missing.");
 
         var baseState = GetFileSwapHistoryState(baseEntry, mapIndex, depth + 1);
         return (hasHistory || baseState.HasHistory, hasChanges || baseState.HasChanges);
+    }
+
+    private static void ValidateFileMap(IReadOnlyDictionary<string, string> fileMap)
+    {
+        foreach (var (gamePath, hash) in fileMap)
+            if (string.IsNullOrEmpty(GamePathUtil.Normalize(gamePath))
+                || !SnapshotBlobUtil.TryNormalizeBlobId(hash, out _))
+                throw new InvalidDataException($"Snapshot contains an invalid file mapping for '{gamePath}'.");
+    }
+
+    private static void ValidateFileSwaps(IReadOnlyDictionary<string, string> fileSwaps)
+    {
+        foreach (var (gamePath, swapPath) in fileSwaps)
+            if (string.IsNullOrEmpty(GamePathUtil.Normalize(gamePath))
+                || string.IsNullOrEmpty(GamePathUtil.Normalize(swapPath)))
+                throw new InvalidDataException($"Snapshot contains an invalid file swap for '{gamePath}'.");
     }
 }
