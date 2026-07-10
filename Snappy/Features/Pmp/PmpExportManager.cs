@@ -38,7 +38,7 @@ public class PmpExportManager : IPmpExportManager
             PluginLog.Debug($"Operating on {snapshotPath}");
 
             var paths = SnapshotPaths.From(snapshotPath);
-            var snapshotInfo = await JsonUtil.DeserializeAsync<SnapshotInfo>(paths.SnapshotFile);
+            var snapshotInfo = await JsonUtil.DeserializeStateAsync<SnapshotInfo>(paths.SnapshotFile);
             if (snapshotInfo == null)
             {
                 Notify.Error("Export failed: Could not read snapshot.json.");

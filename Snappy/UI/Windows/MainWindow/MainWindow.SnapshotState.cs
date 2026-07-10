@@ -139,10 +139,11 @@ public partial class MainWindow
 
         try
         {
-            var snapshotInfo = await JsonUtil.DeserializeAsync<SnapshotInfo>(paths.SnapshotFile);
-            var glamourerHistory = await JsonUtil.DeserializeAsync<GlamourerHistory>(paths.GlamourerHistoryFile) ??
+            var snapshotInfo = await JsonUtil.DeserializeStateAsync<SnapshotInfo>(paths.SnapshotFile)
+                               ?? throw new InvalidDataException($"Snapshot state is missing from '{snapshotPath}'.");
+            var glamourerHistory = await JsonUtil.DeserializeStateAsync<GlamourerHistory>(paths.GlamourerHistoryFile) ??
                                    new GlamourerHistory();
-            var customizeHistory = await JsonUtil.DeserializeAsync<CustomizeHistory>(paths.CustomizeHistoryFile) ??
+            var customizeHistory = await JsonUtil.DeserializeStateAsync<CustomizeHistory>(paths.CustomizeHistoryFile) ??
                                    new CustomizeHistory();
 
             _snappy.QueueAction(() =>
@@ -153,11 +154,8 @@ public partial class MainWindow
                 _selectedSnapshotInfo = snapshotInfo;
                 _glamourerHistory = glamourerHistory;
                 _customizeHistory = customizeHistory;
-                if (snapshotInfo != null)
-                {
-                    _pcpPlayerNameOverride = snapshotInfo.SourceActor ?? string.Empty;
-                    _pcpSelectedWorldIdOverride = snapshotInfo.SourceWorldId;
-                }
+                _pcpPlayerNameOverride = snapshotInfo.SourceActor ?? string.Empty;
+                _pcpSelectedWorldIdOverride = snapshotInfo.SourceWorldId;
             });
         }
         catch (Exception e)

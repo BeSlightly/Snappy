@@ -41,6 +41,15 @@ public static class JsonUtil
         }
     }
 
+    public static async Task<T?> DeserializeStateAsync<T>(string filePath) where T : class
+    {
+        if (!File.Exists(filePath))
+            return null;
+
+        return await DeserializeAsync<T>(filePath)
+               ?? throw new InvalidDataException($"Existing state file '{filePath}' could not be read.");
+    }
+
     public static async Task<T?> DeserializeAsync<T>(string filePath, JsonSerializerSettings settings)
         where T : class
     {

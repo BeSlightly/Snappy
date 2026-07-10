@@ -92,16 +92,16 @@ public class McdfManager : IMcdfManager
         try
         {
             var paths = SnapshotPaths.From(snapshotPath);
-            var snapshotInfo = await JsonUtil.DeserializeAsync<SnapshotInfo>(paths.SnapshotFile);
+            var snapshotInfo = await JsonUtil.DeserializeStateAsync<SnapshotInfo>(paths.SnapshotFile);
             if (snapshotInfo == null)
             {
                 Notify.Error("Failed to load snapshot info for MCDF export.");
                 return;
             }
 
-            var glamourerHistory = await JsonUtil.DeserializeAsync<GlamourerHistory>(paths.GlamourerHistoryFile) ??
+            var glamourerHistory = await JsonUtil.DeserializeStateAsync<GlamourerHistory>(paths.GlamourerHistoryFile) ??
                                    new GlamourerHistory();
-            var customizeHistory = await JsonUtil.DeserializeAsync<CustomizeHistory>(paths.CustomizeHistoryFile) ??
+            var customizeHistory = await JsonUtil.DeserializeStateAsync<CustomizeHistory>(paths.CustomizeHistoryFile) ??
                                    new CustomizeHistory();
 
             var glamourerEntry = selectedGlamourer ?? glamourerHistory.Entries.LastOrDefault();

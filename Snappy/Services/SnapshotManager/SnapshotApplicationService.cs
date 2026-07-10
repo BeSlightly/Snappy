@@ -1,4 +1,3 @@
-using Dalamud.Utility;
 using ECommons.GameHelpers;
 using Snappy.Common;
 using Penumbra.GameData.Structs;
@@ -26,12 +25,6 @@ public class SnapshotApplicationService : ISnapshotApplicationService
         SnapshotLoadComponents loadComponents = SnapshotLoadComponents.All
     )
     {
-        // This method is called from the UI thread, but file I/O should be async.
-        // It's not a Task because the caller is a simple button handler.
-        // We will load the files async and then apply the changes.
-        // For a full refactor, this would return a Task. For now, we use GetResultSafely()
-        // to keep the method signature while still using async file reads.
-
         if (!characterApplyTo.IsValid())
         {
             Notify.Error("Invalid character selected for snapshot loading.");
@@ -42,10 +35,20 @@ public class SnapshotApplicationService : ISnapshotApplicationService
         var isOnLocalPlayer = (localPlayer != null && characterApplyTo.ObjectIndex == localPlayer.ObjectIndex) ||
                               characterApplyTo.ObjectIndex == ObjectIndex.GPosePlayer.Index;
 
-        if (!TryBuildLoadPlan(path, glamourerOverride, customizeOverride, loadComponents, out var plan,
-                out var errorMessage))
+        SnapshotLoadPlan plan;
+        try
         {
-            Notify.Error(errorMessage);
+            if (!TryBuildLoadPlan(path, glamourerOverride, customizeOverride, loadComponents, out plan,
+                    out var errorMessage))
+            {
+                Notify.Error(errorMessage);
+                return false;
+            }
+        }
+        catch (Exception ex)
+        {
+            Notify.Error($"Could not load snapshot: {ex.Message}");
+            PluginLog.Error($"Failed to build snapshot load plan for '{path}': {ex}");
             return false;
         }
 
@@ -154,7 +157,7 @@ public class SnapshotApplicationService : ISnapshotApplicationService
         errorMessage = string.Empty;
 
         var paths = SnapshotPaths.From(path);
-        var snapshotInfo = JsonUtil.DeserializeAsync<SnapshotInfo>(paths.SnapshotFile).GetResultSafely();
+        var snapshotInfo = JsonUtil.DeserializeStateAsync<SnapshotInfo>(paths.SnapshotFile).GetAwaiter().GetResult();
         if (snapshotInfo == null)
         {
             errorMessage = $"Could not load snapshot: {Constants.SnapshotFileName} not found or invalid in {path}";
@@ -162,10 +165,10 @@ public class SnapshotApplicationService : ISnapshotApplicationService
         }
 
         var glamourerHistory =
-            JsonUtil.DeserializeAsync<GlamourerHistory>(paths.GlamourerHistoryFile).GetResultSafely() ??
+            JsonUtil.DeserializeStateAsync<GlamourerHistory>(paths.GlamourerHistoryFile).GetAwaiter().GetResult() ??
             new GlamourerHistory();
         var customizeHistory =
-            JsonUtil.DeserializeAsync<CustomizeHistory>(paths.CustomizeHistoryFile).GetResultSafely() ??
+            JsonUtil.DeserializeStateAsync<CustomizeHistory>(paths.CustomizeHistoryFile).GetAwaiter().GetResult() ??
             new CustomizeHistory();
 
         var applyFiles = loadComponents.HasFlag(SnapshotLoadComponents.Files);
