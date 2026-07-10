@@ -55,7 +55,7 @@ public class PmpExportManager : IPmpExportManager
             temporaryOutput = AtomicFileUtil.CreateTemporaryOutputPath(pmpOutputPath);
 
             var resolvedFileMap = fileMapOverride
-                                  ?? FileMapUtil.ResolveFileMapWithEmptyFallback(snapshotInfo,
+                                  ?? FileMapUtil.ResolveFileMap(snapshotInfo,
                                       fileMapId ?? snapshotInfo.CurrentFileMapId);
 
             var resolvedManipulations = manipulationOverride ??

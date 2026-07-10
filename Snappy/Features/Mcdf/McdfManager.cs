@@ -104,7 +104,7 @@ public class McdfManager : IMcdfManager
             var glamourerEntry = selectedGlamourer ?? glamourerHistory.Entries.LastOrDefault();
             var customizeEntry = selectedCustomize ?? customizeHistory.Entries.LastOrDefault();
             var fileMapId = glamourerEntry?.FileMapId ?? customizeEntry?.FileMapId ?? snapshotInfo.CurrentFileMapId;
-            var resolvedFileMap = FileMapUtil.ResolveFileMapWithEmptyFallback(snapshotInfo, fileMapId);
+            var resolvedFileMap = FileMapUtil.ResolveFileMap(snapshotInfo, fileMapId);
             var resolvedFileSwaps = FileMapUtil.ResolveFileSwaps(snapshotInfo, fileMapId);
             foreach (var gamePath in resolvedFileSwaps.Keys)
                 resolvedFileMap.Remove(gamePath);
