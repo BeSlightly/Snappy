@@ -4,37 +4,22 @@
   <p><strong>(Formerly XIVSnapper)</strong></p>
   <p>A forked and maintained mod originally based on work by <a href="https://github.com/eqbot">@eqbot</a>, <a href="https://github.com/ViviAshe">@ViviAshe</a> and <a href="https://github.com/astrodoobs">@astrodoobs</a>.</p>
 
-  <!-- Badges -->
   <a href="https://github.com/BeSlightly/Snappy/releases"><img src="https://img.shields.io/github/v/release/BeSlightly/Snappy?style=for-the-badge&color=blue" alt="Latest Release"></a>   <a href="https://github.com/BeSlightly/Snappy/releases"><img src="https://img.shields.io/github/v/release/BeSlightly/Snappy?include_prereleases&label=Testing&style=for-the-badge&color=orange" alt="Latest Testing (Pre-release)"></a>
   </div>
 
----
+## What it does
 
-## 📖 What is it?
+Snappy is a Dalamud plugin for saving and loading a character's appearance, including the mod files used by that appearance. Each snapshot is stored as a single-character mod collection and can be exported for sharing without requiring Mare.
 
-Ever wanted to share your character's appearance with a friend, only to realize you'd have to dig through your mod list or settle for the limited Mare Character Data Format (MCDF)? **Snappy solves that problem.**
+## Supported Mare forks
 
-Snappy is a plugin designed to save and load your character’s full appearance - mods and all - with a single click. No restrictions, no compromises. It creates a single-character mod collection that captures everything exactly as it is.
+- [Lightless Sync](https://git.lightless-sync.org/Lightless-Sync/LightlessClient)
+- [Snowcloak](https://github.com/Eauldane/SnowcloakClient)
+- [Player Sync](https://github.com/universalconquistador/MareSynchronosClient)
 
-> **Share your setup with friends, and they can load your character just as you see it, then customize it however they like.**
+For other Mare forks, enable `Use Penumbra/Customize+/Glamourer (fallback)` in Settings to capture live Penumbra, Glamourer, and Customize+ data.
 
-No more relying on MCDF. Just a clean, accurate snapshot of your character, ready to use.
-
----
-
-## 🛠️ Supported Mare Forks
-
- Supported Mare forks:
-
-*   [Lightless Sync](https://git.lightless-sync.org/Lightless-Sync/LightlessClient)
-*   [Snowcloak](https://github.com/Eauldane/SnowcloakClient)
-*   [Player Sync](https://github.com/universalconquistador/MareSynchronosClient)
-
-*Note: For unsupported Mare forks, enable "Use Penumbra/Customize+/Glamourer (fallback)" in Settings to snapshot via live Penumbra/Glamourer/C+ data.*
-
----
-
-## 📥 Installation
+## Installation
 
 Add this custom repo to Dalamud:
 
@@ -46,22 +31,15 @@ https://github.com/BeSlightly/Snappy/raw/refs/heads/master/repo.json
 
 ---
 
-## 🚀 How to Use
+## Usage
 
-1.  **Set a working directory** in the main window (bottom left).
-2.  **To save snapshots**:
-    *   Select an actor in the actor list.
-    *   Press the save icon 💾.
-    *   *If you already have a Snapshot, you can append to the existing save. Hitting the `save` icon while having a Snapshot appends for you.*
-3.  **To load snapshots**:
-    *   Enter **GPose**.
-    *   Select an actor.
-    *   Use the **Load** button to pick a snapshot folder.
-    *   *Tip: Best performance comes from using [Brio](https://github.com/AsgardXIV/Brio)-spawned actors. I test against those, and if you load onto anything else, you're on your own.*
+1. Set a working directory in the bottom-left corner of the main window.
+2. To save, select an actor and press the save button. If a snapshot is selected, saving appends a new state to it.
+3. To load, enter GPose, select an actor, and choose a snapshot with the Load button.
 
----
+Loading is tested primarily with actors spawned by [Brio](https://github.com/AsgardXIV/Brio). Other actor types may behave differently.
 
-## ⚠️ Disclaimer
+## Responsible use
 
 The following is a message from the previous developer, which remains relevant to this fork:
 
