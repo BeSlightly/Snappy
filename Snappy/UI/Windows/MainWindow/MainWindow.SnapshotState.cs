@@ -182,8 +182,9 @@ public partial class MainWindow
             return false;
 
         var paths = SnapshotPaths.From(_selectedSnapshot.FullName);
-        return JsonUtil.Serialize(_glamourerHistory, paths.GlamourerHistoryFile)
-               & JsonUtil.Serialize(_customizeHistory, paths.CustomizeHistoryFile);
+        return JsonUtil.SerializeAll(
+            (_glamourerHistory, paths.GlamourerHistoryFile),
+            (_customizeHistory, paths.CustomizeHistoryFile));
     }
 
     private void SaveSourceActorName()

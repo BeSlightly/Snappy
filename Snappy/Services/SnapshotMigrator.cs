@@ -87,10 +87,10 @@ public static class SnapshotMigrator
                 customizeHistory.Entries.Add(customizeEntry);
             }
 
-            var glamourerSaved = JsonUtil.Serialize(glamourerHistory, paths.GlamourerHistoryFile);
-            var customizeSaved = JsonUtil.Serialize(customizeHistory, paths.CustomizeHistoryFile);
-            var snapshotSaved = glamourerSaved && customizeSaved && JsonUtil.Serialize(newInfo, paths.SnapshotFile);
-            if (!snapshotSaved || !glamourerSaved || !customizeSaved)
+            if (!JsonUtil.SerializeAll(
+                    (glamourerHistory, paths.GlamourerHistoryFile),
+                    (customizeHistory, paths.CustomizeHistoryFile),
+                    (newInfo, paths.SnapshotFile)))
                 throw new IOException("Failed to save all migrated snapshot state files.");
 
             await File.Create(paths.MigrationMarker).DisposeAsync();
