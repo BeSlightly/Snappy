@@ -4,11 +4,11 @@ namespace Snappy.Services;
 
 public static class SnapshotMigrator
 {
-    public static async Task MigrateAsync(string snapshotPath, IIpcManager ipcManager)
+    public static async Task<bool> MigrateAsync(string snapshotPath)
     {
         var paths = SnapshotPaths.From(snapshotPath);
 
-        if (!File.Exists(paths.SnapshotFile) || File.Exists(paths.MigrationMarker)) return;
+        if (!File.Exists(paths.SnapshotFile) || File.Exists(paths.MigrationMarker)) return false;
 
         PluginLog.Information($"Found old format snapshot. Migrating: {Path.GetFileName(snapshotPath)}");
 
@@ -18,29 +18,50 @@ public static class SnapshotMigrator
             if (oldInfo == null)
             {
                 PluginLog.Error($"Could not deserialize old snapshot.json for {snapshotPath}. Skipping migration.");
-                return;
+                return false;
             }
 
             Directory.CreateDirectory(paths.FilesDirectory);
 
             var fileReplacements = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            var legacySourceFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
             foreach (var (sourceFileName, gamePaths) in oldInfo.FileReplacements)
             {
-                var sourceFilePath = Path.Combine(snapshotPath, sourceFileName);
+                var sourceFilePath = ResolveLegacyFilePath(snapshotPath, sourceFileName);
+                if (IsProtectedMigrationPath(paths, sourceFilePath))
+                    throw new InvalidDataException(
+                        $"Legacy snapshot payload uses a reserved state path: '{sourceFileName}'.");
                 if (!File.Exists(sourceFilePath))
-                {
-                    PluginLog.Warning($"Missing file during migration: {sourceFilePath}. Skipping.");
-                    continue;
-                }
+                    throw new FileNotFoundException("A legacy snapshot payload is missing.", sourceFilePath);
+
+                legacySourceFiles.Add(sourceFilePath);
 
                 var fileBytes = await File.ReadAllBytesAsync(sourceFilePath);
                 var hash = PluginUtil.GetFileHash(fileBytes);
                 var newHashedPath = paths.GetPreferredHashedFilePath(hash, sourceFileName);
 
-                if (!File.Exists(newHashedPath)) await File.WriteAllBytesAsync(newHashedPath, fileBytes);
+                if (!File.Exists(newHashedPath))
+                {
+                    var temporaryPath = AtomicFileUtil.CreateTemporaryOutputPath(newHashedPath);
+                    try
+                    {
+                        await File.WriteAllBytesAsync(temporaryPath, fileBytes);
+                        AtomicFileUtil.Complete(temporaryPath, newHashedPath);
+                    }
+                    finally
+                    {
+                        AtomicFileUtil.TryDelete(temporaryPath);
+                    }
+                }
 
-                foreach (var gamePath in gamePaths) fileReplacements[gamePath] = hash;
+                foreach (var rawGamePath in gamePaths ?? [])
+                {
+                    var gamePath = GamePathUtil.Normalize(rawGamePath);
+                    if (string.IsNullOrEmpty(gamePath))
+                        throw new InvalidDataException($"Legacy snapshot contains an invalid game path: '{rawGamePath}'.");
+                    fileReplacements[gamePath] = hash;
+                }
             }
 
             var newInfo = SnapshotImportUtil.BuildSnapshotInfo(
@@ -54,7 +75,7 @@ public static class SnapshotMigrator
                 "Migrated from old format", newInfo.CurrentFileMapId, oldInfo.CustomizeData));
 
             var customizeHistory = new CustomizeHistory();
-            if (!string.IsNullOrEmpty(oldInfo.CustomizeData) && ipcManager.IsCustomizePlusAvailable())
+            if (!string.IsNullOrEmpty(oldInfo.CustomizeData))
             {
                 var cplusJson = oldInfo.CustomizeData.Trim().StartsWith("{")
                     ? oldInfo.CustomizeData
@@ -66,40 +87,61 @@ public static class SnapshotMigrator
                 customizeHistory.Entries.Add(customizeEntry);
             }
 
-            foreach (var file in Directory.GetFiles(snapshotPath)) File.Delete(file);
-
-            foreach (var dir in Directory.GetDirectories(snapshotPath))
-            {
-                if (Path.GetFileName(dir)
-                    .Equals(Constants.FilesSubdirectory, StringComparison.OrdinalIgnoreCase)) continue;
-
-                Directory.Delete(dir, true);
-            }
-
-            var snapshotSaved = JsonUtil.Serialize(newInfo, paths.SnapshotFile);
             var glamourerSaved = JsonUtil.Serialize(glamourerHistory, paths.GlamourerHistoryFile);
             var customizeSaved = JsonUtil.Serialize(customizeHistory, paths.CustomizeHistoryFile);
+            var snapshotSaved = glamourerSaved && customizeSaved && JsonUtil.Serialize(newInfo, paths.SnapshotFile);
             if (!snapshotSaved || !glamourerSaved || !customizeSaved)
                 throw new IOException("Failed to save all migrated snapshot state files.");
 
             await File.Create(paths.MigrationMarker).DisposeAsync();
 
+            foreach (var sourceFile in legacySourceFiles)
+                try
+                {
+                    File.Delete(sourceFile);
+                }
+                catch (Exception cleanupException)
+                {
+                    PluginLog.Warning($"Could not remove migrated legacy file '{sourceFile}': {cleanupException.Message}");
+                }
+
             PluginLog.Information($"Successfully migrated snapshot: {Path.GetFileName(snapshotPath)}");
+            return true;
         }
         catch (Exception ex)
         {
             Notify.Error($"Failed to migrate snapshot at {snapshotPath}.\n{ex.Message}");
             PluginLog.Error($"Failed to migrate snapshot at {snapshotPath}: {ex}");
-            try
-            {
-                Directory.Move(snapshotPath, snapshotPath + "_migration_failed");
-            }
-            catch (Exception moveEx)
-            {
-                PluginLog.Warning(
-                    $"Failed to move snapshot '{snapshotPath}' to migration_failed: {moveEx.Message}");
-            }
+            return false;
         }
+    }
+
+    private static string ResolveLegacyFilePath(string snapshotPath, string sourceFileName)
+    {
+        if (string.IsNullOrWhiteSpace(sourceFileName))
+            throw new InvalidDataException("Legacy snapshot contains an empty payload path.");
+
+        var rootPath = Path.GetFullPath(snapshotPath).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                       + Path.DirectorySeparatorChar;
+        var sourcePath = Path.GetFullPath(Path.Combine(rootPath, sourceFileName));
+        if (!sourcePath.StartsWith(rootPath, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidDataException($"Legacy snapshot payload escapes its directory: '{sourceFileName}'.");
+
+        return sourcePath;
+    }
+
+    private static bool IsProtectedMigrationPath(SnapshotPaths paths, string sourcePath)
+    {
+        if (string.Equals(sourcePath, Path.GetFullPath(paths.SnapshotFile), StringComparison.OrdinalIgnoreCase)
+            || string.Equals(sourcePath, Path.GetFullPath(paths.GlamourerHistoryFile), StringComparison.OrdinalIgnoreCase)
+            || string.Equals(sourcePath, Path.GetFullPath(paths.CustomizeHistoryFile), StringComparison.OrdinalIgnoreCase)
+            || string.Equals(sourcePath, Path.GetFullPath(paths.MigrationMarker), StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        var filesRoot = Path.GetFullPath(paths.FilesDirectory)
+                            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                        + Path.DirectorySeparatorChar;
+        return sourcePath.StartsWith(filesRoot, StringComparison.OrdinalIgnoreCase);
     }
 
     private record OldSnapshotInfo

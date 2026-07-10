@@ -158,8 +158,8 @@ public sealed partial class Snappy
         var migratedCount = 0;
         foreach (var dir in dirsToMigrate)
         {
-            await SnapshotMigrator.MigrateAsync(dir, IpcManager);
-            migratedCount++;
+            if (await SnapshotMigrator.MigrateAsync(dir))
+                migratedCount++;
         }
 
         if (migratedCount > 0 && !isManual) Notify.Success("Snapshot migration complete.");
