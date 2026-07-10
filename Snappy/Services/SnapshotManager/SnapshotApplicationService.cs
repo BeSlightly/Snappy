@@ -59,7 +59,16 @@ public class SnapshotApplicationService : ISnapshotApplicationService
         }
 
         var snapshotName = Path.GetFileName(path);
-        Notify.Success($"Loaded snapshot '{snapshotName}' onto {characterApplyTo.Name.TextValue}.");
+        if (plan.MissingFileCount > 0)
+        {
+            var fileLabel = plan.MissingFileCount == 1 ? "file was" : "files were";
+            Notify.Warning(
+                $"Loaded snapshot '{snapshotName}' onto {characterApplyTo.Name.TextValue}, but {plan.MissingFileCount} referenced {fileLabel} unavailable and skipped.");
+        }
+        else
+        {
+            Notify.Success($"Loaded snapshot '{snapshotName}' onto {characterApplyTo.Name.TextValue}.");
+        }
 
         return true;
     }
@@ -219,6 +228,7 @@ public class SnapshotApplicationService : ISnapshotApplicationService
         }
 
         var moddedPaths = new Dictionary<string, string>();
+        var missingFileCount = 0;
         if (applyFiles && resolvedFileMap.Any())
         {
             var missingGamePaths = new List<string>();
@@ -234,15 +244,12 @@ public class SnapshotApplicationService : ISnapshotApplicationService
 
             if (missingGamePaths.Count > 0)
             {
-                errorMessage = missingGamePaths.Count == 1
-                    ? $"Could not load snapshot: the file for '{missingGamePaths[0]}' is missing."
-                    : $"Could not load snapshot: {missingGamePaths.Count} referenced files are missing.";
+                missingFileCount = missingGamePaths.Count;
                 var loggedPaths = string.Join(", ", missingGamePaths.Take(10));
                 var omittedCount = missingGamePaths.Count - Math.Min(missingGamePaths.Count, 10);
                 PluginLog.Warning(
-                    $"Snapshot '{path}' was not applied because these files are missing: {loggedPaths}"
+                    $"Snapshot '{path}' will be applied without these missing files: {loggedPaths}"
                     + (omittedCount > 0 ? $" (and {omittedCount} more)" : string.Empty));
-                return false;
             }
         }
 
@@ -252,7 +259,7 @@ public class SnapshotApplicationService : ISnapshotApplicationService
                     moddedPaths[gamePath] = swapPath;
 
         plan = new SnapshotLoadPlan(glamourerToApply, customizeDataToApply, moddedPaths, resolvedManipulations,
-            applyFiles, applyGlamourer, customizePlusAvailable);
+            applyFiles, applyGlamourer, customizePlusAvailable, missingFileCount);
         return true;
     }
 
@@ -263,7 +270,8 @@ public class SnapshotApplicationService : ISnapshotApplicationService
         string ResolvedManipulations,
         bool ApplyFiles,
         bool ApplyGlamourer,
-        bool CustomizePlusAvailable);
+        bool CustomizePlusAvailable,
+        int MissingFileCount);
 
     private static CustomizeHistoryEntry? FindClosestCustomizeEntry(IReadOnlyList<CustomizeHistoryEntry> entries,
         GlamourerHistoryEntry glamourerEntry)
