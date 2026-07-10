@@ -51,6 +51,9 @@ public class McdfManager : IMcdfManager
             Directory.CreateDirectory(paths.FilesDirectory);
 
             var gamePathToHashMap = ExtractAndHashMapFiles(charaFile, reader, paths.FilesDirectory);
+            if (reader.BaseStream.ReadByte() != -1)
+                throw new InvalidDataException("MCDF contains undeclared trailing file data.");
+
             var fileSwaps = ExtractFileSwaps(charaFile);
             foreach (var gamePath in fileSwaps.Keys)
                 gamePathToHashMap.Remove(gamePath); // Brio applies swaps after files, so swaps win on collisions.
@@ -202,8 +205,6 @@ public class McdfManager : IMcdfManager
         {
             if (fileData.Length < 0)
                 throw new InvalidDataException($"MCDF file entry has invalid length {fileData.Length}.");
-            if (fileData.Length == 0)
-                continue;
 
             var gamePaths = (fileData.GamePaths ?? [])
                 .Select(GamePathUtil.Normalize)
