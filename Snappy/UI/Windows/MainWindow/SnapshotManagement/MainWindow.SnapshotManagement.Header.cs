@@ -172,9 +172,15 @@ public partial class MainWindow
 
             ImGui.TableNextColumn();
             var renameActorDisabled = _selectedSnapshot == null;
+            var currentSource = _selectedSnapshotInfo?.SourceActor ?? "Unknown";
+            var currentWorld = !string.IsNullOrWhiteSpace(_selectedSnapshotInfo?.SourceWorldName)
+                ? _selectedSnapshotInfo!.SourceWorldName
+                : _selectedSnapshotInfo?.SourceWorldId is > 0
+                    ? _selectedSnapshotInfo.SourceWorldId.Value.ToString()
+                    : "none";
             var renameActorTooltip = renameActorDisabled
-                ? "Select a snapshot to rename its Source Actor."
-                : $"Rename the Source Actor for this snapshot.\nCurrent: '{_selectedSnapshotInfo?.SourceActor ?? "Unknown"}'";
+                ? "Select a snapshot to edit its Source Actor and world."
+                : $"Edit Source Actor and home world for this snapshot.\nCurrent: '{currentSource}' @ {currentWorld}";
             if (
                 UiHelpers.DrawStretchedIconButtonWithText(
                     FontAwesomeIcon.UserEdit,

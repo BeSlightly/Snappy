@@ -58,7 +58,9 @@ public partial class MainWindow : Window, IDisposable
     private string _tempHistoryEntryName = string.Empty;
     private string _tempSnapshotName = string.Empty;
     private string _tempSourceActorName = string.Empty;
+    private int _tempSourceWorldId;
     private WorldSelector _pcpWorldSelector = new("##pcpWorld");
+    private WorldSelector _renameSourceWorldSelector = new("##renameSourceWorld");
 
     public MainWindow(Snappy snappy, IActorService actorService, IActiveSnapshotManager activeSnapshotManager,
         IMcdfManager mcdfManager, IPcpManager pcpManager,
@@ -90,9 +92,11 @@ public partial class MainWindow : Window, IDisposable
         _snapshotCombo = new SnapshotCombo(() => _snapshotList);
         _snapshotCombo.SelectionChanged += OnSnapshotSelectionChanged;
 
-        // Configure world selector
+        // Configure world selectors
         _pcpWorldSelector.EmptyName = "Use snapshot's world";
         _pcpWorldSelector.DisplayCurrent = false;
+        _renameSourceWorldSelector.EmptyName = "No world / clear";
+        _renameSourceWorldSelector.DisplayCurrent = false;
 
         // Load snapshots immediately when the window is created
         LoadSnapshots();

@@ -16,6 +16,9 @@ public partial class MainWindow
             if (_selectedSnapshotInfo != null)
             {
                 _tempSourceActorName = _selectedSnapshotInfo.SourceActor;
+                _tempSourceWorldId = _selectedSnapshotInfo.SourceWorldId is > 0
+                    ? _selectedSnapshotInfo.SourceWorldId.Value
+                    : 0;
                 ImGui.OpenPopup("Rename Source Actor");
             }
 
@@ -124,10 +127,11 @@ public partial class MainWindow
         {
             if (modal)
             {
-                Im.Text("Enter the new name for the Source Actor of this snapshot.");
-                Im.Text("This name is used to find the snapshot when using 'Update Snapshot'.");
+                Im.Text("Edit the source actor used for 'Update Snapshot' matching.");
+                Im.Text("Name and home world identify the character in the snapshot index.");
                 ImGui.Separator();
 
+                Im.Text("Source Actor"u8);
                 ImGui.SetNextItemWidth(300 * ImGuiHelpers.GlobalScale);
                 var enterPressed = Im.Input.Text(
                     "##SourceActorName"u8,
@@ -135,6 +139,13 @@ public partial class MainWindow
                     flags: InputTextFlags.EnterReturnsTrue | InputTextFlags.AutoSelectAll
                 );
                 if (ImGui.IsWindowAppearing()) ImGui.SetKeyboardFocusHere(-1);
+
+                ImGui.Spacing();
+                Im.Text("Source World"u8);
+                ImGui.SetNextItemWidth(300 * ImGuiHelpers.GlobalScale);
+                _renameSourceWorldSelector.Draw(ref _tempSourceWorldId);
+                Im.Tooltip.OnHover(
+                    "Home world stored on the snapshot. Used to match the right character when several share a name."u8);
 
                 ImGui.Separator();
 

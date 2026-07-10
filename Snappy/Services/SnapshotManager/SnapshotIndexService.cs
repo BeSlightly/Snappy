@@ -143,8 +143,18 @@ public class SnapshotIndexService : ISnapshotIndexService
                 if (byWorldName != null)
                     return byWorldName.Path;
             }
+
+            // Actor has a known home world: only fall back to legacy snapshots that
+            // never stored world metadata. Do not treat a different-world snapshot as a match
+            // just because it is the only one with this name.
+            var unscoped = entries.Where(static e => !HasWorldScope(e)).ToList();
+            return unscoped.Count == 1 ? unscoped[0].Path : null;
         }
 
+        // Actor world unknown (e.g. some GPose entities): name-only match only if unique.
         return entries.Count == 1 ? entries[0].Path : null;
     }
+
+    private static bool HasWorldScope(SnapshotIndexEntry entry)
+        => entry.WorldId is > 0 || !string.IsNullOrWhiteSpace(entry.WorldName);
 }

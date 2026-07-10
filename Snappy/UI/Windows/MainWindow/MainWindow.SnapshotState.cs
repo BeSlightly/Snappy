@@ -1,3 +1,4 @@
+using ECommons.ExcelServices;
 using Luna;
 using Snappy.Common;
 
@@ -198,18 +199,39 @@ public partial class MainWindow
 
         var paths = SnapshotPaths.From(_selectedSnapshot.FullName);
         var previousSourceActor = _selectedSnapshotInfo.SourceActor;
-        _selectedSnapshotInfo.SourceActor = _tempSourceActorName;
+        var previousWorldId = _selectedSnapshotInfo.SourceWorldId;
+        var previousWorldName = _selectedSnapshotInfo.SourceWorldName;
+
+        _selectedSnapshotInfo.SourceActor = _tempSourceActorName.Trim();
+        if (_tempSourceWorldId > 0)
+        {
+            _selectedSnapshotInfo.SourceWorldId = _tempSourceWorldId;
+            var worldName = ExcelWorldHelper.GetName((uint)_tempSourceWorldId);
+            _selectedSnapshotInfo.SourceWorldName = string.IsNullOrWhiteSpace(worldName) ? null : worldName;
+        }
+        else
+        {
+            _selectedSnapshotInfo.SourceWorldId = null;
+            _selectedSnapshotInfo.SourceWorldName = null;
+        }
+
         if (!JsonUtil.Serialize(_selectedSnapshotInfo, paths.SnapshotFile))
         {
             _selectedSnapshotInfo.SourceActor = previousSourceActor;
+            _selectedSnapshotInfo.SourceWorldId = previousWorldId;
+            _selectedSnapshotInfo.SourceWorldName = previousWorldName;
             Notify.Error($"Failed to save updated snapshot info for '{_selectedSnapshot.Name}'.");
             return;
         }
 
+        var worldLabel = _selectedSnapshotInfo.SourceWorldName
+                         ?? (_selectedSnapshotInfo.SourceWorldId is > 0
+                             ? _selectedSnapshotInfo.SourceWorldId.Value.ToString()
+                             : "none");
         PluginLog.Debug(
-            $"Updated SourceActor for snapshot '{_selectedSnapshot.Name}' to '{_tempSourceActorName}'."
+            $"Updated source for snapshot '{_selectedSnapshot.Name}' to '{_selectedSnapshotInfo.SourceActor}' @ {worldLabel}."
         );
-        Notify.Success("Source player name updated successfully.");
+        Notify.Success($"Source actor updated to '{_selectedSnapshotInfo.SourceActor}' @ {worldLabel}.");
         _snappy.InvokeSnapshotsUpdated();
     }
 }
