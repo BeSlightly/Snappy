@@ -111,7 +111,7 @@ public class SnapshotFileService : ISnapshotFileService
         var resolvedCurrentMap =
             EnsureBaseFileMap(snapshotInfo, glamourerHistory, customizeHistory, now);
         var resolvedCurrentFileSwaps =
-            FileMapUtil.ResolveFileSwapsWithEmptyFallback(snapshotInfo, snapshotInfo.CurrentFileMapId);
+            FileMapUtil.ResolveFileSwaps(snapshotInfo, snapshotInfo.CurrentFileMapId);
 
         var includeRemovals = !capture.UseLiveData || !_configuration.UsePenumbraIpcResourcePaths;
         var mapChanged = UpdateFileMaps(snapshotInfo, snapshotData, resolvedCurrentMap, resolvedCurrentFileSwaps,
@@ -285,7 +285,7 @@ public class SnapshotFileService : ISnapshotFileService
     {
         var resolvedCurrentMap = FileMapUtil.ResolveFileMap(snapshotInfo, snapshotInfo.CurrentFileMapId);
         var resolvedCurrentFileSwaps =
-            FileMapUtil.ResolveFileSwapsWithEmptyFallback(snapshotInfo, snapshotInfo.CurrentFileMapId);
+            FileMapUtil.ResolveFileSwaps(snapshotInfo, snapshotInfo.CurrentFileMapId);
 
         FileMapUtil.CreateBaseMapIfMissing(snapshotInfo, resolvedCurrentMap, resolvedCurrentFileSwaps, now);
         if (snapshotInfo.CurrentFileMapId != null)
@@ -347,7 +347,7 @@ public class SnapshotFileService : ISnapshotFileService
         snapshotInfo.FileReplacements = new Dictionary<string, string>(resolvedCurrentMap,
             StringComparer.OrdinalIgnoreCase);
         snapshotInfo.FileSwaps =
-            FileMapUtil.ResolveFileSwapsWithEmptyFallback(snapshotInfo, snapshotInfo.CurrentFileMapId);
+            FileMapUtil.ResolveFileSwaps(snapshotInfo, snapshotInfo.CurrentFileMapId);
 
         return mapChanged;
     }

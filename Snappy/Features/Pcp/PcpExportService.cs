@@ -34,7 +34,7 @@ internal sealed class PcpExportService
 
             var fileMapId = selectedGlamourer?.FileMapId ?? selectedCustomize?.FileMapId ?? snapshotInfo.CurrentFileMapId;
             var resolvedFileMap = FileMapUtil.ResolveFileMapWithEmptyFallback(snapshotInfo, fileMapId);
-            var resolvedFileSwaps = FileMapUtil.ResolveFileSwapsWithEmptyFallback(snapshotInfo, fileMapId);
+            var resolvedFileSwaps = FileMapUtil.ResolveFileSwaps(snapshotInfo, fileMapId);
             foreach (var gamePath in resolvedFileSwaps.Keys)
                 resolvedFileMap.Remove(gamePath);
             var resolvedManipulations = FileMapUtil.ResolveManipulation(snapshotInfo, fileMapId);
