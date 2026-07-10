@@ -202,6 +202,7 @@ public class SnapshotApplicationService : ISnapshotApplicationService
         var moddedPaths = new Dictionary<string, string>();
         if (applyFiles && resolvedFileMap.Any())
         {
+            var missingGamePaths = new List<string>();
             foreach (var (gamePath, hash) in resolvedFileMap)
             {
                 var hashedFilePath = paths.ResolveHashedFilePath(hash, gamePath);
@@ -209,7 +210,20 @@ public class SnapshotApplicationService : ISnapshotApplicationService
                 if (File.Exists(hashedFilePath))
                     moddedPaths[gamePath] = hashedFilePath;
                 else
-                    PluginLog.Warning($"Missing file blob for {gamePath} (hash: {hash}). It will not be applied.");
+                    missingGamePaths.Add(gamePath);
+            }
+
+            if (missingGamePaths.Count > 0)
+            {
+                errorMessage = missingGamePaths.Count == 1
+                    ? $"Could not load snapshot: the file for '{missingGamePaths[0]}' is missing."
+                    : $"Could not load snapshot: {missingGamePaths.Count} referenced files are missing.";
+                var loggedPaths = string.Join(", ", missingGamePaths.Take(10));
+                var omittedCount = missingGamePaths.Count - Math.Min(missingGamePaths.Count, 10);
+                PluginLog.Warning(
+                    $"Snapshot '{path}' was not applied because these files are missing: {loggedPaths}"
+                    + (omittedCount > 0 ? $" (and {omittedCount} more)" : string.Empty));
+                return false;
             }
         }
 
