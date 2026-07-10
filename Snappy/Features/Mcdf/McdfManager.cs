@@ -311,17 +311,13 @@ public class McdfManager : IMcdfManager
                 .Select(gamePath => SnapshotBlobUtil.ResolveBlobPath(filesDirectory, group.Key, gamePath))
                 .FirstOrDefault(File.Exists);
             if (blobPath == null)
-            {
-                PluginLog.Warning($"Skipping missing MCDF export blob '{group.Key}' for '{gamePaths[0]}'.");
-                continue;
-            }
+                throw new FileNotFoundException(
+                    $"Snapshot blob '{group.Key}' for '{gamePaths[0]}' is missing.");
 
             var length = new FileInfo(blobPath).Length;
             if (length > int.MaxValue)
-            {
-                PluginLog.Warning($"Skipping MCDF export blob '{group.Key}' because it exceeds the MCDF size limit.");
-                continue;
-            }
+                throw new InvalidDataException(
+                    $"Snapshot blob '{group.Key}' exceeds the MCDF per-file size limit.");
 
             files.Add(new McdfExportFile(new McdfData.FileData(gamePaths, (int)length, group.Key), blobPath));
         }

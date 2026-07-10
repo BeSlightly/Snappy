@@ -13,9 +13,12 @@ public static class ModpackExportUtil
         IReadOnlyDictionary<string, string>? resolvedFileMap = null,
         bool useReadableArchivePaths = false)
     {
-        if (!Directory.Exists(sourceFilesDirectory)) return;
-
         var fileMap = resolvedFileMap ?? snapshotInfo.FileReplacements;
+        if (fileMap.Count == 0)
+            return;
+        if (!Directory.Exists(sourceFilesDirectory))
+            throw new DirectoryNotFoundException($"Snapshot files directory not found: {sourceFilesDirectory}");
+
         if (useReadableArchivePaths)
         {
             AddSnapshotFilesWithReadablePaths(archive, sourceFilesDirectory, fileMap, filesDictionary);
@@ -33,10 +36,8 @@ public static class ModpackExportUtil
                 .Select(gamePath => SnapshotBlobUtil.ResolveBlobPath(sourceFilesDirectory, hash, gamePath))
                 .FirstOrDefault(File.Exists);
             if (sourceFilePath == null)
-            {
-                PluginLog.Warning($"Skipping missing export blob '{hash}' for '{gamePaths[0]}'.");
-                continue;
-            }
+                throw new FileNotFoundException(
+                    $"Snapshot blob '{hash}' for '{gamePaths[0]}' is missing.");
 
             var archiveFileName = BuildArchiveFileName(hash, Path.GetFileName(sourceFilePath), gamePaths);
             var archiveFilePath = $"files/{archiveFileName}";
@@ -87,7 +88,7 @@ public static class ModpackExportUtil
 
             var sourceFilePath = SnapshotBlobUtil.ResolveBlobPath(sourceFilesDirectory, hash, gamePath);
             if (!File.Exists(sourceFilePath))
-                continue;
+                throw new FileNotFoundException($"Snapshot blob '{hash}' for '{gamePath}' is missing.");
 
             var archiveFilePath = BuildReadableArchiveFilePath(gamePath);
             if (string.IsNullOrWhiteSpace(archiveFilePath))
