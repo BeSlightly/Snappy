@@ -1,3 +1,5 @@
+using System.Threading;
+
 namespace Snappy;
 
 public sealed partial class Snappy
@@ -6,16 +8,27 @@ public sealed partial class Snappy
 
     public void QueueAction(Action action)
     {
+        ArgumentNullException.ThrowIfNull(action);
+        if (Volatile.Read(ref _disposed) != 0)
+            return;
+
         _mainThreadActions.Enqueue(action);
     }
 
     public void ExecuteBackgroundTask(Func<Task> task)
     {
-        Task.Run(async () =>
+        ArgumentNullException.ThrowIfNull(task);
+        if (Volatile.Read(ref _disposed) != 0)
+            return;
+
+        _ = Task.Run(async () =>
         {
+            if (Volatile.Read(ref _disposed) != 0)
+                return;
+
             try
             {
-                await task();
+                await task().ConfigureAwait(false);
             }
             catch (Exception ex)
             {

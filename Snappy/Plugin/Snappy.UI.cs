@@ -17,7 +17,17 @@ public sealed partial class Snappy
 
     private void DrawUI()
     {
-        while (_mainThreadActions.TryDequeue(out var action)) action.Invoke();
+        while (_mainThreadActions.TryDequeue(out var action))
+        {
+            try
+            {
+                action.Invoke();
+            }
+            catch (Exception ex)
+            {
+                PluginLog.Error($"A queued UI action failed: {ex}");
+            }
+        }
 
         WindowSystem.Draw();
         FileDialogManager.Draw();

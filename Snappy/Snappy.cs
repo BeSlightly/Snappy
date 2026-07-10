@@ -24,6 +24,7 @@ public sealed partial class Snappy : IDalamudPlugin
     private readonly ConcurrentQueue<Action> _mainThreadActions = new();
     private readonly SemaphoreSlim _snapshotRefreshGate = new(1, 1);
     private readonly Luna.ImSharpDalamudContext _imSharpContext;
+    private int _disposed;
 
     public Snappy(IDalamudPluginInterface pluginInterface)
     {
@@ -116,6 +117,9 @@ public sealed partial class Snappy : IDalamudPlugin
 
     public void Dispose()
     {
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+            return;
+
         // Revert while Penumbra/Glamourer/C+ IPC is still available. Otherwise
         // temp collections and locks would stick around after disable/update.
         try
@@ -141,6 +145,7 @@ public sealed partial class Snappy : IDalamudPlugin
         Svc.PluginInterface.UiBuilder.Draw -= DrawUI;
         Svc.PluginInterface.UiBuilder.OpenConfigUi -= DrawConfigUI;
         Svc.PluginInterface.UiBuilder.OpenMainUi -= ToggleMainUI;
+        Svc.PluginInterface.UiBuilder.DisableGposeUiHide = false;
         _imSharpContext.Dispose();
         ECommonsMain.Dispose();
     }
