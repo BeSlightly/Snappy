@@ -2,6 +2,18 @@ namespace Snappy.Common.Utilities;
 
 public static class SnapshotBlobUtil
 {
+    public static bool TryNormalizeBlobId(string? value, out string blobId)
+    {
+        blobId = value?.Trim() ?? string.Empty;
+        if (blobId.Length is not (40 or 64) || blobId.Any(character => !Uri.IsHexDigit(character)))
+        {
+            blobId = string.Empty;
+            return false;
+        }
+
+        return true;
+    }
+
     public static string GetPreferredExtensionFromGamePath(string gamePath)
     {
         var ext = Path.GetExtension(gamePath);
@@ -10,21 +22,23 @@ public static class SnapshotBlobUtil
 
     public static string GetPreferredBlobPath(string filesDirectory, string hash, string gamePath)
     {
+        var blobId = RequireBlobId(hash);
         var ext = GetPreferredExtensionFromGamePath(gamePath);
-        return Path.Combine(filesDirectory, hash + ext);
+        return Path.Combine(filesDirectory, blobId + ext);
     }
 
     public static string? FindAnyExistingBlobPath(string filesDirectory, string hash)
     {
+        var blobId = RequireBlobId(hash);
         if (!Directory.Exists(filesDirectory))
             return null;
 
         // Old snapshots stored blobs without an extension. Keep those snapshots loadable.
-        var extensionlessPath = Path.Combine(filesDirectory, hash);
+        var extensionlessPath = Path.Combine(filesDirectory, blobId);
         if (File.Exists(extensionlessPath))
             return extensionlessPath;
 
-        return Directory.EnumerateFiles(filesDirectory, hash + ".*").FirstOrDefault();
+        return Directory.EnumerateFiles(filesDirectory, blobId + ".*").FirstOrDefault();
     }
 
     public static string ResolveBlobPath(string filesDirectory, string hash, string gamePath)
@@ -35,6 +49,14 @@ public static class SnapshotBlobUtil
 
         var anyExisting = FindAnyExistingBlobPath(filesDirectory, hash);
         return anyExisting ?? preferredPath;
+    }
+
+    private static string RequireBlobId(string value)
+    {
+        if (TryNormalizeBlobId(value, out var blobId))
+            return blobId;
+
+        throw new InvalidDataException("Snapshot blob identifier is not a supported content hash.");
     }
 
     private static string NormalizeExtension(string? extension)

@@ -25,8 +25,8 @@ public static class GamePathUtil
         foreach (var (rawGamePath, rawHash) in mappings)
         {
             var gamePath = Normalize(rawGamePath);
-            var hash = rawHash?.Trim();
-            if (!string.IsNullOrEmpty(gamePath) && !string.IsNullOrEmpty(hash))
+            if (!string.IsNullOrEmpty(gamePath)
+                && SnapshotBlobUtil.TryNormalizeBlobId(rawHash, out var hash))
                 result[gamePath] = hash;
         }
 

@@ -234,6 +234,9 @@ public class SnapshotFileService : ISnapshotFileService
 
     private static SnapshotData NormalizeSnapshotData(SnapshotData snapshotData)
     {
+        if (snapshotData.FileReplacements.Values.Any(hash => !SnapshotBlobUtil.TryNormalizeBlobId(hash, out _)))
+            throw new InvalidDataException("Snapshot data contains an invalid file hash.");
+
         var fileReplacements = GamePathUtil.NormalizeFileMap(snapshotData.FileReplacements);
         var fileSwaps = GamePathUtil.NormalizeFileSwaps(snapshotData.FileSwaps);
         foreach (var gamePath in fileSwaps.Keys)
