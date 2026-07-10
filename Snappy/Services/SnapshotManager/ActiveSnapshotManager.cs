@@ -195,7 +195,8 @@ public class ActiveSnapshotManager : IActiveSnapshotManager
 
     private static bool IsMatchingObjectIndex(ActiveSnapshot snapshot, ICharacter character)
     {
-        return snapshot.ObjectIndex == character.ObjectIndex;
+        return snapshot.ObjectIndex == character.ObjectIndex
+               && IsMatchingName(snapshot, character);
     }
 
     private static bool IsMatchingLocalPlayer(ActiveSnapshot snapshot, ICharacter character)
@@ -220,9 +221,12 @@ public class ActiveSnapshotManager : IActiveSnapshotManager
 
     private static bool IsMatchingByName(ActiveSnapshot snapshot, ICharacter character)
     {
-        return !string.IsNullOrEmpty(snapshot.CharacterName)
-               && string.Equals(snapshot.CharacterName, character.Name.TextValue, StringComparison.Ordinal);
+        return !string.IsNullOrEmpty(snapshot.CharacterName) && IsMatchingName(snapshot, character);
     }
+
+    private static bool IsMatchingName(ActiveSnapshot snapshot, IGameObject character)
+        => string.IsNullOrEmpty(snapshot.CharacterName)
+           || string.Equals(snapshot.CharacterName, character.Name.TextValue, StringComparison.Ordinal);
 
     private int RevertInternal(bool respectConfig)
     {
@@ -306,6 +310,13 @@ public class ActiveSnapshotManager : IActiveSnapshotManager
         bool logOnRetarget)
     {
         var target = Svc.Objects[snapshot.ObjectIndex];
+        if (target != null && !IsMatchingName(snapshot, target))
+        {
+            if (logOnRetarget)
+                PluginLog.Warning(
+                    $"Actor index {snapshot.ObjectIndex} is now occupied by '{target.Name}', not '{snapshot.CharacterName}'.");
+            target = null;
+        }
 
         if (target == null && snapshot.IsOnLocalPlayer)
         {
