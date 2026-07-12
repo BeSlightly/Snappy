@@ -133,30 +133,33 @@ jobs:
           PREV_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
           echo "Previous tag: $PREV_TAG"
           if [ -z "$PREV_TAG" ]; then
-            LOGS=$(git log --pretty=format:"- %s (%h)")
+            LOGS=$(git log --pretty=format:"- %s (%h)" --invert-grep --grep='^Update repo\.json for ')
           else
-            LOGS=$(git log $PREV_TAG..HEAD --pretty=format:"- %s (%h)")
+            LOGS=$(git log $PREV_TAG..HEAD --pretty=format:"- %s (%h)" --invert-grep --grep='^Update repo\.json for ')
           fi
           
           echo "logs<<EOF" >> $GITHUB_OUTPUT
           echo "$LOGS" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-      - name: Create GitHub Release and Tag
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.event.inputs.tag }}
-          name: ${{ github.event.repository.name }} ${{ github.event.inputs.tag }}
-          body: ${{ steps.changelog.outputs.logs }}
-          prerelease: ${{ github.event.inputs.prerelease }}
-          files: Snappy/bin/Release/Snappy/latest.zip
-          make_latest: ${{ github.event.inputs.prerelease == 'false' }}
-
       - name: Commit and Push Updated repo.json
+        id: release_commit
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           git add repo.json
           git diff --staged --quiet || git commit -m "Update repo.json for ${{ github.event.inputs.tag }}"
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
           git push
         shell: bash
+
+      - name: Create GitHub Release and Tag
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag }}
+          target_commitish: ${{ steps.release_commit.outputs.sha }}
+          name: ${{ github.event.repository.name }} ${{ github.event.inputs.tag }}
+          body: ${{ steps.changelog.outputs.logs }}
+          prerelease: ${{ github.event.inputs.prerelease }}
+          files: Snappy/bin/Release/Snappy/latest.zip
+          make_latest: ${{ github.event.inputs.prerelease == 'false' }}
