@@ -1,10 +1,10 @@
 using Luna;
 using Penumbra.GameData.Data;
 using Penumbra.GameData.Enums;
-using Penumbra.GameData.Files;
 using Penumbra.GameData.Structs;
 using Penumbra.Meta.Manipulations;
 using Penumbra.UI.Classes;
+using Snappy.Features.Pmp;
 using Snappy.Services;
 
 namespace Snappy.Features.Pmp.ChangedItems;
@@ -29,6 +29,8 @@ public sealed partial class SnapshotChangedItemService : ISnapshotChangedItemSer
         var identifier = await _gameDataProvider.GetIdentifierAsync();
         var items = new Dictionary<string, IIdentifiedObjectData>(StringComparer.OrdinalIgnoreCase);
         var gamePathsByItem = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+        var identifiedByPath = new Dictionary<string, Dictionary<string, IIdentifiedObjectData>>(
+            StringComparer.OrdinalIgnoreCase);
         var unresolvedPaths = new List<string>();
 
         foreach (var gamePath in gamePaths)
@@ -47,10 +49,12 @@ public sealed partial class SnapshotChangedItemService : ISnapshotChangedItemSer
                 }
             }
 
+            identifiedByPath[NormalizeGamePath(gamePath)] = perPath;
             MergeIdentifiedItems(perPath, items, gamePathsByItem, gamePath);
         }
 
-        ResolveUnidentifiedPaths(identifier, unresolvedPaths, resolvedFileMap, filesDirectory, items, gamePathsByItem);
+        ResolveUnidentifiedPaths(unresolvedPaths, identifiedByPath, resolvedFileMap, filesDirectory, items,
+            gamePathsByItem);
         AddManipulationItems(identifier, base64Manipulations, items, gamePathsByItem);
         var categories = BuildCategories(items);
         return new SnapshotChangedItemSet(categories, gamePathsByItem);
@@ -211,20 +215,22 @@ public sealed partial class SnapshotChangedItemService : ISnapshotChangedItemSer
         }
     }
 
-    private static void ResolveUnidentifiedPaths(ObjectIdentification identifier, IReadOnlyList<string> unresolvedPaths,
+    private static void ResolveUnidentifiedPaths(IReadOnlyList<string> unresolvedPaths,
+        IReadOnlyDictionary<string, Dictionary<string, IIdentifiedObjectData>> identifiedByPath,
         IReadOnlyDictionary<string, string>? resolvedFileMap, string? filesDirectory,
         Dictionary<string, IIdentifiedObjectData> items, Dictionary<string, HashSet<string>> gamePathsByItem)
     {
         if (unresolvedPaths.Count == 0)
             return;
 
-        var mappedByTexturePath = BuildMaterialTextureItemMap(identifier, unresolvedPaths, resolvedFileMap, filesDirectory);
+        var mappedByDependencyPath = BuildDependencyItemMap(unresolvedPaths, identifiedByPath, resolvedFileMap,
+            filesDirectory);
 
         foreach (var gamePath in unresolvedPaths)
         {
             var normalizedPath = NormalizeGamePath(gamePath);
             if (!string.IsNullOrEmpty(normalizedPath)
-                && mappedByTexturePath.TryGetValue(normalizedPath, out var mappedItems)
+                && mappedByDependencyPath.TryGetValue(normalizedPath, out var mappedItems)
                 && mappedItems.Count > 0)
             {
                 AddMappedItemsForPath(gamePath, mappedItems, items, gamePathsByItem);
@@ -235,9 +241,9 @@ public sealed partial class SnapshotChangedItemService : ISnapshotChangedItemSer
         }
     }
 
-    private static Dictionary<string, Dictionary<string, IIdentifiedObjectData>> BuildMaterialTextureItemMap(
-        ObjectIdentification identifier,
+    private static Dictionary<string, Dictionary<string, IIdentifiedObjectData>> BuildDependencyItemMap(
         IReadOnlyList<string> unresolvedPaths,
+        IReadOnlyDictionary<string, Dictionary<string, IIdentifiedObjectData>> identifiedByPath,
         IReadOnlyDictionary<string, string>? resolvedFileMap,
         string? filesDirectory)
     {
@@ -254,154 +260,31 @@ public sealed partial class SnapshotChangedItemService : ISnapshotChangedItemSer
         if (unresolvedLookup.Count == 0)
             return mapped;
 
-        foreach (var (mtrlPath, hash) in resolvedFileMap)
+        var dependencyGraph = PmpFileDependencyGraph.Build(resolvedFileMap, filesDirectory,
+            unresolvedPaths.Concat(identifiedByPath.Keys));
+        foreach (var (identifiedPath, identifiedItems) in identifiedByPath)
         {
-            if (string.IsNullOrWhiteSpace(mtrlPath) || string.IsNullOrWhiteSpace(hash))
-                continue;
-            if (!mtrlPath.EndsWith(".mtrl", StringComparison.OrdinalIgnoreCase))
-                continue;
-
-            var identifiedItems = IdentifyPathWithFallback(identifier, mtrlPath);
             if (identifiedItems.Count == 0)
                 continue;
 
-            var mtrlBlobPath = SnapshotBlobUtil.ResolveBlobPath(filesDirectory, hash, mtrlPath);
-            if (!File.Exists(mtrlBlobPath))
-                continue;
-
-            if (!TryGetMaterialTexturePaths(mtrlPath, mtrlBlobPath, out var texturePaths))
-                continue;
-
-            foreach (var texturePath in texturePaths)
+            foreach (var dependencyPath in dependencyGraph.ExpandDependencies([identifiedPath]))
             {
-                var normalizedTexturePath = NormalizeGamePath(texturePath);
-                if (string.IsNullOrEmpty(normalizedTexturePath) || !unresolvedLookup.Contains(normalizedTexturePath))
+                if (!unresolvedLookup.Contains(dependencyPath))
                     continue;
 
-                if (!mapped.TryGetValue(normalizedTexturePath, out var perTextureItems))
+                if (!mapped.TryGetValue(dependencyPath, out var perDependencyItems))
                 {
-                    perTextureItems = new Dictionary<string, IIdentifiedObjectData>(StringComparer.OrdinalIgnoreCase);
-                    mapped[normalizedTexturePath] = perTextureItems;
+                    perDependencyItems = new Dictionary<string, IIdentifiedObjectData>(StringComparer.OrdinalIgnoreCase);
+                    mapped[dependencyPath] = perDependencyItems;
                 }
 
                 foreach (var (key, data) in identifiedItems)
-                    if (!perTextureItems.ContainsKey(key))
-                        perTextureItems[key] = CloneWithSingleCount(data);
+                    if (!perDependencyItems.ContainsKey(key))
+                        perDependencyItems[key] = CloneWithSingleCount(data);
             }
         }
 
         return mapped;
-    }
-
-    private static Dictionary<string, IIdentifiedObjectData> IdentifyPathWithFallback(ObjectIdentification identifier,
-        string gamePath)
-    {
-        var identified = new Dictionary<string, IIdentifiedObjectData>(StringComparer.OrdinalIgnoreCase);
-        identifier.Identify(identified, gamePath);
-        if (identified.Count == 0)
-            TryIdentifyByPathHeuristic(identifier, gamePath, identified);
-
-        return identified;
-    }
-
-    private static bool TryGetMaterialTexturePaths(string mtrlGamePath, string mtrlBlobPath,
-        out IReadOnlySet<string> texturePaths)
-    {
-        texturePaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        try
-        {
-            var bytes = File.ReadAllBytes(mtrlBlobPath);
-            var mtrl = new MtrlFile(bytes);
-            if (mtrl.Textures.Length == 0)
-                return false;
-
-            var mtrlDirectory = GetGamePathDirectory(mtrlGamePath);
-            var paths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            foreach (var texture in mtrl.Textures)
-            {
-                var resolvedPath = ResolveMaterialTexturePath(mtrlDirectory, texture.Path);
-                if (!string.IsNullOrWhiteSpace(resolvedPath))
-                    paths.Add(resolvedPath);
-            }
-
-            if (paths.Count == 0)
-                return false;
-
-            texturePaths = paths;
-            return true;
-        }
-        catch (Exception ex)
-        {
-            PluginLog.Verbose($"[PMP] Failed to parse material '{mtrlGamePath}' for texture mapping: {ex.Message}");
-            return false;
-        }
-    }
-
-    private static string? ResolveMaterialTexturePath(string mtrlDirectory, string texturePath)
-    {
-        if (string.IsNullOrWhiteSpace(texturePath))
-            return null;
-
-        var normalizedTexture = NormalizeGamePath(texturePath);
-        if (string.IsNullOrEmpty(normalizedTexture))
-            return null;
-
-        if (normalizedTexture.StartsWith("--", StringComparison.Ordinal))
-            normalizedTexture = normalizedTexture[2..];
-
-        if (string.IsNullOrEmpty(normalizedTexture))
-            return null;
-
-        if (IsRootedGamePath(normalizedTexture))
-            return normalizedTexture;
-        if (normalizedTexture.IndexOf(':') >= 0)
-            return null;
-
-        return CombineGamePaths(mtrlDirectory, normalizedTexture);
-    }
-
-    private static bool IsRootedGamePath(string path)
-    {
-        return path.StartsWith("chara/", StringComparison.OrdinalIgnoreCase)
-               || path.StartsWith("vfx/", StringComparison.OrdinalIgnoreCase)
-               || path.StartsWith("ui/", StringComparison.OrdinalIgnoreCase)
-               || path.StartsWith("common/", StringComparison.OrdinalIgnoreCase)
-               || path.StartsWith("bg/", StringComparison.OrdinalIgnoreCase)
-               || path.StartsWith("bgcommon/", StringComparison.OrdinalIgnoreCase)
-               || path.StartsWith("shader/", StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static string CombineGamePaths(string baseDirectory, string relativePath)
-    {
-        if (string.IsNullOrWhiteSpace(baseDirectory))
-            return NormalizeGamePath(relativePath);
-
-        var segments = baseDirectory.Split('/', StringSplitOptions.RemoveEmptyEntries).ToList();
-        foreach (var segment in relativePath.Split('/', StringSplitOptions.RemoveEmptyEntries))
-        {
-            if (segment == ".")
-                continue;
-            if (segment == "..")
-            {
-                if (segments.Count > 0)
-                    segments.RemoveAt(segments.Count - 1);
-                continue;
-            }
-
-            segments.Add(segment);
-        }
-
-        return string.Join("/", segments);
-    }
-
-    private static string GetGamePathDirectory(string gamePath)
-    {
-        var normalized = NormalizeGamePath(gamePath);
-        if (string.IsNullOrEmpty(normalized))
-            return string.Empty;
-
-        var lastSlash = normalized.LastIndexOf('/');
-        return lastSlash <= 0 ? string.Empty : normalized[..lastSlash];
     }
 
     private static string NormalizeGamePath(string path)

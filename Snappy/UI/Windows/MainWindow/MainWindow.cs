@@ -23,6 +23,7 @@ public partial class MainWindow : Window, IDisposable
     private readonly SnapshotCombo _snapshotCombo;
     private readonly ISnapshotFileService _snapshotFileService;
     private readonly ISnapshotIndexService _snapshotIndexService;
+    private readonly PmpCategoryIconDrawer _pmpCategoryIcons = new();
 
     private CustomizeHistory _customizeHistory = new();
 
@@ -118,6 +119,7 @@ public partial class MainWindow : Window, IDisposable
     public void Dispose()
     {
         Svc.Framework.Update -= OnFrameworkUpdate;
+        _pmpCategoryIcons.Dispose();
         _snappy.GPoseService.GPoseExited -= ClearActorSelection;
         _snappy.SnapshotsUpdated -= OnSnapshotsChanged;
     }

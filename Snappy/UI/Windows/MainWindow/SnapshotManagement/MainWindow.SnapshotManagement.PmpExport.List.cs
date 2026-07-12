@@ -27,6 +27,8 @@ public partial class MainWindow
         if (_pmpChangedItems == null)
             return;
 
+        using var tabPadding = ImRaii.PushStyle(ImGuiStyleVar.FramePadding,
+            new Vector2(12f, 9f) * ImGuiHelpers.GlobalScale);
         using var tabBar = Im.TabBar.Begin("PmpItemCategories"u8);
         if (!tabBar)
             return;
@@ -36,11 +38,26 @@ public partial class MainWindow
             if (category.Items.Count == 0)
                 continue;
 
-            var label = BuildPmpCategoryLabel(category.Category, category.Items.Count);
+            var label = _pmpCategoryIcons.HasIcon(category.Category)
+                ? $"      ##PmpCategory_{category.Category}"
+                : BuildPmpCategoryLabel(category.Category, category.Items.Count);
             using var tab = Im.TabBar.BeginItem(label);
+            _pmpCategoryIcons.DrawTabIcon(category.Category);
             if (tab)
+            {
+                DrawPmpCategoryHeading(category.Category, category.Items.Count);
                 DrawPmpItemList(category.Category, category.Items);
+            }
         }
+    }
+
+    private static void DrawPmpCategoryHeading(ChangedItemIconFlag category, int count)
+    {
+        var name = category == ChangedItemIconFlag.Unknown
+            ? "Misc / Unknown"
+            : category.ToNameU8().ToString();
+        Im.Text($"{name} · {count} changed {(count == 1 ? "item" : "items")}");
+        ImGui.Spacing();
     }
 
     private void DrawPmpItemList(ChangedItemIconFlag category, IReadOnlyList<SnapshotChangedItem> items)

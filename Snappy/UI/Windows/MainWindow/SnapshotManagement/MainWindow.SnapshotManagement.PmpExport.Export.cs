@@ -32,16 +32,6 @@ public partial class MainWindow
 
             var selectedPaths = BuildSelectedPmpGamePaths(selectedKeys);
             var filesDirectory = SnapshotPaths.From(snapshotPath).FilesDirectory;
-            selectedPaths = PmpExportDependencyResolver.ExpandMtrlDependencies(
-                selectedPaths,
-                resolvedFileMap,
-                filesDirectory);
-            var filteredFileMap = resolvedFileMap
-                .Where(kvp => selectedPaths.Contains(kvp.Key))
-                .ToDictionary(kvp => kvp.Key, kvp => kvp.Value, StringComparer.OrdinalIgnoreCase);
-            var filteredFileSwaps = resolvedFileSwaps
-                .Where(kvp => selectedPaths.Contains(kvp.Key))
-                .ToDictionary(kvp => kvp.Key, kvp => kvp.Value, StringComparer.OrdinalIgnoreCase);
             var manipBase = FileMapUtil.ResolveManipulation(_selectedSnapshotInfo, fileMapId);
 
             _snappy.FileDialogManager.SaveFileDialog(
@@ -57,6 +47,20 @@ public partial class MainWindow
                     Notify.Info($"Starting PMP export for '{snapshotName}'...");
                     _snappy.ExecuteBackgroundTask(async () =>
                     {
+                        var expandedPaths = PmpExportDependencyResolver.ExpandDependencies(
+                            selectedPaths,
+                            resolvedFileMap,
+                            filesDirectory,
+                            resolvedFileSwaps.Keys);
+                        var filteredFileMap = resolvedFileMap
+                            .Where(kvp => expandedPaths.Contains(kvp.Key))
+                            .ToDictionary(kvp => kvp.Key, kvp => kvp.Value, StringComparer.OrdinalIgnoreCase);
+                        var filteredFileSwaps = resolvedFileSwaps
+                            .Where(kvp => expandedPaths.Contains(kvp.Key))
+                            .ToDictionary(kvp => kvp.Key, kvp => kvp.Value, StringComparer.OrdinalIgnoreCase);
+                        PluginLog.Debug(
+                            $"[PMP] Exporting {filteredFileMap.Count} files and {filteredFileSwaps.Count} swaps " +
+                            $"for {selectedKeys.Count} selected changed items.");
                         var filteredManip = await _snapshotChangedItemService
                             .FilterManipulationsAsync(manipBase, selectedKeys);
                         await _pmpExportManager.SnapshotToPMPAsync(snapshotPath, path, fileMapId,
