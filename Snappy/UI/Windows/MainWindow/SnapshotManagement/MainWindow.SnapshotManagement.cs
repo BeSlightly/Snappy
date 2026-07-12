@@ -4,7 +4,7 @@ public partial class MainWindow
 {
     private void DrawSnapshotManagementPanel()
     {
-        Im.Text("SNAPSHOT MANAGEMENT"u8);
+        Im.Text("Snapshots"u8);
         ImGui.Separator();
 
         DrawSnapshotHeader();

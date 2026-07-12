@@ -30,20 +30,19 @@ public class WorldSelector
 
     public void Draw(ref int worldConfig, ImGuiComboFlags flags = ImGuiComboFlags.HeightLarge)
     {
-        ImGui.PushID(_id);
+        using var id = ImRaii.PushId(_id);
         string name;
         if (worldConfig == 0)
             name = EmptyName ?? "Not selected";
         else
             name = ExcelWorldHelper.GetName((uint)worldConfig);
 
-        if (ImGui.BeginCombo("", name, flags))
+        using (var combo = ImRaii.Combo("", name, flags))
         {
+            if (!combo)
+                return;
             DrawInternal(ref worldConfig);
-            ImGui.EndCombo();
         }
-
-        ImGui.PopID();
     }
 
     private void DrawInternal(ref int worldConfig)
@@ -54,7 +53,7 @@ public class WorldSelector
         ImGui.InputTextWithHint("##worldfilter", "Search...", ref _worldFilter, 50);
         var regions = GetCachedRegions();
 
-        ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, new Vector2(0, 1));
+        using var itemSpacing = ImRaii.PushStyle(ImGuiStyleVar.ItemSpacing, new Vector2(0, 1));
 
         if (EmptyName != null)
         {
@@ -107,12 +106,11 @@ public class WorldSelector
                     ImGui.SetNextItemOpen(false);
                     foreach (var v in region.Value)
                     {
-                        ImGui.PushID($"{region.Key}");
+                        using var id = ImRaii.PushId($"{region.Key}");
                         ImGui.GetStateStorage()
                             .SetInt(
                                 ImGui.GetID(
                                     $"{Svc.Data.GetExcelSheet<WorldDCGroupType>()!.GetRowOrDefault(v.Key)?.Name}"), 0);
-                        ImGui.PopID();
                     }
                 }
             }
@@ -120,7 +118,8 @@ public class WorldSelector
             if (DefaultAllOpen && ImGui.IsWindowAppearing())
                 ImGui.SetNextItemOpen(true);
 
-            if (ImGuiEx.TreeNode($"{region.Key}"))
+            using var regionNode = Im.Tree.Node($"{region.Key}");
+            if (regionNode)
             {
                 foreach (var dc in region.Value)
                 {
@@ -143,7 +142,8 @@ public class WorldSelector
                         ImGui.SetNextItemOpen(true);
 
                     var dcName = Svc.Data.GetExcelSheet<WorldDCGroupType>()!.GetRowOrDefault(dc.Key)?.Name;
-                    if (ImGuiEx.TreeNode($"{dcName}"))
+                    using var dcNode = Im.Tree.Node($"{dcName}");
+                    if (dcNode)
                     {
                         foreach (var world in dc.Value)
                         {
@@ -157,15 +157,10 @@ public class WorldSelector
                             }
                         }
 
-                        ImGui.TreePop();
                     }
                 }
-
-                ImGui.TreePop();
             }
         }
-
-        ImGui.PopStyleVar();
         _worldFilterActive = _worldFilter != string.Empty;
     }
 

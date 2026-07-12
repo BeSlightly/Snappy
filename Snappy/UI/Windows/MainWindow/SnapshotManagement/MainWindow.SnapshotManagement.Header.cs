@@ -7,7 +7,7 @@ public partial class MainWindow
     private void DrawSnapshotHeader()
     {
         ImGui.AlignTextToFramePadding();
-        Im.Text("SNAPSHOT:"u8);
+        Im.Text("Snapshot"u8);
         ImGui.SameLine();
 
         var buttonsDisabled = _selectedSnapshot == null;
@@ -23,15 +23,14 @@ public partial class MainWindow
             var comboWidth =
                 ImGui.GetContentRegionAvail().X - iconBarWidth - ImGui.GetStyle().ItemSpacing.X;
 
-            using var disabled = ImRaii.Disabled(_snapshotList.Length == 0);
-
-            _snapshotCombo.Draw(
-                "##SnapshotSelector",
-                _selectedSnapshot?.Name ?? "Select a Snapshot...",
-                comboWidth
-            );
-
-            disabled.Dispose();
+            using (ImRaii.Disabled(_snapshotList.Length == 0))
+            {
+                _snapshotCombo.Draw(
+                    "##SnapshotSelector",
+                    _selectedSnapshot?.Name ?? "Select a Snapshot...",
+                    comboWidth
+                );
+            }
 
             if (ImGui.IsItemHovered() && ImGui.IsItemClicked(ImGuiMouseButton.Right)) ClearSnapshotSelection();
             Im.Tooltip.OnHover("Right-click to clear selection.");
@@ -111,7 +110,8 @@ public partial class MainWindow
     {
         const ImGuiTableFlags tableFlags = ImGuiTableFlags.SizingStretchSame;
 
-        if (ImGui.BeginTable("ActionButtonsTable", 3, tableFlags))
+        using var table = ImRaii.Table("ActionButtonsTable", 3, tableFlags);
+        if (table)
         {
             using var style = ImRaii.PushStyle(ImGuiStyleVar.FrameBorderSize, 0f);
 
@@ -190,8 +190,6 @@ public partial class MainWindow
                 )
             )
                 _openRenameActorPopup = true;
-
-            ImGui.EndTable();
         }
     }
 }

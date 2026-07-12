@@ -4,21 +4,29 @@ namespace Snappy.UI;
 
 public static class UiHelpers
 {
+    public static float GetLabeledIconButtonHeight(float extraPadding = 0f)
+    {
+        // Original Snappy labeled-button height: content + frame pad + 8px bulk.
+        var iconHeight = FontAwesomeIcon.BoxOpen.CalculateSize().Y;
+        var textHeight = Im.Font.CalculateSize("Ag").Y;
+        var contentHeight = Math.Max(iconHeight, textHeight);
+        return contentHeight
+               + ImGui.GetStyle().FramePadding.Y * 2
+               + 8f * ImGuiHelpers.GlobalScale
+               + extraPadding;
+    }
+
     public static bool DrawStretchedIconButtonWithText(
         FontAwesomeIcon icon,
         string text,
         string tooltip,
         bool disabled = false,
-        float? fixedWidth = null
+        float? fixedWidth = null,
+        float? fixedHeight = null
     )
     {
-        var textSize = Im.Font.CalculateSize(text);
-        var framePadding = ImGui.GetStyle().FramePadding;
-
-        var contentMaxHeight = Math.Max(icon.CalculateSize().Y, textSize.Y);
-        var buttonHeight =
-            contentMaxHeight + framePadding.Y * 2 + 8f * ImGuiHelpers.GlobalScale;
         var buttonWidth = fixedWidth ?? ImGui.GetContentRegionAvail().X;
+        var buttonHeight = fixedHeight ?? GetLabeledIconButtonHeight();
         var config = new ImEx.ButtonConfiguration
         {
             Size = new Vector2(buttonWidth, buttonHeight),
@@ -46,10 +54,10 @@ public static class UiHelpers
         }
 
         ImGui.SameLine();
-        if (IconButton(FontAwesomeIcon.Check)) onCommit();
+        if (IconButton(FontAwesomeIcon.Check, "Confirm")) onCommit();
 
         ImGui.SameLine();
-        if (IconButton(FontAwesomeIcon.Times)) onCancel();
+        if (IconButton(FontAwesomeIcon.Times, "Cancel")) onCancel();
     }
 
     public static bool ButtonEx(string label, string tooltip, Vector2 size, bool disabled = false)
@@ -60,19 +68,27 @@ public static class UiHelpers
         return ret && !disabled;
     }
 
-    public static bool IconButton(FontAwesomeIcon icon, string tooltip = "", Vector2 size = default, bool disabled = false)
+    /// <summary>
+    /// Square icon button that stays inside its frame (uses ImEx padding so FA glyphs don't overflow).
+    /// </summary>
+    public static bool IconButton(FontAwesomeIcon icon, string tooltip = "", Vector2 size = default,
+        bool disabled = false)
     {
-        var actualSize = size == default ? new Vector2(ImGui.GetFrameHeight(), ImGui.GetFrameHeight()) : size;
-        bool ret;
-        using (var disabledScope = ImRaii.Disabled(disabled))
-        using (var iconFont = ImRaii.PushFont(UiBuilder.IconFont))
+        var frame = ImGui.GetFrameHeight();
+        var actualSize = size == default ? new Vector2(frame, frame) : size;
+        var config = new ImEx.ButtonConfiguration
         {
-            ret = Im.Button(icon.ToIconString(), actualSize);
-        }
+            Size = actualSize,
+            Disabled = disabled,
+        };
 
-        if (!string.IsNullOrEmpty(tooltip))
-            Im.Tooltip.OnHover(HoveredFlags.AllowWhenDisabled, tooltip);
+        return ImEx.Icon.Button(icon.Icon(), tooltip, in config);
+    }
 
-        return ret && !disabled;
+    public static void DrawStatusIcon(FontAwesomeIcon icon, Vector4 color)
+    {
+        using var _ = ImRaii.PushColor(ImGuiCol.Text, color);
+        // DrawAligned keeps FA icons on the same baseline as adjacent text.
+        ImEx.Icon.DrawAligned(icon.Icon());
     }
 }

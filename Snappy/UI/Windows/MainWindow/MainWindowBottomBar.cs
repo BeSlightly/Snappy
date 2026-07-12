@@ -48,7 +48,9 @@ internal static class MainWindowBottomBar
         ImGui.SameLine();
 
         var revertButtonText = "Revert All";
-        var revertButtonSize = new Vector2(100 * ImGuiHelpers.GlobalScale, 0);
+        var revertPadding = ImGui.GetStyle().FramePadding.X * 2 + 16f * ImGuiHelpers.GlobalScale;
+        var revertButtonWidth = Im.Font.CalculateSize(revertButtonText).X + revertPadding;
+        var revertButtonSize = new Vector2(revertButtonWidth, 0);
         var isRevertDisabled = !activeSnapshotManager.HasActiveSnapshots;
 
         var buttonPosX = ImGui.GetWindowContentRegionMax().X - revertButtonSize.X;

@@ -17,7 +17,7 @@ internal sealed class PmpCategoryIconDrawer : IDisposable
         return _icons.ContainsKey(category);
     }
 
-    public void DrawTabIcon(ChangedItemIconFlag category)
+    public void DrawTabIcon(ChangedItemIconFlag category, int count = 0)
     {
         if (!_icons.TryGetValue(category, out var icon))
             return;
@@ -25,13 +25,25 @@ internal sealed class PmpCategoryIconDrawer : IDisposable
         var minimum = ImGui.GetItemRectMin();
         var maximum = ImGui.GetItemRectMax();
         var available = maximum - minimum;
-        var size = Math.Min(available.Y - 8f * ImGuiHelpers.GlobalScale,
-            30f * ImGuiHelpers.GlobalScale);
+        // Fit the tab with a small inset; cap around mid-size (readable, not the old 30px bulk).
+        var scale = ImGuiHelpers.GlobalScale;
+        var inset = 6f * scale;
+        var size = Math.Min(available.Y - inset, 22f * scale);
         if (size <= 0)
             return;
 
         var topLeft = minimum + (available - new Vector2(size)) / 2f;
         ImGui.GetWindowDrawList().AddImage(icon.Handle, topLeft, topLeft + new Vector2(size));
+
+        if (ImGui.IsItemHovered())
+        {
+            var name = category == ChangedItemIconFlag.Unknown
+                ? "Misc / Unknown"
+                : category.ToNameU8().ToString();
+            ImGui.SetTooltip(count > 0
+                ? $"{name}\n{count} changed {(count == 1 ? "item" : "items")}"
+                : name);
+        }
     }
 
     public void Dispose()

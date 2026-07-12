@@ -18,3 +18,4 @@ global using ImSharp;
 global using Newtonsoft.Json;
 global using Snappy.Models;
 global using Snappy.Common.Utilities;
+global using Snappy.UI;

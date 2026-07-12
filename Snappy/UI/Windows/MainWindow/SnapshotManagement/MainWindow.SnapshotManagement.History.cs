@@ -41,57 +41,59 @@ public partial class MainWindow
         if (!table)
             return;
 
+        var spacingX = 6f * ImGuiHelpers.GlobalScale;
+        var buttonSize = ImGui.GetFrameHeight();
+        const int buttonCount = 5;
+        var controlsWidth = buttonCount * buttonSize + (buttonCount - 1) * spacingX
+                            + ImGui.GetStyle().CellPadding.X * 2
+                            + 8f * ImGuiHelpers.GlobalScale;
+
         table.SetupColumn("Description", TableColumnFlags.WidthStretch);
         table.SetupColumn(
             "Controls",
             TableColumnFlags.WidthFixed,
-            260f * ImGuiHelpers.GlobalScale
+            controlsWidth
         );
 
-        var rowHeight = ImGui.GetFrameHeight() + 20f * ImGuiHelpers.GlobalScale;
+        // Comfortable row padding so entries don't feel stacked on top of each other.
+        var rowHeight = ImGui.GetFrameHeight() + 16f * ImGuiHelpers.GlobalScale;
         var totalEntries = entries.Count;
         var activeSnapshot = TryGetSelectedActor(out var selectedActor)
             ? _activeSnapshotManager.GetSnapshotForCharacter(selectedActor)
             : null;
         var selectedSnapshotPath = _selectedSnapshot == null ? null : Path.GetFullPath(_selectedSnapshot.FullName);
-        var clipper = new ImGuiListClipper();
-        clipper.Begin(totalEntries, rowHeight);
-        while (clipper.Step())
+        using var clipper = new Im.ListClipper(totalEntries, rowHeight);
+        foreach (var row in clipper)
         {
-            for (var row = clipper.DisplayStart; row < clipper.DisplayEnd; row++)
+            var i = totalEntries - 1 - row;
+            var entry = entries[i];
+            ImGui.TableNextRow(ImGuiTableRowFlags.None, rowHeight);
+            ImGui.TableNextColumn();
+
+            var initialY = ImGui.GetCursorPosY();
+            var frameHeight = ImGui.GetFrameHeight();
+            ImGui.SetCursorPosY(initialY + (rowHeight - frameHeight) / 2f);
+
+            if (_historyEntryToRename == entry)
             {
-                var i = totalEntries - 1 - row;
-                var entry = entries[i];
-                ImGui.TableNextRow(ImGuiTableRowFlags.None, rowHeight);
-                ImGui.TableNextColumn();
-
-                var initialY = ImGui.GetCursorPosY();
-                var frameHeight = ImGui.GetFrameHeight();
-                ImGui.SetCursorPosY(initialY + (rowHeight - frameHeight) / 2f);
-
-                if (_historyEntryToRename == entry)
-                {
-                    var onCommit = () => SetHistoryEntryDescription(entry, _tempHistoryEntryName);
-                    Action onCancel = () => _historyEntryToRename = null;
-                    UiHelpers.DrawInlineRename($"rename_{i}", ref _tempHistoryEntryName, onCommit, onCancel);
-                }
-                else
-                {
-                    var description = entry.Description;
-                    if (string.IsNullOrEmpty(description))
-                        description = "Unnamed Entry";
-                    Im.Text(description);
-                }
-
-                ImGui.TableNextColumn();
-
-                var buttonHeight = ImGui.GetFrameHeight();
-                ImGui.SetCursorPosY(ImGui.GetCursorPosY() + (rowHeight - buttonHeight) / 2f);
-                DrawHistoryEntryControls(type, entry, activeSnapshot, selectedSnapshotPath);
+                var onCommit = () => SetHistoryEntryDescription(entry, _tempHistoryEntryName);
+                Action onCancel = () => _historyEntryToRename = null;
+                UiHelpers.DrawInlineRename($"rename_{i}", ref _tempHistoryEntryName, onCommit, onCancel);
             }
-        }
+            else
+            {
+                var description = entry.Description;
+                if (string.IsNullOrEmpty(description))
+                    description = "Unnamed Entry";
+                Im.Text(description);
+            }
 
-        clipper.End();
+            ImGui.TableNextColumn();
+
+            var buttonHeight = ImGui.GetFrameHeight();
+            ImGui.SetCursorPosY(ImGui.GetCursorPosY() + (rowHeight - buttonHeight) / 2f);
+            DrawHistoryEntryControls(type, entry, activeSnapshot, selectedSnapshotPath);
+        }
     }
 
     private void DrawHistoryEntryControls<T>(string type, T entry, ActiveSnapshot? activeSnapshot,
@@ -102,7 +104,7 @@ public partial class MainWindow
             return;
 
         using var id = ImRaii.PushId(entry.GetHashCode());
-        var spacingX = 6 * ImGuiHelpers.GlobalScale;
+        var spacingX = 6f * ImGuiHelpers.GlobalScale;
         var buttonSize = ImGui.GetFrameHeight();
         const int buttonCount = 5;
         var totalWidth = buttonCount * buttonSize + (buttonCount - 1) * spacingX;
@@ -120,8 +122,9 @@ public partial class MainWindow
         var loadClicked = false;
         if (isApplied)
         {
+            // Check (not CheckCircle) stays inside the square icon button cleanly.
             using var appliedColor = ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.HealerGreen);
-            loadClicked = UiHelpers.IconButton(FontAwesomeIcon.CheckCircle, loadTooltip, default,
+            loadClicked = UiHelpers.IconButton(FontAwesomeIcon.Check, loadTooltip, default,
                 !_isActorModifiable);
         }
         else

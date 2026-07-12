@@ -16,13 +16,9 @@ public partial class MainWindow
             ? "An export is already in progress..."
             : "Export a PMP containing only the selected items.";
 
-        var buttonWidth = 240f * ImGuiHelpers.GlobalScale;
-        var cursorX = (ImGui.GetContentRegionAvail().X - buttonWidth) * 0.5f;
-        var cursorPos = ImGui.GetCursorPosX();
-        ImGui.SetCursorPosX(cursorPos + Math.Max(0, cursorX));
-
+        // Full-width export action reads better than a short centered button in a wide panel.
         if (UiHelpers.DrawStretchedIconButtonWithText(FontAwesomeIcon.BoxOpen, "Export Selected to PMP",
-                tooltip, exportDisabled, buttonWidth))
+                tooltip, exportDisabled))
         {
             var snapshotPath = _selectedSnapshot.FullName;
             var snapshotName = _selectedSnapshot.Name;

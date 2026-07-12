@@ -182,7 +182,7 @@ public partial class MainWindow : Window, IDisposable
                         ImGuiStyleVar.WindowPadding,
                         new Vector2(8f, 8f) * ImGuiHelpers.GlobalScale
                     );
-                    Im.Text("ACTOR SELECTION");
+                    Im.Text("Actors"u8);
                     ImGui.Separator();
                     DrawPlayerSelector();
                 }

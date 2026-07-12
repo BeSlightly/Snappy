@@ -13,33 +13,34 @@ public partial class MainWindow
         EnsurePmpHistorySelection(options);
 
         ImGui.AlignTextToFramePadding();
-        Im.Text("Glamourer Entry"u8);
+        Im.Text("Source"u8);
         ImGui.SameLine();
 
         ImGui.SetNextItemWidth(-1);
         var preview = _pmpSelectedHistoryLabel ?? "Select a Glamourer entry";
-        if (ImGui.BeginCombo("##PmpHistoryEntry", preview))
+        using (var combo = ImRaii.Combo("##PmpHistoryEntry", preview))
         {
-            foreach (var option in options)
+            if (combo)
             {
-                var isSelected = _pmpSelectedHistoryIndex.HasValue && option.Index == _pmpSelectedHistoryIndex.Value;
-                if (ImGui.Selectable(option.Label, isSelected))
+                foreach (var option in options)
                 {
-                    _pmpSelectedHistoryIndex = option.Index;
-                    _pmpSelectedHistoryLabel = option.Label;
-                    _pmpSelectedFileMapId = option.FileMapId;
-                    _pmpSelectedGlamourerBase64 = option.GlamourerBase64;
-                    _pmpNeedsRebuild = true;
+                    var isSelected = _pmpSelectedHistoryIndex.HasValue && option.Index == _pmpSelectedHistoryIndex.Value;
+                    if (ImGui.Selectable(option.Label, isSelected))
+                    {
+                        _pmpSelectedHistoryIndex = option.Index;
+                        _pmpSelectedHistoryLabel = option.Label;
+                        _pmpSelectedFileMapId = option.FileMapId;
+                        _pmpSelectedGlamourerBase64 = option.GlamourerBase64;
+                        _pmpNeedsRebuild = true;
+                    }
+
+                    if (isSelected)
+                        ImGui.SetItemDefaultFocus();
                 }
-
-                if (isSelected)
-                    ImGui.SetItemDefaultFocus();
             }
-
-            ImGui.EndCombo();
         }
 
-        Im.Tooltip.OnHover("Select a snapshot or Glamourer entry to build the export list from its file map."u8);
+        Im.Tooltip.OnHover("Glamourer history entry used to build the export list and filter equipped items."u8);
     }
 
     private IReadOnlyList<PmpHistoryOption> BuildPmpHistoryOptions()

@@ -64,7 +64,7 @@ public partial class MainWindow
 
     private void DrawPlayerSelector()
     {
-        ImGui.BeginGroup();
+        using var group = ImRaii.Group();
         DrawPlayerFilter();
         var rows = GetVisibleActorRows();
 
@@ -84,15 +84,9 @@ public partial class MainWindow
                 if (rows.Count > 0)
                 {
                     var lineHeight = ImGui.GetTextLineHeightWithSpacing();
-                    var clipper = new ImGuiListClipper();
-                    clipper.Begin(rows.Count, lineHeight);
-                    while (clipper.Step())
-                    {
-                        for (var i = clipper.DisplayStart; i < clipper.DisplayEnd; i++)
-                            DrawSelectable(rows[i]);
-                    }
-
-                    clipper.End();
+                    using var clipper = new Im.ListClipper(rows.Count, lineHeight);
+                    foreach (var i in clipper)
+                        DrawSelectable(rows[i]);
                 }
             }
         }
@@ -151,24 +145,16 @@ public partial class MainWindow
         }
 
         ImGui.SameLine(0, spacing);
-        using (var disabled = ImRaii.Disabled(isLockDisabled))
+        if (UiHelpers.IconButton(lockIcon, lockTooltip, lockButtonSize, isLockDisabled))
         {
-            using (var font = ImRaii.PushFont(UiBuilder.IconFont))
+            if (_isActorLockedBySnappy && TryGetSelectedActor(out var selectedActor))
             {
-                if (Im.Button(lockIcon.ToIconString(), lockButtonSize))
-                    if (_isActorLockedBySnappy && TryGetSelectedActor(out var selectedActor))
-                    {
-                        var isCurrentlyLocked = _activeSnapshotManager.IsActorGlamourerLocked(selectedActor);
-                        if (isCurrentlyLocked)
-                            _activeSnapshotManager.UnlockActorGlamourer(selectedActor);
-                        else
-                            _activeSnapshotManager.LockActorGlamourer(selectedActor);
-                    }
+                var isCurrentlyLocked = _activeSnapshotManager.IsActorGlamourerLocked(selectedActor);
+                if (isCurrentlyLocked)
+                    _activeSnapshotManager.UnlockActorGlamourer(selectedActor);
+                else
+                    _activeSnapshotManager.LockActorGlamourer(selectedActor);
             }
         }
-
-        Im.Tooltip.OnHover(HoveredFlags.AllowWhenDisabled, lockTooltip);
-
-        ImGui.EndGroup();
     }
 }

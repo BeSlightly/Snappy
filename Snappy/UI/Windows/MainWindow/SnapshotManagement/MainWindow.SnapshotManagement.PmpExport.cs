@@ -15,10 +15,10 @@ public partial class MainWindow
         using (var warningColor = ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.DalamudYellow))
         {
             Im.TextWrapped(
-                "Warning: PMP export is highly experimental. Please report any issues on GitHub.");
+                "PMP export is experimental — please report issues on GitHub.");
         }
-        ImGui.Spacing();
 
+        ImGui.Spacing();
         DrawPmpHistorySelector();
         ImGui.Spacing();
 
@@ -37,7 +37,7 @@ public partial class MainWindow
         if (!string.IsNullOrEmpty(_pmpBuildError))
         {
             using var _ = ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.DalamudRed);
-            Im.Text(_pmpBuildError);
+            Im.TextWrapped(_pmpBuildError);
             return;
         }
 
@@ -50,9 +50,11 @@ public partial class MainWindow
         DrawPmpSelectionToolbar();
         ImGui.Separator();
 
-        var footerHeight = ImGui.GetFrameHeight() * 3f + ImGui.GetStyle().ItemSpacing.Y * 2f;
-        var availableHeight = ImGui.GetContentRegionAvail().Y;
-        var listHeight = Math.Max(0f, availableHeight - footerHeight);
+        // Reserve footer for separator + export button without guessing oversized multiples of FrameHeight.
+        var footerHeight = UiHelpers.GetLabeledIconButtonHeight()
+                           + ImGui.GetStyle().ItemSpacing.Y * 3
+                           + 1f * ImGuiHelpers.GlobalScale;
+        var listHeight = Math.Max(0f, ImGui.GetContentRegionAvail().Y - footerHeight);
 
         using (var listRegion = Im.Child.Begin("PmpItemsRegion", new Vector2(0, listHeight), false,
                    WindowFlags.NoScrollbar))
