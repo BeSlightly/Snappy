@@ -1,6 +1,7 @@
 using ECommons.ExcelServices;
 using Luna;
 using Snappy.Common;
+using System.Threading;
 
 namespace Snappy.Services.SnapshotManager;
 
@@ -12,6 +13,7 @@ public class SnapshotFileService : ISnapshotFileService
     private readonly LiveSnapshotDataBuilder _liveSnapshotDataBuilder;
     private readonly MareSnapshotDataBuilder _mareSnapshotDataBuilder;
     private readonly ISnapshotIndexService _snapshotIndexService;
+    private readonly SemaphoreSlim _snapshotMutationGate = new(1, 1);
 
     public SnapshotFileService(Configuration configuration, IIpcManager ipcManager,
         ISnapshotIndexService snapshotIndexService)
@@ -41,7 +43,15 @@ public class SnapshotFileService : ISnapshotFileService
         if (capture == null)
             return null;
 
-        return await Task.Run(() => UpdateSnapshotFromCaptureAsync(capture)).ConfigureAwait(false);
+        await _snapshotMutationGate.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            return await Task.Run(() => UpdateSnapshotFromCaptureAsync(capture)).ConfigureAwait(false);
+        }
+        finally
+        {
+            _snapshotMutationGate.Release();
+        }
     }
 
     private SnapshotCapture? CaptureSnapshotState(ICharacter character, bool isLocalPlayer)
@@ -241,7 +251,8 @@ public class SnapshotFileService : ISnapshotFileService
 
         snapshotInfo.LastUpdate = now.ToString("o", CultureInfo.InvariantCulture);
 
-        SaveSnapshotToDisk(capture.SnapshotPath, snapshotInfo, glamourerHistory, customizeHistory);
+        if (!SaveSnapshotToDiskCore(capture.SnapshotPath, snapshotInfo, glamourerHistory, customizeHistory))
+            throw new IOException($"Failed to save all snapshot state files in '{capture.SnapshotPath}'.");
 
         if (isNewSnapshot)
             Notify.Success($"New snapshot for '{capture.CharacterName}' created successfully.");
@@ -532,15 +543,320 @@ public class SnapshotFileService : ISnapshotFileService
         }
     }
 
+    public async Task<HistoryEntryDeletionResult> DeleteHistoryEntryAsync(string snapshotPath,
+        HistoryEntryBase entry, bool deleteUniqueGlamourerFiles)
+    {
+        await _snapshotMutationGate.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            return await DeleteHistoryEntryCoreAsync(snapshotPath, entry, deleteUniqueGlamourerFiles)
+                .ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            PluginLog.Error($"Failed to delete history entry from '{snapshotPath}': {ex}");
+            return new HistoryEntryDeletionResult(false, ErrorMessage: ex.Message);
+        }
+        finally
+        {
+            _snapshotMutationGate.Release();
+        }
+    }
+
+    private static async Task<HistoryEntryDeletionResult> DeleteHistoryEntryCoreAsync(string snapshotPath,
+        HistoryEntryBase entry, bool deleteUniqueGlamourerFiles)
+    {
+        var paths = SnapshotPaths.From(snapshotPath);
+        var snapshotInfo = await JsonUtil.DeserializeStateAsync<SnapshotInfo>(paths.SnapshotFile)
+                           ?? throw new InvalidDataException("Snapshot state is missing.");
+        var glamourerHistory = await JsonUtil.DeserializeStateAsync<GlamourerHistory>(paths.GlamourerHistoryFile)
+                               ?? new GlamourerHistory();
+        var customizeHistory = await JsonUtil.DeserializeStateAsync<CustomizeHistory>(paths.CustomizeHistoryFile)
+                               ?? new CustomizeHistory();
+        NormalizeDeletionState(snapshotInfo, glamourerHistory, customizeHistory);
+
+        GlamourerHistoryEntry? deletedGlamourerEntry = null;
+        if (entry is GlamourerHistoryEntry glamourerEntry)
+        {
+            var index = FindHistoryEntryIndex(glamourerHistory.Entries, glamourerEntry);
+            if (index < 0)
+                return new HistoryEntryDeletionResult(false, ErrorMessage: "The Glamourer history entry no longer exists.");
+
+            deletedGlamourerEntry = glamourerHistory.Entries[index];
+            glamourerHistory.Entries.RemoveAt(index);
+        }
+        else if (entry is CustomizeHistoryEntry customizeEntry)
+        {
+            var index = FindHistoryEntryIndex(customizeHistory.Entries, customizeEntry);
+            if (index < 0)
+                return new HistoryEntryDeletionResult(false, ErrorMessage: "The Customize+ history entry no longer exists.");
+
+            customizeHistory.Entries.RemoveAt(index);
+        }
+        else
+        {
+            return new HistoryEntryDeletionResult(false, ErrorMessage: "Unsupported history entry type.");
+        }
+
+        var updatedSnapshotInfo = snapshotInfo;
+        HashSet<string> uniqueBlobIds = [];
+        string? cleanupSkippedReason = null;
+        if (deleteUniqueGlamourerFiles && deletedGlamourerEntry != null)
+        {
+            if (!TryBuildUniqueBlobDeletionPlan(snapshotInfo, deletedGlamourerEntry, glamourerHistory,
+                    customizeHistory, out updatedSnapshotInfo, out uniqueBlobIds, out cleanupSkippedReason))
+            {
+                updatedSnapshotInfo = snapshotInfo;
+                uniqueBlobIds.Clear();
+            }
+        }
+
+        if (!SaveSnapshotToDiskCore(snapshotPath, updatedSnapshotInfo, glamourerHistory, customizeHistory))
+            return new HistoryEntryDeletionResult(false, ErrorMessage: "Could not save the updated snapshot state.");
+
+        if (uniqueBlobIds.Count == 0)
+            return new HistoryEntryDeletionResult(true, CleanupSkippedReason: cleanupSkippedReason);
+
+        // Re-read the committed state and prove each candidate is still unreferenced before touching the file store.
+        var committedInfo = await JsonUtil.DeserializeStateAsync<SnapshotInfo>(paths.SnapshotFile);
+        var committedGlamourer = await JsonUtil.DeserializeStateAsync<GlamourerHistory>(paths.GlamourerHistoryFile)
+                                 ?? new GlamourerHistory();
+        var committedCustomize = await JsonUtil.DeserializeStateAsync<CustomizeHistory>(paths.CustomizeHistoryFile)
+                                 ?? new CustomizeHistory();
+        if (committedInfo != null)
+            NormalizeDeletionState(committedInfo, committedGlamourer, committedCustomize);
+        string? validationError = null;
+        if (committedInfo == null ||
+            !TryCollectReferencedBlobIds(committedInfo, committedGlamourer, committedCustomize,
+                out var committedReferences, out validationError))
+        {
+            var reason = committedInfo == null ? "the committed snapshot state could not be reloaded" : validationError;
+            PluginLog.Warning($"Unique file cleanup skipped for '{snapshotPath}': {reason}.");
+            return new HistoryEntryDeletionResult(true, CleanupSkippedReason: reason);
+        }
+
+        uniqueBlobIds.ExceptWith(committedReferences);
+        var deletedFileCount = 0;
+        var failedFileCount = 0;
+        foreach (var blobId in uniqueBlobIds)
+        {
+            IReadOnlyList<string> blobPaths;
+            try
+            {
+                blobPaths = SnapshotBlobUtil.FindAllExistingBlobPaths(paths.FilesDirectory, blobId);
+            }
+            catch (Exception ex)
+            {
+                failedFileCount++;
+                PluginLog.Error($"Could not enumerate snapshot blob '{blobId}' for deletion: {ex}");
+                continue;
+            }
+
+            foreach (var blobPath in blobPaths)
+            {
+                try
+                {
+                    File.Delete(blobPath);
+                    deletedFileCount++;
+                }
+                catch (Exception ex)
+                {
+                    failedFileCount++;
+                    PluginLog.Error($"Could not delete unique snapshot file '{blobPath}': {ex}");
+                }
+            }
+        }
+
+        return new HistoryEntryDeletionResult(true, deletedFileCount, failedFileCount,
+            CleanupSkippedReason: cleanupSkippedReason);
+    }
+
+    private static void NormalizeDeletionState(SnapshotInfo snapshotInfo, GlamourerHistory glamourerHistory,
+        CustomizeHistory customizeHistory)
+    {
+        snapshotInfo.FileMaps ??= new List<FileMapEntry>();
+        snapshotInfo.FileReplacements ??= new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        snapshotInfo.FileSwaps ??= new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        glamourerHistory.Entries ??= new List<GlamourerHistoryEntry>();
+        customizeHistory.Entries ??= new List<CustomizeHistoryEntry>();
+    }
+
+    private static int FindHistoryEntryIndex<T>(IReadOnlyList<T> entries, T requestedEntry)
+        where T : HistoryEntryBase
+    {
+        for (var i = 0; i < entries.Count; i++)
+        {
+            var candidate = entries[i];
+            if (EqualityComparer<T>.Default.Equals(candidate, requestedEntry))
+                return i;
+        }
+
+        return -1;
+    }
+
+    private static bool TryBuildUniqueBlobDeletionPlan(SnapshotInfo snapshotInfo,
+        GlamourerHistoryEntry deletedEntry, GlamourerHistory remainingGlamourer,
+        CustomizeHistory remainingCustomize, out SnapshotInfo updatedSnapshotInfo,
+        out HashSet<string> uniqueBlobIds, out string? error)
+    {
+        updatedSnapshotInfo = snapshotInfo;
+        uniqueBlobIds = [];
+        error = null;
+
+        if (!TryResolveHistoryFileMap(snapshotInfo, deletedEntry, out var deletedMap, out error))
+            return false;
+
+        var targetMapId = deletedEntry.FileMapId ?? snapshotInfo.CurrentFileMapId;
+        var currentMapBelongsOnlyToDeletedEntry = !string.IsNullOrEmpty(targetMapId)
+                                                  && string.Equals(snapshotInfo.CurrentFileMapId, targetMapId,
+                                                      StringComparison.OrdinalIgnoreCase)
+                                                  && !remainingGlamourer.Entries.Cast<HistoryEntryBase>()
+                                                      .Concat(remainingCustomize.Entries)
+                                                      .Any(remaining => HistoryEntryUsesMap(remaining, targetMapId,
+                                                          snapshotInfo.CurrentFileMapId));
+
+        if (currentMapBelongsOnlyToDeletedEntry)
+        {
+            var replacement = remainingGlamourer.Entries.LastOrDefault(e => !string.IsNullOrEmpty(e.FileMapId))
+                              ?? (HistoryEntryBase?)remainingCustomize.Entries.LastOrDefault(e =>
+                                  !string.IsNullOrEmpty(e.FileMapId));
+            if (replacement == null)
+            {
+                updatedSnapshotInfo = snapshotInfo with
+                {
+                    CurrentFileMapId = null,
+                    FileReplacements = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+                    FileSwaps = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+                    ManipulationString = string.Empty
+                };
+            }
+            else
+            {
+                if (!TryResolveHistoryFileMap(snapshotInfo, replacement, out var replacementMap, out error))
+                    return false;
+
+                var replacementMapId = replacement.FileMapId;
+                try
+                {
+                    updatedSnapshotInfo = snapshotInfo with
+                    {
+                        CurrentFileMapId = replacementMapId,
+                        FileReplacements = new Dictionary<string, string>(replacementMap,
+                            StringComparer.OrdinalIgnoreCase),
+                        FileSwaps = FileMapUtil.ResolveFileSwaps(snapshotInfo, replacementMapId),
+                        ManipulationString = FileMapUtil.ResolveManipulation(snapshotInfo, replacementMapId)
+                    };
+                }
+                catch (Exception ex)
+                {
+                    error = $"replacement file-map validation failed ({ex.Message}); no files were deleted";
+                    updatedSnapshotInfo = snapshotInfo;
+                    return false;
+                }
+            }
+        }
+
+        if (!TryCollectReferencedBlobIds(updatedSnapshotInfo, remainingGlamourer, remainingCustomize,
+                out var remainingReferences, out error))
+            return false;
+
+        uniqueBlobIds = deletedMap.Values
+            .Select(value => SnapshotBlobUtil.TryNormalizeBlobId(value, out var blobId) ? blobId : string.Empty)
+            .Where(value => !string.IsNullOrEmpty(value))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        uniqueBlobIds.ExceptWith(remainingReferences);
+        return true;
+    }
+
+    private static bool TryCollectReferencedBlobIds(SnapshotInfo snapshotInfo, GlamourerHistory glamourerHistory,
+        CustomizeHistory customizeHistory, out HashSet<string> referencedBlobIds, out string? error)
+    {
+        referencedBlobIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        error = null;
+
+        foreach (var entry in glamourerHistory.Entries.Cast<HistoryEntryBase>().Concat(customizeHistory.Entries))
+        {
+            if (!TryResolveHistoryFileMap(snapshotInfo, entry, out var fileMap, out error))
+                return false;
+            AddBlobIds(fileMap, referencedBlobIds);
+        }
+
+        if (!string.IsNullOrEmpty(snapshotInfo.CurrentFileMapId) || snapshotInfo.FileReplacements.Count > 0)
+        {
+            if (!TryResolveFileMapStrict(snapshotInfo, snapshotInfo.CurrentFileMapId, out var currentMap, out error))
+                return false;
+            AddBlobIds(currentMap, referencedBlobIds);
+        }
+
+        return true;
+    }
+
+    private static bool TryResolveHistoryFileMap(SnapshotInfo snapshotInfo, HistoryEntryBase entry,
+        out Dictionary<string, string> fileMap, out string? error)
+        => TryResolveFileMapStrict(snapshotInfo, entry.FileMapId ?? snapshotInfo.CurrentFileMapId, out fileMap,
+            out error);
+
+    private static bool TryResolveFileMapStrict(SnapshotInfo snapshotInfo, string? fileMapId,
+        out Dictionary<string, string> fileMap, out string? error)
+    {
+        fileMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        error = null;
+        try
+        {
+            if (!string.IsNullOrEmpty(fileMapId))
+            {
+                if (!FileMapUtil.TryResolveFileMap(snapshotInfo, fileMapId, out fileMap))
+                {
+                    error = $"file map '{fileMapId}' could not be resolved; no files were deleted";
+                    return false;
+                }
+
+                return true;
+            }
+
+            fileMap = FileMapUtil.ResolveFileMap(snapshotInfo, null);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            error = $"file-map validation failed ({ex.Message}); no files were deleted";
+            return false;
+        }
+    }
+
+    private static bool HistoryEntryUsesMap(HistoryEntryBase entry, string mapId, string? currentMapId)
+        => string.Equals(entry.FileMapId ?? currentMapId, mapId, StringComparison.OrdinalIgnoreCase);
+
+    private static void AddBlobIds(IReadOnlyDictionary<string, string> fileMap, ISet<string> blobIds)
+    {
+        foreach (var hash in fileMap.Values)
+            if (SnapshotBlobUtil.TryNormalizeBlobId(hash, out var blobId))
+                blobIds.Add(blobId);
+    }
+
     public void SaveSnapshotToDisk(string snapshotPath, SnapshotInfo info, GlamourerHistory glamourerHistory,
         CustomizeHistory customizeHistory)
     {
+        _snapshotMutationGate.Wait();
+        try
+        {
+            if (!SaveSnapshotToDiskCore(snapshotPath, info, glamourerHistory, customizeHistory))
+                throw new IOException($"Failed to save all snapshot state files in '{snapshotPath}'.");
+        }
+        finally
+        {
+            _snapshotMutationGate.Release();
+        }
+    }
+
+    private static bool SaveSnapshotToDiskCore(string snapshotPath, SnapshotInfo info,
+        GlamourerHistory glamourerHistory, CustomizeHistory customizeHistory)
+    {
         var paths = SnapshotPaths.From(snapshotPath);
-        if (!JsonUtil.SerializeAll(
-                (glamourerHistory, paths.GlamourerHistoryFile),
-                (customizeHistory, paths.CustomizeHistoryFile),
-                (info, paths.SnapshotFile)))
-            throw new IOException($"Failed to save all snapshot state files in '{snapshotPath}'.");
+        return JsonUtil.SerializeAll(
+            (glamourerHistory, paths.GlamourerHistoryFile),
+            (customizeHistory, paths.CustomizeHistoryFile),
+            (info, paths.SnapshotFile));
     }
 
     private sealed record SnapshotCapture(

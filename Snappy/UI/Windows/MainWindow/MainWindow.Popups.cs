@@ -1,10 +1,22 @@
+using Dalamud.Interface.Colors;
+using Snappy.Services.SnapshotManager;
+
 namespace Snappy.UI.Windows;
 
 public partial class MainWindow
 {
     private void HandlePopups()
     {
-        if (_historyEntryToDelete != null) ImGui.OpenPopup("Delete History Entry");
+        if (_historyEntryToDelete != null)
+        {
+            ImGui.OpenPopup("Delete History Entry");
+            var historyDeletePopupWidth = 390f * ImGuiHelpers.GlobalScale;
+            var parentWindowCenter = ImGui.GetWindowPos() + ImGui.GetWindowSize() / 2f;
+            ImGui.SetNextWindowPos(parentWindowCenter, ImGuiCond.Appearing, new Vector2(0.5f, 0.5f));
+            ImGui.SetNextWindowSizeConstraints(
+                new Vector2(historyDeletePopupWidth, 0),
+                new Vector2(historyDeletePopupWidth, float.MaxValue));
+        }
         if (_openDeleteSnapshotPopup)
         {
             ImGui.OpenPopup("Delete Snapshot");
@@ -34,42 +46,67 @@ public partial class MainWindow
         {
             if (modal)
             {
-                Im.Text(
-                    "Are you sure you want to delete this history entry?\nThis action cannot be undone."
-                );
-                ImGui.Separator();
-                if (Im.Button("Yes, Delete", new Vector2(120, 0)))
+                var isGlamourerEntry = _historyEntryToDelete is GlamourerHistoryEntry;
+                var deleteUniqueFiles = isGlamourerEntry
+                                        && _snappy.Configuration.DeleteUniqueFilesWithGlamourerHistoryEntry;
+                var entryType = isGlamourerEntry ? "Glamourer" : "Customize+";
+                Im.Text($"Delete this {entryType} history entry?");
+                ImGui.Spacing();
+
+                if (deleteUniqueFiles)
                 {
-                    Action? restoreEntry = null;
-                    if (_historyEntryToDelete is GlamourerHistoryEntry gEntry)
+                    using (var warningColor = ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.DalamudYellow))
                     {
-                        var index = _glamourerHistory.Entries.IndexOf(gEntry);
-                        if (index >= 0)
-                        {
-                            _glamourerHistory.Entries.RemoveAt(index);
-                            restoreEntry = () => _glamourerHistory.Entries.Insert(index, gEntry);
-                        }
-                    }
-                    else if (_historyEntryToDelete is CustomizeHistoryEntry cEntry)
-                    {
-                        var index = _customizeHistory.Entries.IndexOf(cEntry);
-                        if (index >= 0)
-                        {
-                            _customizeHistory.Entries.RemoveAt(index);
-                            restoreEntry = () => _customizeHistory.Entries.Insert(index, cEntry);
-                        }
+                        Im.Text("Unique snapshot files will also be deleted.");
                     }
 
-                    if (restoreEntry == null || !SaveHistory())
+                    using (var mutedColor = ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.DalamudGrey))
                     {
-                        restoreEntry?.Invoke();
-                        Notify.Error("Failed to delete the history entry.");
+                        Im.Text("Files used by other entries will stay.");
+                        Im.Text("Turn off cleanup in Settings to keep all files.");
+                    }
+                }
+                else
+                {
+                    using (var keptColor = ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.HealerGreen))
+                    {
+                        Im.Text("Snapshot files will stay on disk.");
+                    }
+
+                    using (var mutedColor = ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.DalamudGrey))
+                    {
+                        Im.Text("Only the history entry will be removed.");
+                        if (isGlamourerEntry)
+                            Im.Text("Optional cleanup is available in Snappy Settings.");
+                    }
+                }
+
+                ImGui.Spacing();
+                using (var warningColor = ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.DalamudRed))
+                {
+                    Im.Text("This cannot be undone.");
+                }
+                ImGui.Separator();
+                if (Im.Button("Delete Entry", new Vector2(120, 0)))
+                {
+                    var entryToDelete = _historyEntryToDelete;
+                    var snapshotPath = _selectedSnapshot?.FullName;
+                    _historyEntryToDelete = null;
+                    ImGui.CloseCurrentPopup();
+
+                    if (entryToDelete == null || string.IsNullOrEmpty(snapshotPath))
+                    {
+                        Notify.Error("Failed to delete the history entry because the snapshot is no longer selected.");
                         return;
                     }
 
-                    Notify.Success("History entry deleted.");
-                    _historyEntryToDelete = null;
-                    ImGui.CloseCurrentPopup();
+                    _historyDeleteInProgress = true;
+                    _snappy.ExecuteBackgroundTask(async () =>
+                    {
+                        var result = await _snapshotFileService.DeleteHistoryEntryAsync(snapshotPath, entryToDelete,
+                            deleteUniqueFiles).ConfigureAwait(false);
+                        _snappy.QueueAction(() => CompleteHistoryEntryDeletion(snapshotPath, result));
+                    });
                 }
 
                 ImGui.SameLine();
@@ -167,5 +204,36 @@ public partial class MainWindow
                 if (Im.Button("Cancel", new Vector2(120, 0))) ImGui.CloseCurrentPopup();
             }
         }
+    }
+
+    private void CompleteHistoryEntryDeletion(string snapshotPath, HistoryEntryDeletionResult result)
+    {
+        _historyDeleteInProgress = false;
+        if (string.Equals(_selectedSnapshot?.FullName, snapshotPath, StringComparison.OrdinalIgnoreCase))
+            BeginLoadHistoryForSelectedSnapshot();
+
+        if (!result.Success)
+        {
+            Notify.Error($"Failed to delete the history entry.\n{result.ErrorMessage}");
+            return;
+        }
+
+        if (!string.IsNullOrEmpty(result.CleanupSkippedReason))
+        {
+            Notify.Warning($"History entry deleted, but its files were kept for safety: {result.CleanupSkippedReason}");
+            return;
+        }
+
+        if (result.FailedFileCount > 0)
+        {
+            Notify.Warning(
+                $"History entry deleted. Removed {result.DeletedFileCount} unique file(s), but {result.FailedFileCount} file(s) could not be removed.");
+            return;
+        }
+
+        var fileMessage = result.DeletedFileCount > 0
+            ? $" Removed {result.DeletedFileCount} unique file(s)."
+            : string.Empty;
+        Notify.Success("History entry deleted." + fileMessage);
     }
 }

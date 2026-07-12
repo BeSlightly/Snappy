@@ -218,7 +218,9 @@ public partial class MainWindow
 
         ImGui.SameLine();
 
-        if (UiHelpers.IconButton(FontAwesomeIcon.Trash, "Delete Entry", default)) _historyEntryToDelete = entry;
+        var deleteTooltip = _historyDeleteInProgress ? "Another history entry is being deleted..." : "Delete Entry";
+        if (UiHelpers.IconButton(FontAwesomeIcon.Trash, deleteTooltip, default, _historyDeleteInProgress))
+            _historyEntryToDelete = entry;
     }
 
     private static bool IsHistoryEntryApplied(HistoryEntryBase entry, ActiveSnapshot? activeSnapshot,

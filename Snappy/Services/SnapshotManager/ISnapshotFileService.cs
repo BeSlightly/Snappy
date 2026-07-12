@@ -6,6 +6,9 @@ public interface ISnapshotFileService
 
     void RenameSnapshot(string oldPath, string newName);
 
+    Task<HistoryEntryDeletionResult> DeleteHistoryEntryAsync(string snapshotPath, HistoryEntryBase entry,
+        bool deleteUniqueGlamourerFiles);
+
     void SaveSnapshotToDisk(string snapshotPath, SnapshotInfo info, GlamourerHistory glamourerHistory,
         CustomizeHistory customizeHistory);
 }

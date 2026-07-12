@@ -46,6 +46,7 @@ public partial class MainWindow : Window, IDisposable
     private int _pmpBuildToken;
     private int _historyLoadVersion;
     private int _snapshotRefreshVersion;
+    private bool _historyDeleteInProgress;
     private bool _pmpNeedsRebuild;
     private string? _pmpBuildError;
     private bool _isRenamingSnapshot;

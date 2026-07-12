@@ -10,6 +10,7 @@ public class Configuration
     public bool UseLiveSnapshotData { get; set; }
     public bool UsePenumbraIpcResourcePaths { get; set; }
     public bool IncludeVisibleTempCollectionActors { get; set; }
+    public bool DeleteUniqueFilesWithGlamourerHistoryEntry { get; set; }
 
     public bool IsValid()
     {

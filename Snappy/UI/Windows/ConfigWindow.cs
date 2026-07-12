@@ -108,6 +108,19 @@ public sealed class ConfigWindow : Window
         Im.Text("Maintenance"u8);
         ImGui.Spacing();
 
+        var deleteUniqueHistoryFiles = _configuration.DeleteUniqueFilesWithGlamourerHistoryEntry;
+        if (Im.Checkbox("Delete files unique to deleted Glamourer history entries", ref deleteUniqueHistoryFiles))
+        {
+            _configuration.DeleteUniqueFilesWithGlamourerHistoryEntry = deleteUniqueHistoryFiles;
+            _configuration.Save();
+        }
+
+        Im.Tooltip.OnHover(
+            "Opt-in and disabled by default. When enabled, deleting a Glamourer history entry also deletes managed "
+            + "snapshot files that are not used by any remaining Glamourer or Customize+ history entry.");
+
+        ImGui.Spacing();
+
         if (Im.Button("Run Snapshot Migration Scan", new Vector2(ImGui.GetContentRegionAvail().X, 0)))
             _snappy.ManuallyRunMigration();
 
