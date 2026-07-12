@@ -3,7 +3,7 @@
   <!-- Plugin manifest -->
   <PropertyGroup>
     <Name>Snappy</Name>
-    <Version>0.5.2.2</Version>
+    <Version>0.5.2.3</Version>
     <Author>Eqbot, Vivi, astrodoobs, BeSlightly</Author>
     <RepoUrl>https://github.com/BeSlightly/Snappy</RepoUrl>
     <Punchline>Plugin to save current appearance and applied mods of a character</Punchline>
@@ -29,4 +29,36 @@
     <PackageReference Include="ECommons" Version="3.2.1.15" />
     <PackageReference Include="lz4net" Version="1.0.15.93" />
   </ItemGroup>
+
+  <!-- Keep Penumbra's unrelated runtime dependencies out of the release zip. -->
+  <Target Name="PruneUnusedPenumbraRuntimeFiles"
+          BeforeTargets="DefaultDalamudPackagerRelease"
+          Condition="'$(Configuration)' == 'Release'">
+    <ItemGroup>
+      <_UnusedPenumbraRuntimeFile Include="$(OutputPath)SharpCompress.dll" />
+      <_UnusedPenumbraRuntimeFile Include="$(OutputPath)SixLabors.ImageSharp.dll" />
+      <_UnusedPenumbraRuntimeFile Include="$(OutputPath)DirectXTexC.dll" />
+      <_UnusedPenumbraRuntimeFile Include="$(OutputPath)SharpGLTF.Core.dll" />
+      <_UnusedPenumbraRuntimeFile Include="$(OutputPath)SharpGLTF.Runtime.dll" />
+      <_UnusedPenumbraRuntimeFile Include="$(OutputPath)SharpGLTF.Toolkit.dll" />
+      <_UnusedPenumbraRuntimeFile Include="$(OutputPath)LiteDB.dll" />
+      <_UnusedPenumbraRuntimeFile Include="$(OutputPath)EmbedIO.dll" />
+      <_UnusedPenumbraRuntimeFile Include="$(OutputPath)Swan.Lite.dll" />
+      <_UnusedPenumbraRuntimeFile Include="$(OutputPath)PeNet.dll" />
+      <_UnusedPenumbraRuntimeFile Include="$(OutputPath)System.Security.Cryptography.Pkcs.dll" />
+      <_UnusedPenumbraRuntimeFile Include="$(OutputPath)runtimes\**\System.Security.Cryptography.Pkcs.dll" />
+      <_UnusedPenumbraRuntimeFile Include="$(OutputPath)OtterTex.dll" />
+      <_UnusedPenumbraRuntimeFile Include="$(OutputPath)Penumbra.CrashHandler.exe" />
+      <_UnusedPenumbraRuntimeFile Include="$(OutputPath)Penumbra.CrashHandler.dll" />
+      <_UnusedPenumbraRuntimeFile Include="$(OutputPath)Penumbra.CrashHandler.deps.json" />
+      <_UnusedPenumbraRuntimeFile Include="$(OutputPath)Penumbra.CrashHandler.runtimeconfig.json" />
+      <_UnusedPenumbraRuntimeFile Include="$(OutputPath)Penumbra.json" />
+      <_UnusedPenumbraRuntimeFile Include="$(OutputPath)tsmLogo.png" />
+      <_UnusedPenumbraRuntimeFile Include="$(OutputPath)Penumbra.Api.xml" />
+      <_UnusedPenumbraRuntimeFile Include="$(OutputPath)Penumbra.String.xml" />
+      <_UnusedPenumbraRuntimeFile Include="$(OutputPath)Glamourer.Api.xml" />
+    </ItemGroup>
+
+    <Delete Files="@(_UnusedPenumbraRuntimeFile)" />
+  </Target>
 </Project>
