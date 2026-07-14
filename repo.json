@@ -25,11 +25,11 @@
     "IsTestingExclusive": "False",
     "DownloadLinkInstall": "https://github.com/BeSlightly/Snappy/releases/download/v0.5.1.1/latest.zip",
     "DownloadLinkUpdate": "https://github.com/BeSlightly/Snappy/releases/download/v0.5.1.1/latest.zip",
-    "DownloadLinkTesting": "https://github.com/BeSlightly/Snappy/releases/download/v0.5.2.4/latest.zip",
+    "DownloadLinkTesting": "https://github.com/BeSlightly/Snappy/releases/download/v0.5.2.5/latest.zip",
     "IconUrl": "https://raw.githubusercontent.com/BeSlightly/Snappy/refs/heads/master/snappy.png",
-    "LastUpdate": 1783895855,
+    "LastUpdate": 1784049869,
     "Changelog": "",
-    "DownloadCount": 8203,
-    "TestingAssemblyVersion": "0.5.2.4"
+    "DownloadCount": 8275,
+    "TestingAssemblyVersion": "0.5.2.5"
   }
 ]
