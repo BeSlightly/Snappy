@@ -59,7 +59,7 @@ public class McdfManager : IMcdfManager
                 gamePathToHashMap.Remove(gamePath); // Brio applies swaps after files, so swaps win on collisions.
 
             var snapshotInfo = CreateSnapshotInfo(charaFile, createdSnapshotPath, gamePathToHashMap, fileSwaps);
-            var customizeHistory = CreateCustomizeHistory(charaFile, snapshotInfo.CurrentFileMapId);
+            var customizeHistory = CreateCustomizeHistory(charaFile);
             var customizeData = customizeHistory.Entries.LastOrDefault()?.CustomizeData ?? string.Empty;
             var glamourerHistory = CreateGlamourerHistory(charaFile, snapshotInfo.CurrentFileMapId, customizeData);
 
@@ -106,7 +106,7 @@ public class McdfManager : IMcdfManager
 
             var glamourerEntry = selectedGlamourer ?? glamourerHistory.Entries.LastOrDefault();
             var customizeEntry = selectedCustomize ?? customizeHistory.Entries.LastOrDefault();
-            var fileMapId = glamourerEntry?.FileMapId ?? customizeEntry?.FileMapId ?? snapshotInfo.CurrentFileMapId;
+            var fileMapId = glamourerEntry?.FileMapId ?? snapshotInfo.CurrentFileMapId;
             var resolvedFileMap = FileMapUtil.ResolveFileMap(snapshotInfo, fileMapId);
             var resolvedFileSwaps = FileMapUtil.ResolveFileSwaps(snapshotInfo, fileMapId);
             foreach (var gamePath in resolvedFileSwaps.Keys)
@@ -180,7 +180,7 @@ public class McdfManager : IMcdfManager
         return history;
     }
 
-    private static CustomizeHistory CreateCustomizeHistory(McdfHeader charaFile, string? fileMapId)
+    private static CustomizeHistory CreateCustomizeHistory(McdfHeader charaFile)
     {
         var history = new CustomizeHistory();
         var customizeData = charaFile.CharaFileData.CustomizePlusData;
@@ -192,7 +192,7 @@ public class McdfManager : IMcdfManager
             ? Convert.ToBase64String(Encoding.UTF8.GetBytes(normalizedProfileJson))
             : customizeData;
         history.Entries.Add(CustomizeHistoryEntry.CreateFromBase64(normalizedData,
-            normalizedData == customizeData ? profileJson : normalizedProfileJson, "Imported from MCDF", fileMapId));
+            normalizedData == customizeData ? profileJson : normalizedProfileJson, "Imported from MCDF"));
         return history;
     }
 

@@ -83,7 +83,7 @@ public static class SnapshotMigrator
 
                 var customizeEntry =
                     CustomizeHistoryEntry.CreateFromBase64(oldInfo.CustomizeData, cplusJson,
-                        "Migrated from old format", newInfo.CurrentFileMapId);
+                        "Migrated from old format");
                 customizeHistory.Entries.Add(customizeEntry);
             }
 

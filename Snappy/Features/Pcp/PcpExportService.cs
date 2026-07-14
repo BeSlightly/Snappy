@@ -32,7 +32,8 @@ internal sealed class PcpExportService
             var customizeHistory = await JsonUtil.DeserializeStateAsync<CustomizeHistory>(paths.CustomizeHistoryFile) ??
                                    new CustomizeHistory();
 
-            var fileMapId = selectedGlamourer?.FileMapId ?? selectedCustomize?.FileMapId ?? snapshotInfo.CurrentFileMapId;
+            var glamourerEntry = selectedGlamourer ?? glamourerHistory.Entries.LastOrDefault();
+            var fileMapId = glamourerEntry?.FileMapId ?? snapshotInfo.CurrentFileMapId;
             var resolvedFileMap = FileMapUtil.ResolveFileMap(snapshotInfo, fileMapId);
             var resolvedFileSwaps = FileMapUtil.ResolveFileSwaps(snapshotInfo, fileMapId);
             foreach (var gamePath in resolvedFileSwaps.Keys)
@@ -72,7 +73,6 @@ internal sealed class PcpExportService
                     Note = "Exported from Snappy"
                 };
 
-                var glamourerEntry = selectedGlamourer ?? glamourerHistory.Entries.LastOrDefault();
                 if (glamourerEntry != null)
                     try
                     {

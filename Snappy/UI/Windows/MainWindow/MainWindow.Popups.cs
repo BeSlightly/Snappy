@@ -57,12 +57,12 @@ public partial class MainWindow
                 {
                     using (var warningColor = ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.DalamudYellow))
                     {
-                        Im.Text("Unique snapshot files will also be deleted.");
+                        Im.Text("Unused snapshot files will also be deleted.");
                     }
 
                     using (var mutedColor = ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.DalamudGrey))
                     {
-                        Im.Text("Files used by other entries will stay.");
+                        Im.Text("Files used by other Glamourer entries will stay.");
                         Im.Text("Turn off cleanup in Settings to keep all files.");
                     }
                 }

@@ -230,8 +230,7 @@ public class SnapshotApplicationService : ISnapshotApplicationService
         var resolvedManipulations = string.Empty;
         if (applyFiles)
         {
-            var mapIdToUse = glamourerToApply?.FileMapId ?? customizeOverride?.FileMapId ??
-                             snapshotInfo.CurrentFileMapId;
+            var mapIdToUse = glamourerToApply?.FileMapId ?? snapshotInfo.CurrentFileMapId;
             resolvedFileMap = FileMapUtil.ResolveFileMap(snapshotInfo, mapIdToUse);
             resolvedFileSwaps = FileMapUtil.ResolveFileSwaps(snapshotInfo, mapIdToUse);
             resolvedManipulations = FileMapUtil.ResolveManipulation(snapshotInfo, mapIdToUse);

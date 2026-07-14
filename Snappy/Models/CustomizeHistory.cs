@@ -10,15 +10,13 @@ public record CustomizeHistoryEntry : HistoryEntryBase
     public string CustomizeData { get; set; } = string.Empty; // Base64 from Mare
     public string CustomizeTemplate { get; set; } = string.Empty; // Importable template
 
-    public static CustomizeHistoryEntry CreateFromBase64(string base64Data, string? profileJson, string description,
-        string? fileMapId = null)
+    public static CustomizeHistoryEntry CreateFromBase64(string base64Data, string? profileJson, string description)
     {
         var entry = new CustomizeHistoryEntry
         {
             Timestamp = DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture),
             Description = description,
-            CustomizeData = base64Data,
-            FileMapId = fileMapId
+            CustomizeData = base64Data
         };
 
         if (!string.IsNullOrEmpty(profileJson))

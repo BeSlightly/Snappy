@@ -69,6 +69,32 @@ public static class SnapshotBlobUtil
         return paths;
     }
 
+    public static IReadOnlyList<(string BlobId, string Path)> FindAllManagedBlobPaths(string filesDirectory)
+    {
+        if (!Directory.Exists(filesDirectory))
+            return [];
+
+        var fullFilesDirectory = Path.GetFullPath(filesDirectory);
+        if ((File.GetAttributes(fullFilesDirectory) & FileAttributes.ReparsePoint) != 0)
+            throw new InvalidOperationException("Snapshot file cleanup will not follow a reparse-point files directory.");
+
+        var paths = new List<(string BlobId, string Path)>();
+        foreach (var path in Directory.EnumerateFiles(fullFilesDirectory, "*", SearchOption.TopDirectoryOnly))
+        {
+            if (!TryGetManagedBlobId(Path.GetFileName(path), out var blobId))
+                continue;
+
+            var fullPath = Path.GetFullPath(path);
+            if (!string.Equals(Path.GetDirectoryName(fullPath), fullFilesDirectory,
+                    StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            paths.Add((blobId, fullPath));
+        }
+
+        return paths;
+    }
+
     public static string ResolveBlobPath(string filesDirectory, string hash, string gamePath)
     {
         var preferredPath = GetPreferredBlobPath(filesDirectory, hash, gamePath);
@@ -89,13 +115,21 @@ public static class SnapshotBlobUtil
 
     private static bool IsManagedBlobFileName(string fileName, string blobId)
     {
-        if (string.Equals(fileName, blobId, StringComparison.OrdinalIgnoreCase))
-            return true;
+        return TryGetManagedBlobId(fileName, out var fileBlobId)
+               && string.Equals(fileBlobId, blobId, StringComparison.OrdinalIgnoreCase);
+    }
 
-        if (!fileName.StartsWith(blobId + ".", StringComparison.OrdinalIgnoreCase))
+    private static bool TryGetManagedBlobId(string fileName, out string blobId)
+    {
+        var separatorIndex = fileName.IndexOf('.');
+        var rawBlobId = separatorIndex < 0 ? fileName : fileName[..separatorIndex];
+        if (!TryNormalizeBlobId(rawBlobId, out blobId))
             return false;
 
-        var extension = fileName[(blobId.Length + 1)..];
+        if (separatorIndex < 0)
+            return true;
+
+        var extension = fileName[(separatorIndex + 1)..];
         return extension.Length is > 0 and <= 15 && !extension.Contains('.');
     }
 

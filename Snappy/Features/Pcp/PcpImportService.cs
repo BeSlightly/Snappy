@@ -60,7 +60,7 @@ internal sealed class PcpImportService
 
             var customizeHistory = new CustomizeHistory();
             if (characterData.CustomizePlus != null)
-                customizeHistory = CreateCustomizeHistory(characterData, snapshotInfo.CurrentFileMapId);
+                customizeHistory = CreateCustomizeHistory(characterData);
             var customizeData = customizeHistory.Entries.LastOrDefault()?.CustomizeData ?? string.Empty;
 
             var glamourerHistory = new GlamourerHistory();
@@ -166,7 +166,7 @@ internal sealed class PcpImportService
         return history;
     }
 
-    private static CustomizeHistory CreateCustomizeHistory(PcpCharacterData characterData, string? fileMapId)
+    private static CustomizeHistory CreateCustomizeHistory(PcpCharacterData characterData)
     {
         var history = new CustomizeHistory();
         if (characterData.CustomizePlus != null)
@@ -182,8 +182,7 @@ internal sealed class PcpImportService
 
                 var customizeBase64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(profileJson));
                 history.Entries.Add(CustomizeHistoryEntry.CreateFromBase64(customizeBase64, profileJson,
-                    customizePlusObj["Template"] == null ? "Imported from PCP (Legacy Format)" : "Imported from PCP",
-                    fileMapId));
+                    customizePlusObj["Template"] == null ? "Imported from PCP (Legacy Format)" : "Imported from PCP"));
             }
             catch (Exception ex)
             {

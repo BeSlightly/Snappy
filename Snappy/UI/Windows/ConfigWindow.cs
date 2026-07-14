@@ -109,7 +109,7 @@ public sealed class ConfigWindow : Window
         ImGui.Spacing();
 
         var deleteUniqueHistoryFiles = _configuration.DeleteUniqueFilesWithGlamourerHistoryEntry;
-        if (Im.Checkbox("Delete files unique to deleted Glamourer history entries", ref deleteUniqueHistoryFiles))
+        if (Im.Checkbox("Delete unused files with Glamourer history entries", ref deleteUniqueHistoryFiles))
         {
             _configuration.DeleteUniqueFilesWithGlamourerHistoryEntry = deleteUniqueHistoryFiles;
             _configuration.Save();
@@ -117,7 +117,8 @@ public sealed class ConfigWindow : Window
 
         Im.Tooltip.OnHover(
             "Opt-in and disabled by default. When enabled, deleting a Glamourer history entry also deletes managed "
-            + "snapshot files that are not used by any remaining Glamourer or Customize+ history entry.");
+            + "snapshot files that are not used by the current state or any remaining Glamourer history entry. "
+            + "Customize+ entries do not own snapshot files.");
 
         ImGui.Spacing();
 

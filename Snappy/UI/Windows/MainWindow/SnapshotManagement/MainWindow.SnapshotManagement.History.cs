@@ -199,7 +199,9 @@ public partial class MainWindow
                             return;
 
                         Notify.Info($"Starting PMP export for entry '{entry.Description ?? ""}'...");
-                        var mapId = entry.FileMapId ?? _selectedSnapshotInfo?.CurrentFileMapId;
+                        var mapId = entry is GlamourerHistoryEntry
+                            ? entry.FileMapId ?? _selectedSnapshotInfo?.CurrentFileMapId
+                            : _selectedSnapshotInfo?.CurrentFileMapId;
                         _snappy.ExecuteBackgroundTask(() =>
                             _pmpExportManager.SnapshotToPMPAsync(snapshotPath, path, mapId));
                     },

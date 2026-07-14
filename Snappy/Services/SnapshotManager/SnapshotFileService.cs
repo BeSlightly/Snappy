@@ -244,7 +244,7 @@ public class SnapshotFileService : ISnapshotFileService
         {
             var entryStamp = DateTime.UtcNow;
             var newEntry = CustomizeHistoryEntry.CreateFromBase64(b64Customize, snapshotData.Customize,
-                $"Customize+ Update - {entryStamp:yyyy-MM-dd HH:mm:ss} UTC", snapshotInfo.CurrentFileMapId);
+                $"Customize+ Update - {entryStamp:yyyy-MM-dd HH:mm:ss} UTC");
             customizeHistory.Entries.Add(newEntry);
             PluginLog.Debug("New Customize+ version detected. Appending to history.");
         }
@@ -367,8 +367,6 @@ public class SnapshotFileService : ISnapshotFileService
         if (snapshotInfo.CurrentFileMapId != null)
         {
             foreach (var entry in glamourerHistory.Entries.Where(e => string.IsNullOrEmpty(e.FileMapId)))
-                entry.FileMapId = snapshotInfo.CurrentFileMapId;
-            foreach (var entry in customizeHistory.Entries.Where(e => string.IsNullOrEmpty(e.FileMapId)))
                 entry.FileMapId = snapshotInfo.CurrentFileMapId;
         }
 
@@ -599,22 +597,22 @@ public class SnapshotFileService : ISnapshotFileService
         }
 
         var updatedSnapshotInfo = snapshotInfo;
-        HashSet<string> uniqueBlobIds = [];
+        var cleanupPlanned = false;
         string? cleanupSkippedReason = null;
         if (deleteUniqueGlamourerFiles && deletedGlamourerEntry != null)
         {
-            if (!TryBuildUniqueBlobDeletionPlan(snapshotInfo, deletedGlamourerEntry, glamourerHistory,
-                    customizeHistory, out updatedSnapshotInfo, out uniqueBlobIds, out cleanupSkippedReason))
+            cleanupPlanned = TryBuildHistoryDeletionPlan(snapshotInfo, deletedGlamourerEntry, glamourerHistory,
+                out updatedSnapshotInfo, out cleanupSkippedReason);
+            if (!cleanupPlanned)
             {
                 updatedSnapshotInfo = snapshotInfo;
-                uniqueBlobIds.Clear();
             }
         }
 
         if (!SaveSnapshotToDiskCore(snapshotPath, updatedSnapshotInfo, glamourerHistory, customizeHistory))
             return new HistoryEntryDeletionResult(false, ErrorMessage: "Could not save the updated snapshot state.");
 
-        if (uniqueBlobIds.Count == 0)
+        if (!cleanupPlanned)
             return new HistoryEntryDeletionResult(true, CleanupSkippedReason: cleanupSkippedReason);
 
         // Re-read the committed state and prove each candidate is still unreferenced before touching the file store.
@@ -627,7 +625,7 @@ public class SnapshotFileService : ISnapshotFileService
             NormalizeDeletionState(committedInfo, committedGlamourer, committedCustomize);
         string? validationError = null;
         if (committedInfo == null ||
-            !TryCollectReferencedBlobIds(committedInfo, committedGlamourer, committedCustomize,
+            !TryCollectReferencedBlobIds(committedInfo, committedGlamourer,
                 out var committedReferences, out validationError))
         {
             var reason = committedInfo == null ? "the committed snapshot state could not be reloaded" : validationError;
@@ -635,35 +633,34 @@ public class SnapshotFileService : ISnapshotFileService
             return new HistoryEntryDeletionResult(true, CleanupSkippedReason: reason);
         }
 
-        uniqueBlobIds.ExceptWith(committedReferences);
+        IReadOnlyList<(string BlobId, string Path)> managedBlobPaths;
+        try
+        {
+            managedBlobPaths = SnapshotBlobUtil.FindAllManagedBlobPaths(paths.FilesDirectory);
+        }
+        catch (Exception ex)
+        {
+            var reason = $"managed snapshot files could not be enumerated ({ex.Message})";
+            PluginLog.Warning($"Unused file cleanup skipped for '{snapshotPath}': {reason}.");
+            return new HistoryEntryDeletionResult(true, CleanupSkippedReason: reason);
+        }
+
         var deletedFileCount = 0;
         var failedFileCount = 0;
-        foreach (var blobId in uniqueBlobIds)
+        foreach (var (blobId, blobPath) in managedBlobPaths)
         {
-            IReadOnlyList<string> blobPaths;
+            if (committedReferences.Contains(blobId))
+                continue;
+
             try
             {
-                blobPaths = SnapshotBlobUtil.FindAllExistingBlobPaths(paths.FilesDirectory, blobId);
+                File.Delete(blobPath);
+                deletedFileCount++;
             }
             catch (Exception ex)
             {
                 failedFileCount++;
-                PluginLog.Error($"Could not enumerate snapshot blob '{blobId}' for deletion: {ex}");
-                continue;
-            }
-
-            foreach (var blobPath in blobPaths)
-            {
-                try
-                {
-                    File.Delete(blobPath);
-                    deletedFileCount++;
-                }
-                catch (Exception ex)
-                {
-                    failedFileCount++;
-                    PluginLog.Error($"Could not delete unique snapshot file '{blobPath}': {ex}");
-                }
+                PluginLog.Error($"Could not delete unused snapshot file '{blobPath}': {ex}");
             }
         }
 
@@ -694,32 +691,27 @@ public class SnapshotFileService : ISnapshotFileService
         return -1;
     }
 
-    private static bool TryBuildUniqueBlobDeletionPlan(SnapshotInfo snapshotInfo,
+    private static bool TryBuildHistoryDeletionPlan(SnapshotInfo snapshotInfo,
         GlamourerHistoryEntry deletedEntry, GlamourerHistory remainingGlamourer,
-        CustomizeHistory remainingCustomize, out SnapshotInfo updatedSnapshotInfo,
-        out HashSet<string> uniqueBlobIds, out string? error)
+        out SnapshotInfo updatedSnapshotInfo, out string? error)
     {
         updatedSnapshotInfo = snapshotInfo;
-        uniqueBlobIds = [];
         error = null;
 
-        if (!TryResolveHistoryFileMap(snapshotInfo, deletedEntry, out var deletedMap, out error))
+        if (!TryResolveHistoryFileMap(snapshotInfo, deletedEntry, out _, out error))
             return false;
 
         var targetMapId = deletedEntry.FileMapId ?? snapshotInfo.CurrentFileMapId;
         var currentMapBelongsOnlyToDeletedEntry = !string.IsNullOrEmpty(targetMapId)
                                                   && string.Equals(snapshotInfo.CurrentFileMapId, targetMapId,
                                                       StringComparison.OrdinalIgnoreCase)
-                                                  && !remainingGlamourer.Entries.Cast<HistoryEntryBase>()
-                                                      .Concat(remainingCustomize.Entries)
-                                                      .Any(remaining => HistoryEntryUsesMap(remaining, targetMapId,
+                                                  && !remainingGlamourer.Entries.Any(remaining =>
+                                                      HistoryEntryUsesMap(remaining, targetMapId,
                                                           snapshotInfo.CurrentFileMapId));
 
         if (currentMapBelongsOnlyToDeletedEntry)
         {
-            var replacement = remainingGlamourer.Entries.LastOrDefault(e => !string.IsNullOrEmpty(e.FileMapId))
-                              ?? (HistoryEntryBase?)remainingCustomize.Entries.LastOrDefault(e =>
-                                  !string.IsNullOrEmpty(e.FileMapId));
+            var replacement = remainingGlamourer.Entries.LastOrDefault(e => !string.IsNullOrEmpty(e.FileMapId));
             if (replacement == null)
             {
                 updatedSnapshotInfo = snapshotInfo with
@@ -756,25 +748,19 @@ public class SnapshotFileService : ISnapshotFileService
             }
         }
 
-        if (!TryCollectReferencedBlobIds(updatedSnapshotInfo, remainingGlamourer, remainingCustomize,
-                out var remainingReferences, out error))
+        if (!TryCollectReferencedBlobIds(updatedSnapshotInfo, remainingGlamourer, out _, out error))
             return false;
 
-        uniqueBlobIds = deletedMap.Values
-            .Select(value => SnapshotBlobUtil.TryNormalizeBlobId(value, out var blobId) ? blobId : string.Empty)
-            .Where(value => !string.IsNullOrEmpty(value))
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
-        uniqueBlobIds.ExceptWith(remainingReferences);
         return true;
     }
 
     private static bool TryCollectReferencedBlobIds(SnapshotInfo snapshotInfo, GlamourerHistory glamourerHistory,
-        CustomizeHistory customizeHistory, out HashSet<string> referencedBlobIds, out string? error)
+        out HashSet<string> referencedBlobIds, out string? error)
     {
         referencedBlobIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         error = null;
 
-        foreach (var entry in glamourerHistory.Entries.Cast<HistoryEntryBase>().Concat(customizeHistory.Entries))
+        foreach (var entry in glamourerHistory.Entries)
         {
             if (!TryResolveHistoryFileMap(snapshotInfo, entry, out var fileMap, out error))
                 return false;
