@@ -1,11 +1,22 @@
 <div align="center">
   <img src="snappy.png" alt="Snappy Logo" width="150" />
-  <h1>Snappy</h1>
-  <p><strong>(Formerly XIVSnapper)</strong></p>
-  <p>A forked and maintained mod originally based on work by <a href="https://github.com/eqbot">@eqbot</a>, <a href="https://github.com/ViviAshe">@ViviAshe</a> and <a href="https://github.com/astrodoobs">@astrodoobs</a>.</p>
 
-  <a href="https://github.com/BeSlightly/Snappy/releases"><img src="https://img.shields.io/github/v/release/BeSlightly/Snappy?style=for-the-badge&color=blue" alt="Latest Release"></a>   <a href="https://github.com/BeSlightly/Snappy/releases"><img src="https://img.shields.io/github/v/release/BeSlightly/Snappy?include_prereleases&label=Testing&style=for-the-badge&color=orange" alt="Latest Testing (Pre-release)"></a>
-  </div>
+  <h1>Snappy</h1>
+
+  <p><strong>(Formerly XIVSnapper)</strong></p>
+
+  <p>
+    A forked and maintained mod originally based on work by
+    <a href="https://github.com/eqbot">@eqbot</a>,
+    <a href="https://github.com/ViviAshe">@ViviAshe</a> and
+    <a href="https://github.com/astrodoobs">@astrodoobs</a>.
+  </p>
+
+  <p>
+    <a href="https://github.com/BeSlightly/Snappy/releases/latest"><picture><source media="(prefers-color-scheme: dark)" srcset="https://www.shieldcn.dev/github/release/BeSlightly/Snappy/stable.svg?size=xs&amp;mode=dark&amp;variant=default"><img src="https://www.shieldcn.dev/github/release/BeSlightly/Snappy/stable.svg?size=xs&amp;mode=light&amp;variant=default" alt="Stable Release"></picture></a>
+    <a href="https://github.com/BeSlightly/Snappy/releases"><picture><source media="(prefers-color-scheme: dark)" srcset="https://www.shieldcn.dev/badge/dynamic/json.svg?url=https%3A%2F%2Fapi.github.com%2Frepos%2FBeSlightly%2FSnappy%2Freleases%3Fper_page%3D1&amp;query=%24%5B0%5D.tag_name&amp;label=testing&amp;logo=lu%3ATag&amp;size=xs&amp;mode=dark&amp;variant=default"><img src="https://www.shieldcn.dev/badge/dynamic/json.svg?url=https%3A%2F%2Fapi.github.com%2Frepos%2FBeSlightly%2FSnappy%2Freleases%3Fper_page%3D1&amp;query=%24%5B0%5D.tag_name&amp;label=testing&amp;logo=lu%3ATag&amp;size=xs&amp;mode=light&amp;variant=default" alt="Latest Testing Release"></picture></a>
+  </p>
+</div>
 
 ## What it does
 
@@ -23,7 +34,7 @@ For other Mare forks, enable `Use Penumbra/Customize+/Glamourer (fallback)` in S
 
 Add this custom repo to Dalamud:
 
-```
+```text
 https://github.com/BeSlightly/Snappy/raw/refs/heads/master/repo.json
 ```
 
