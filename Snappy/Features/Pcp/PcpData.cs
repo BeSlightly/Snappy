@@ -13,6 +13,7 @@ public record PcpMetadata
     public string Website { get; set; } = string.Empty;
     public List<string> ModTags { get; set; } = ["PCP"];
     public List<object> DefaultPreferredItems { get; set; } = [];
+    public PcpModData? DefaultData { get; set; }
 }
 
 public record PcpCharacterData

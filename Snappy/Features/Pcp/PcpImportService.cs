@@ -46,8 +46,7 @@ internal sealed class PcpImportService
                 "Invalid PCP file: missing character.json", "Failed to parse character.json from PCP file.");
             if (characterData == null) return;
 
-            var modData = ArchiveUtil.ReadJsonEntry<PcpModData>(archive, "default_mod.json", Notify.Error,
-                "Invalid PCP file: missing default_mod.json", "Failed to parse default_mod.json from PCP file.");
+            var modData = ReadModData(archive, metadata);
             if (modData == null) return;
 
             snapshotPath = CreateSnapshotDirectory(metadata.Name);
@@ -91,6 +90,15 @@ internal sealed class PcpImportService
     {
         var snapshotDirName = SnapshotImportUtil.SanitizeDirectoryName(description, "PCP_Import");
         return SnapshotImportUtil.CreateUniqueSnapshotDirectory(_configuration.WorkingDirectory, snapshotDirName);
+    }
+
+    private static PcpModData? ReadModData(ZipArchive archive, PcpMetadata metadata)
+    {
+        if (metadata.FileVersion >= 4)
+            return metadata.DefaultData ?? new PcpModData();
+
+        return ArchiveUtil.ReadJsonEntry<PcpModData>(archive, "default_mod.json", Notify.Error,
+            "Invalid PCP file: missing default_mod.json", "Failed to parse default_mod.json from PCP file.");
     }
 
     private static SnapshotInfo CreateSnapshotInfo(PcpCharacterData characterData,
