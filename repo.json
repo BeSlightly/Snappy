@@ -28,7 +28,7 @@
     "DownloadLinkTesting": "https://github.com/BeSlightly/Snappy/releases/download/v0.5.2.6/latest.zip",
     "IconUrl": "https://raw.githubusercontent.com/BeSlightly/Snappy/refs/heads/master/snappy.png",
     "LastUpdate": 1785179952,
-    "Changelog": "Bypass for Lightless block :).",
+    "Changelog": "Lightless removed their Snappy block, so the bypass has been removed again.",
     "DownloadCount": 8986,
     "TestingAssemblyVersion": "0.5.2.6"
   }
