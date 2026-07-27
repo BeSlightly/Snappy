@@ -105,22 +105,29 @@ public sealed class PenumbraIpc : IpcSubscriber
 
     public bool HasTemporaryCollection(int objIdx)
     {
-        if (!IsReady()) return false;
+        return GetTemporaryCollectionName(objIdx) != null;
+    }
+
+    public string? GetTemporaryCollectionName(int objIdx)
+    {
+        if (!IsReady()) return null;
 
         try
         {
             var (valid, _, effectiveCollection) = _getCollectionForObject.Invoke(objIdx);
-            if (!valid) return false;
-            if (effectiveCollection.Id == Guid.Empty) return false;
+            if (!valid) return null;
+            if (effectiveCollection.Id == Guid.Empty) return null;
 
             var persistentIds = GetPersistentCollectionIds();
-            if (persistentIds.Count == 0) return false;
-            return !persistentIds.Contains(effectiveCollection.Id);
+            if (persistentIds.Count == 0) return null;
+            if (persistentIds.Contains(effectiveCollection.Id)) return null;
+
+            return effectiveCollection.Name;
         }
         catch (Exception e)
         {
             PluginLog.Error($"Error checking Penumbra collection for object index {objIdx}:\n{e}");
-            return false;
+            return null;
         }
     }
 

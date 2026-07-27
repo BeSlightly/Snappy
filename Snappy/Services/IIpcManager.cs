@@ -8,6 +8,7 @@ public interface IIpcManager : IDisposable
     Dictionary<string, HashSet<string>> PenumbraGetGameObjectResourcePaths(int objIdx);
     Dictionary<string, string> PenumbraGetCollectionResolvedFiles(int objIdx);
     bool PenumbraHasTemporaryCollection(int objIdx);
+    string? PenumbraGetTemporaryCollectionName(int objIdx);
     bool PenumbraSetTempMods(ICharacter character, int? idx, Dictionary<string, string> mods, string manips);
     string GetGlamourerState(ICharacter c);
     void ApplyGlamourerState(string? base64, ICharacter c);

@@ -57,6 +57,11 @@ public class IpcManager : IIpcManager, IDisposable
         return _penumbra.HasTemporaryCollection(objIdx);
     }
 
+    public string? PenumbraGetTemporaryCollectionName(int objIdx)
+    {
+        return _penumbra.GetTemporaryCollectionName(objIdx);
+    }
+
     public bool PenumbraSetTempMods(ICharacter character, int? idx, Dictionary<string, string> mods, string manips)
     {
         return _penumbra.SetTemporaryMods(character, idx, mods, manips);

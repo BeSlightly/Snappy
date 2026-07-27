@@ -27,7 +27,7 @@ Snappy is a Dalamud plugin for saving and loading a character's appearance, incl
 - [Lightless Sync](https://git.lightless-sync.org/Lightless-Sync/LightlessClient)
 - [Snowcloak](https://github.com/Eauldane/SnowcloakClient)
 - [Player Sync](https://github.com/universalconquistador/MareSynchronosClient)
-- [Laci Synchroni](https://github.com/LaciSynchroni/client)
+- [Laci Synchroni](https://github.com/LaciSynchroni/client) [Experimental]
 
 For other Mare forks, enable `Use Penumbra/Customize+/Glamourer (fallback)` in Settings to capture live Penumbra, Glamourer, and Customize+ data.
 

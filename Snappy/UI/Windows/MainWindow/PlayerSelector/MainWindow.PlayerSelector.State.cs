@@ -100,6 +100,8 @@ public partial class MainWindow
             return;
 
         var inGpose = PluginUtil.IsInGpose();
+        var showTempCollections = _snappy.Configuration.UseLiveSnapshotData
+                                  && _snappy.Configuration.IncludeVisibleTempCollectionActors;
         var nameCount = new Dictionary<string, int>(StringComparer.Ordinal);
         foreach (var actor in selectableActors)
         {
@@ -150,6 +152,13 @@ public partial class MainWindow
             var syncSource = GetSyncSourceLabel(isSnowcloak, isLightless, isPlayerSync, isLaci);
             if (syncSource != null)
                 displayName = $"{displayName} ({syncSource})";
+
+            if (showTempCollections)
+            {
+                var collectionName = _ipcManager.PenumbraGetTemporaryCollectionName(actor.ObjectIndex);
+                if (!string.IsNullOrEmpty(collectionName))
+                    displayName = $"{displayName} {{{collectionName}}}";
+            }
 
             _cachedActorRows.Add(new ActorRow(actor, displayName, isSnowcloak, isLightless, isPlayerSync, isLaci));
         }
