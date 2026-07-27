@@ -222,6 +222,7 @@ public sealed class ConfigWindow : Window
             "LightlessSync" => "Lightless Sync",
             "Snowcloak" => "Snowcloak",
             "MareSempiterne" => "Player Sync",
+            "LaciSynchroni" => "Laci Synchroni",
             _ => pluginName
         };
 
