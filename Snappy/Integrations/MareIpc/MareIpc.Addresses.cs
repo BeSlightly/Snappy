@@ -41,6 +41,9 @@ public sealed partial class MareIpc
         foreach (var addr in GetCurrentPlayerSyncAddresses())
             pairedAddresses.Add(addr);
 
+        foreach (var addr in GetCurrentLaciAddresses())
+            pairedAddresses.Add(addr);
+
         return pairedAddresses;
     }
 
@@ -68,6 +71,43 @@ public sealed partial class MareIpc
         }
 
         return false;
+    }
+
+    public bool IsAddressHandledByLaci(nint address)
+    {
+        if (!IsPluginActive(LaciSynchroniPluginKey)) return false;
+
+        try
+        {
+            return GetCurrentLaciAddresses().Contains(address);
+        }
+        catch (Exception ex)
+        {
+            PluginLog.Debug($"Failed Laci Synchroni address check: {ex.Message}");
+        }
+
+        return false;
+    }
+
+    private HashSet<nint> GetCurrentLaciAddresses()
+    {
+        if (!IsPluginActive(LaciSynchroniPluginKey))
+            return [];
+
+        var handledAddresses = GetHandledAddressesFromIpc(_laciSyncHandledAddresses, "LaciSynchroni");
+        var visibleAddresses = _marePlugins.TryGetValue(LaciSynchroniPluginKey, out var laciPlugin)
+            ? GetVisiblePairedAddressesViaPairs(laciPlugin)
+            : null;
+
+        if (visibleAddresses != null)
+        {
+            if (handledAddresses != null)
+                visibleAddresses.IntersectWith(handledAddresses);
+
+            return visibleAddresses;
+        }
+
+        return handledAddresses ?? [];
     }
 
     private HashSet<nint> GetCurrentLightlessAddresses()

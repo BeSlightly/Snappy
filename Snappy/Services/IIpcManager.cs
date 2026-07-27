@@ -29,4 +29,5 @@ public interface IIpcManager : IDisposable
     bool IsLightlessAddress(nint address);
     bool IsPlayerSyncAddress(nint address);
     bool IsSnowcloakAddress(nint address);
+    bool IsLaciAddress(nint address);
 }

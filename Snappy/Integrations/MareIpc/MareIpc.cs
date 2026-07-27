@@ -10,11 +10,13 @@ public sealed partial class MareIpc : IpcSubscriber
     private const string LightlessSyncPluginKey = "LightlessSync";
     private const string SnowcloakPluginKey = "Snowcloak";
     private const string MareSempiternePluginKey = "MareSempiterne";
+    private const string LaciSynchroniPluginKey = "LaciSynchroni";
     private const string PlayerSyncDisplayName = "Player Sync";
     private const string MareSynchronosNamespacePrefix = "MareSynchronos";
     private const string LightlessHandledAddressesIpc = "LightlessSync.GetHandledAddresses";
     private const string SnowcloakHandledAddressesIpc = "Snowcloak.GetHandledAddresses";
     private const string PlayerSyncHandledAddressesIpc = "PlayerSync.GetHandledAddresses";
+    private const string LaciHandledAddressesIpc = "LaciSynchroni.GetHandledAddresses";
 
     private bool _isUiOpen;
 
@@ -22,7 +24,8 @@ public sealed partial class MareIpc : IpcSubscriber
     {
         { LightlessSyncPluginKey, new MarePluginInfo(LightlessSyncPluginKey, LightlessSyncPluginKey) },
         { SnowcloakPluginKey, new MarePluginInfo(SnowcloakPluginKey, SnowcloakPluginKey) },
-        { MareSempiternePluginKey, new MarePluginInfo(PlayerSyncDisplayName, MareSynchronosNamespacePrefix) }
+        { MareSempiternePluginKey, new MarePluginInfo(PlayerSyncDisplayName, MareSynchronosNamespacePrefix) },
+        { LaciSynchroniPluginKey, new MarePluginInfo(LaciSynchroniPluginKey, LaciSynchroniPluginKey) }
     };
 
     private class MarePluginInfo
@@ -50,11 +53,14 @@ public sealed partial class MareIpc : IpcSubscriber
             Svc.PluginInterface.GetIpcSubscriber<List<nint>>(SnowcloakHandledAddressesIpc);
         _playerSyncHandledAddresses =
             Svc.PluginInterface.GetIpcSubscriber<List<nint>>(PlayerSyncHandledAddressesIpc);
+        _laciSyncHandledAddresses =
+            Svc.PluginInterface.GetIpcSubscriber<List<nint>>(LaciHandledAddressesIpc);
     }
 
     private ICallGateSubscriber<List<nint>>? _lightlessSyncHandledAddresses;
     private ICallGateSubscriber<List<nint>>? _snowcloakSyncHandledAddresses;
     private ICallGateSubscriber<List<nint>>? _playerSyncHandledAddresses;
+    private ICallGateSubscriber<List<nint>>? _laciSyncHandledAddresses;
 
     private bool IsPluginActive(string pluginKey)
     {

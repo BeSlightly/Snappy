@@ -11,7 +11,8 @@ public partial class MainWindow
         string Label,
         bool IsSnowcloak,
         bool IsLightless,
-        bool IsPlayerSync);
+        bool IsPlayerSync,
+        bool IsLaci);
 
     private const int ActorCacheRefreshIntervalMs = 250;
     private const int SelectedActorStateRefreshIntervalMs = 250;
@@ -145,15 +146,16 @@ public partial class MainWindow
             var isSnowcloak = _ipcManager.IsSnowcloakAddress(actor.Address);
             var isLightless = !isSnowcloak && _ipcManager.IsLightlessAddress(actor.Address);
             var isPlayerSync = !isSnowcloak && !isLightless && _ipcManager.IsPlayerSyncAddress(actor.Address);
-            var syncSource = GetSyncSourceLabel(isSnowcloak, isLightless, isPlayerSync);
+            var isLaci = !isSnowcloak && !isLightless && !isPlayerSync && _ipcManager.IsLaciAddress(actor.Address);
+            var syncSource = GetSyncSourceLabel(isSnowcloak, isLightless, isPlayerSync, isLaci);
             if (syncSource != null)
                 displayName = $"{displayName} ({syncSource})";
 
-            _cachedActorRows.Add(new ActorRow(actor, displayName, isSnowcloak, isLightless, isPlayerSync));
+            _cachedActorRows.Add(new ActorRow(actor, displayName, isSnowcloak, isLightless, isPlayerSync, isLaci));
         }
     }
 
-    private static string? GetSyncSourceLabel(bool isSnowcloak, bool isLightless, bool isPlayerSync)
+    private static string? GetSyncSourceLabel(bool isSnowcloak, bool isLightless, bool isPlayerSync, bool isLaci)
     {
         if (isSnowcloak)
             return "Snowcloak";
@@ -161,6 +163,8 @@ public partial class MainWindow
             return "Lightless";
         if (isPlayerSync)
             return "Player Sync";
+        if (isLaci)
+            return "Laci";
 
         return null;
     }

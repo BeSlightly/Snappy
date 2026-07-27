@@ -175,6 +175,11 @@ public class IpcManager : IIpcManager, IDisposable
         return _mare.IsAddressHandledBySnowcloak(address);
     }
 
+    public bool IsLaciAddress(nint address)
+    {
+        return _mare.IsAddressHandledByLaci(address);
+    }
+
 
     public void Dispose()
     {

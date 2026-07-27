@@ -39,6 +39,11 @@ public partial class MainWindow
             using var _ = ImRaii.PushColor(ImGuiCol.Text, MareForkColors.PlayerSync);
             ApplySelectableSelection(selectablePlayer, row.Label, selectablePlayer.ObjectIndex, isSelected);
         }
+        else if (row.IsLaci)
+        {
+            using var _ = ImRaii.PushColor(ImGuiCol.Text, MareForkColors.LaciSynchroni);
+            ApplySelectableSelection(selectablePlayer, row.Label, selectablePlayer.ObjectIndex, isSelected);
+        }
         else
         {
             ApplySelectableSelection(selectablePlayer, row.Label, selectablePlayer.ObjectIndex, isSelected);

@@ -122,6 +122,8 @@ public sealed partial class MareIpc
         {
             LightlessSyncPluginKey => ["EnumeratePairs"],
             SnowcloakPluginKey => ["GetOnlineUserPairs", "_allClientPairs"],
+            // Laci is multi-server: its parameterless probe spans every connected server.
+            LaciSynchroniPluginKey => ["GetOnlineUserPairsAcrossAllServers", "_allClientPairs"],
             MareSynchronosNamespacePrefix => ["GetOnlineUserPairs", "_allClientPairs"],
             _ => ["GetOnlineUserPairs", "GetAllPairObjects", "EnumeratePairs", "_allClientPairs"]
         };
