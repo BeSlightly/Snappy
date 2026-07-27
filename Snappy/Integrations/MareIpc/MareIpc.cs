@@ -128,11 +128,13 @@ public sealed partial class MareIpc : IpcSubscriber
                     if (pluginInfo.FileCacheManager != null)
                     {
                         pluginInfo.GetFileCacheByHashMethod = fileCacheManagerType.GetMethod("GetFileCacheByHash",
-                            new[] { typeof(string), typeof(bool) });
+                            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+                            null, [typeof(string), typeof(bool)], null);
 
                         if (pluginInfo.GetFileCacheByHashMethod == null)
-                            pluginInfo.GetFileCacheByHashMethod =
-                                fileCacheManagerType.GetMethod("GetFileCacheByHash", new[] { typeof(string) });
+                            pluginInfo.GetFileCacheByHashMethod = fileCacheManagerType.GetMethod("GetFileCacheByHash",
+                                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+                                null, [typeof(string)], null);
 
                         if (pluginInfo.GetFileCacheByHashMethod == null)
                             PluginLog.Warning(

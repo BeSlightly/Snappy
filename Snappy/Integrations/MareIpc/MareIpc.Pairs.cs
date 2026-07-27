@@ -222,7 +222,11 @@ public sealed partial class MareIpc
     {
         try
         {
-            var method = pairManager.GetType().GetMethod(methodName, BindingFlags.Instance | BindingFlags.Public);
+            var method = pairManager.GetType().GetMethod(methodName,
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+                null,
+                Type.EmptyTypes,
+                null);
             return method?.Invoke(pairManager, null);
         }
         catch
