@@ -49,6 +49,7 @@ public partial class MainWindow : Window, IDisposable
     private bool _historyDeleteInProgress;
     private bool _pmpNeedsRebuild;
     private string? _pmpBuildError;
+    private HistorySortMode _historySortMode = HistorySortMode.DateNewestFirst;
     private bool _isRenamingSnapshot;
     private bool _lastIsOpenState;
     private bool _openDeleteSnapshotPopup;

@@ -1,5 +1,4 @@
 using Dalamud.Utility;
-using Luna;
 
 namespace Snappy.UI.Windows;
 
@@ -98,25 +97,9 @@ public partial class MainWindow
 
     private void DrawSnapshotSortButton()
     {
-        var currentMode = _snappy.Configuration.SnapshotSortMode;
-        var current = Array.Find(SnapshotSortModes, m => m.Mode == currentMode);
-        if (current.Label == null)
-            current = SnapshotSortModes[0];
-
-        if (UiHelpers.IconButton(current.Icon, $"Sort snapshots\nCurrent: {current.Label}"))
-            ImGui.OpenPopup("SnapshotSortPopup");
-
-        using var popup = ImRaii.Popup("SnapshotSortPopup");
-        if (!popup)
-            return;
-
-        foreach (var (mode, icon, label) in SnapshotSortModes)
-        {
-            ImEx.Icon.Draw(icon.Icon());
-            ImGui.SameLine();
-            if (ImGui.Selectable(label, mode == currentMode))
-                SetSnapshotSortMode(mode);
-        }
+        if (UiHelpers.DrawSortButton("SnapshotSortPopup", "Sort snapshots", SnapshotSortModes,
+                _snappy.Configuration.SnapshotSortMode, out var newMode))
+            SetSnapshotSortMode(newMode);
     }
 
     private void HandleSnapshotRename()

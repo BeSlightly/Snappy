@@ -85,6 +85,68 @@ public static class UiHelpers
         return ImEx.Icon.Button(icon.Icon(), tooltip, in config);
     }
 
+    public static (TMode Mode, FontAwesomeIcon Icon, string Label) GetActiveSortMode<TMode>(
+        (TMode Mode, FontAwesomeIcon Icon, string Label)[] modes, TMode current)
+        where TMode : struct, Enum
+    {
+        var active = Array.Find(modes, m => EqualityComparer<TMode>.Default.Equals(m.Mode, current));
+        return active.Label == null ? modes[0] : active;
+    }
+
+    public static bool DrawSortButton<TMode>(string popupId, string tooltipTitle,
+        (TMode Mode, FontAwesomeIcon Icon, string Label)[] modes, TMode current, out TMode newMode)
+        where TMode : struct, Enum
+    {
+        var active = GetActiveSortMode(modes, current);
+        if (IconButton(active.Icon, $"{tooltipTitle}\nCurrent: {active.Label}"))
+            ImGui.OpenPopup(popupId);
+
+        return DrawSortPopup(popupId, modes, current, out newMode);
+    }
+
+    public static bool DrawSortTabButton<TMode>(string popupId, string tooltipTitle,
+        (TMode Mode, FontAwesomeIcon Icon, string Label)[] modes, TMode current, out TMode newMode)
+        where TMode : struct, Enum
+    {
+        var active = GetActiveSortMode(modes, current);
+        bool clicked;
+        using (AwesomeIcon.Font.Push())
+        {
+            clicked = Im.TabBar.Button($"{active.Icon.Icon().Span}##{popupId}", TabItemFlags.Trailing);
+        }
+
+        Im.Tooltip.OnHover($"{tooltipTitle}\nCurrent: {active.Label}");
+        if (clicked)
+            ImGui.OpenPopup(popupId);
+
+        return DrawSortPopup(popupId, modes, current, out newMode);
+    }
+
+    public static bool DrawSortPopup<TMode>(string popupId,
+        (TMode Mode, FontAwesomeIcon Icon, string Label)[] modes, TMode current, out TMode newMode)
+        where TMode : struct, Enum
+    {
+        newMode = current;
+        using var popup = ImRaii.Popup(popupId);
+        if (!popup)
+            return false;
+
+        var changed = false;
+        foreach (var (mode, icon, label) in modes)
+        {
+            var isCurrent = EqualityComparer<TMode>.Default.Equals(mode, current);
+            ImEx.Icon.Draw(icon.Icon());
+            ImGui.SameLine();
+            if (ImGui.Selectable(label, isCurrent) && !isCurrent)
+            {
+                newMode = mode;
+                changed = true;
+            }
+        }
+
+        return changed;
+    }
+
     public static void DrawStatusIcon(FontAwesomeIcon icon, Vector4 color)
     {
         using var _ = ImRaii.PushColor(ImGuiCol.Text, color);

@@ -20,6 +20,57 @@ public partial class MainWindow
         _historyEntryToRename = null;
     }
 
+    private static readonly (HistorySortMode Mode, FontAwesomeIcon Icon, string Label)[] HistorySortModes =
+    [
+        (HistorySortMode.DateNewestFirst, FontAwesomeIcon.SortAmountDown, "Newest first"),
+        (HistorySortMode.DateOldestFirst, FontAwesomeIcon.SortAmountUpAlt, "Oldest first"),
+        (HistorySortMode.NameAscending, FontAwesomeIcon.SortAlphaDown, "Name (A to Z)"),
+        (HistorySortMode.NameDescending, FontAwesomeIcon.SortAlphaUpAlt, "Name (Z to A)")
+    ];
+
+    private readonly List<int> _historyOrder = new();
+
+    private void DrawHistorySortTabButton()
+    {
+        if (UiHelpers.DrawSortTabButton("HistorySortPopup", "Sort entries", HistorySortModes,
+                _historySortMode, out var newMode))
+            _historySortMode = newMode;
+    }
+
+    private List<int> BuildHistoryOrder<T>(List<T> entries)
+        where T : HistoryEntryBase
+    {
+        _historyOrder.Clear();
+        for (var i = 0; i < entries.Count; ++i)
+            _historyOrder.Add(i);
+
+        Comparison<int> comparison = _historySortMode switch
+        {
+            HistorySortMode.DateOldestFirst => (a, b) => CompareTimestamps(entries, a, b),
+            HistorySortMode.NameAscending => (a, b) => CompareDescriptions(entries, a, b),
+            HistorySortMode.NameDescending => (a, b) => CompareDescriptions(entries, b, a),
+            _ => (a, b) => CompareTimestamps(entries, b, a)
+        };
+
+        _historyOrder.Sort(comparison);
+        return _historyOrder;
+    }
+
+    private static int CompareTimestamps<T>(List<T> entries, int a, int b)
+        where T : HistoryEntryBase
+    {
+        var result = string.CompareOrdinal(entries[a].Timestamp, entries[b].Timestamp);
+        return result != 0 ? result : a.CompareTo(b);
+    }
+
+    private static int CompareDescriptions<T>(List<T> entries, int a, int b)
+        where T : HistoryEntryBase
+    {
+        var result = string.Compare(entries[a].Description, entries[b].Description,
+            StringComparison.OrdinalIgnoreCase);
+        return result != 0 ? result : CompareTimestamps(entries, a, b);
+    }
+
     private void DrawHistoryList<T>(string type, List<T> entries)
         where T : HistoryEntryBase
     {
@@ -62,10 +113,11 @@ public partial class MainWindow
             ? _activeSnapshotManager.GetSnapshotForCharacter(selectedActor)
             : null;
         var selectedSnapshotPath = _selectedSnapshot == null ? null : Path.GetFullPath(_selectedSnapshot.FullName);
+        var order = BuildHistoryOrder(entries);
         using var clipper = new Im.ListClipper(totalEntries, rowHeight);
         foreach (var row in clipper)
         {
-            var i = totalEntries - 1 - row;
+            var i = order[row];
             var entry = entries[i];
             ImGui.TableNextRow(ImGuiTableRowFlags.None, rowHeight);
             ImGui.TableNextColumn();

@@ -27,16 +27,24 @@ public partial class MainWindow
         if (!tabBar)
             return;
 
+        var onHistoryTab = false;
+
         using (var tab = Im.TabBar.BeginItem("Glamourer"u8))
         {
             if (tab)
+            {
+                onHistoryTab = true;
                 DrawHistoryList("Glamourer", _glamourerHistory.Entries);
+            }
         }
 
         using (var tab = Im.TabBar.BeginItem("Customize+"u8))
         {
             if (tab)
+            {
+                onHistoryTab = true;
                 DrawHistoryList("Customize+", _customizeHistory.Entries);
+            }
         }
 
         using (var tab = Im.TabBar.BeginItem("PMP Export"u8))
@@ -50,5 +58,8 @@ public partial class MainWindow
             if (tab)
                 DrawCharacterExportTab();
         }
+
+        if (onHistoryTab)
+            DrawHistorySortTabButton();
     }
 }
