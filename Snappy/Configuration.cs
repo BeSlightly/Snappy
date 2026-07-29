@@ -11,6 +11,7 @@ public class Configuration
     public bool UsePenumbraIpcResourcePaths { get; set; }
     public bool IncludeVisibleTempCollectionActors { get; set; }
     public bool DeleteUniqueFilesWithGlamourerHistoryEntry { get; set; }
+    public SnapshotSortMode SnapshotSortMode { get; set; } = SnapshotSortMode.NameAscending;
 
     public bool IsValid()
     {

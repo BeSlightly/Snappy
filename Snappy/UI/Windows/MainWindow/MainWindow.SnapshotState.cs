@@ -25,20 +25,20 @@ public partial class MainWindow
     }
 
     private void LoadSnapshots()
-        => LoadSnapshots(GetSnapshotPaths());
+        => LoadSnapshots(EnumerateSnapshots());
 
     private void RefreshSnapshotsInBackground()
     {
         var refreshVersion = ++_snapshotRefreshVersion;
         _snappy.ExecuteBackgroundTask(() =>
         {
-            var snapshotPaths = GetSnapshotPaths();
+            var snapshots = EnumerateSnapshots();
             _snappy.QueueAction(() =>
             {
                 if (refreshVersion != _snapshotRefreshVersion)
                     return;
 
-                LoadSnapshots(snapshotPaths);
+                LoadSnapshots(snapshots);
                 if (_selectedSnapshot != null && Directory.Exists(_selectedSnapshot.FullName))
                     BeginLoadHistoryForSelectedSnapshot();
                 if (_objIdxSelected != null || _selectedActorAddress != null)
@@ -48,7 +48,7 @@ public partial class MainWindow
         });
     }
 
-    private IReadOnlyList<string> GetSnapshotPaths()
+    private IReadOnlyList<Snapshot> EnumerateSnapshots()
     {
         var directory = _snappy.Configuration.WorkingDirectory;
         if (!Directory.Exists(directory))
@@ -58,6 +58,7 @@ public partial class MainWindow
         {
             return Directory.EnumerateDirectories(directory)
                 .Where(path => File.Exists(Path.Combine(path, Constants.SnapshotFileName)))
+                .Select(path => new Snapshot(path) { CreatedUtc = GetCreationTimeUtc(path) })
                 .ToArray();
         }
         catch (Exception ex)
@@ -67,7 +68,20 @@ public partial class MainWindow
         }
     }
 
-    private void LoadSnapshots(IReadOnlyList<string> snapshotPaths)
+    private static DateTime GetCreationTimeUtc(string snapshotPath)
+    {
+        try
+        {
+            return Directory.GetCreationTimeUtc(snapshotPath);
+        }
+        catch (Exception ex)
+        {
+            PluginLog.Warning($"Failed to read the creation time of '{snapshotPath}': {ex.Message}");
+            return DateTime.MinValue;
+        }
+    }
+
+    private void LoadSnapshots(IReadOnlyList<Snapshot> snapshots)
     {
         var fs = _snappy.SnapshotFS;
         var selectedPath = _selectedSnapshot?.FullName;
@@ -75,20 +89,43 @@ public partial class MainWindow
         foreach (var child in fs.Root.GetChildren(ISortMode.Lexicographical).ToList())
             fs.Delete(child);
 
-        foreach (var snapshotPath in snapshotPaths)
-        {
-            var snapshot = new Snapshot(snapshotPath);
+        foreach (var snapshot in snapshots)
             fs.CreateDataNode(fs.Root, snapshot.Name, snapshot);
-        }
 
-        _snapshotList = fs
-            .Root.GetChildren(ISortMode.Lexicographical)
-            .OfType<IFileSystemData<Snapshot>>()
-            .OrderBy(s => s.Name.ToString(), StringComparer.OrdinalIgnoreCase)
-            .ToArray();
+        _snapshotList = SortSnapshots(
+            fs.Root.GetChildren(ISortMode.Lexicographical).OfType<IFileSystemData<Snapshot>>());
 
         var newSelection = Array.Find(_snapshotList, s => s.Value.FullName == selectedPath);
         _snapshotCombo.SetSelection(newSelection);
+    }
+
+    private IFileSystemData<Snapshot>[] SortSnapshots(IEnumerable<IFileSystemData<Snapshot>> snapshots)
+        => _snappy.Configuration.SnapshotSortMode switch
+        {
+            SnapshotSortMode.NameDescending => snapshots
+                .OrderByDescending(s => s.Value.Name, StringComparer.OrdinalIgnoreCase)
+                .ToArray(),
+            SnapshotSortMode.DateNewestFirst => snapshots
+                .OrderByDescending(s => s.Value.CreatedUtc)
+                .ThenBy(s => s.Value.Name, StringComparer.OrdinalIgnoreCase)
+                .ToArray(),
+            SnapshotSortMode.DateOldestFirst => snapshots
+                .OrderBy(s => s.Value.CreatedUtc)
+                .ThenBy(s => s.Value.Name, StringComparer.OrdinalIgnoreCase)
+                .ToArray(),
+            _ => snapshots
+                .OrderBy(s => s.Value.Name, StringComparer.OrdinalIgnoreCase)
+                .ToArray()
+        };
+
+    private void SetSnapshotSortMode(SnapshotSortMode mode)
+    {
+        if (_snappy.Configuration.SnapshotSortMode == mode)
+            return;
+
+        _snappy.Configuration.SnapshotSortMode = mode;
+        _snappy.Configuration.Save();
+        _snapshotList = SortSnapshots(_snapshotList);
     }
 
     private void ClearSnapshotSelection()

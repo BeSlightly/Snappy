@@ -1,4 +1,5 @@
 using Dalamud.Utility;
+using Luna;
 
 namespace Snappy.UI.Windows;
 
@@ -19,7 +20,7 @@ public partial class MainWindow
         }
         else
         {
-            var iconBarWidth = (ImGui.GetFrameHeight() + ImGui.GetStyle().ItemSpacing.X) * 3;
+            var iconBarWidth = (ImGui.GetFrameHeight() + ImGui.GetStyle().ItemSpacing.X) * 4;
             var comboWidth =
                 ImGui.GetContentRegionAvail().X - iconBarWidth - ImGui.GetStyle().ItemSpacing.X;
 
@@ -37,6 +38,9 @@ public partial class MainWindow
 
             if (ImGui.IsItemHovered() && _snapshotList.Length == 0)
                 Im.Tooltip.OnHover("No snapshots exist yet. Save one first."u8);
+
+            ImGui.SameLine();
+            DrawSnapshotSortButton();
 
             ImGui.SameLine();
             if (
@@ -81,6 +85,37 @@ public partial class MainWindow
                 )
             )
                 _openDeleteSnapshotPopup = true;
+        }
+    }
+
+    private static readonly (SnapshotSortMode Mode, FontAwesomeIcon Icon, string Label)[] SnapshotSortModes =
+    [
+        (SnapshotSortMode.NameAscending, FontAwesomeIcon.SortAlphaDown, "Name (A to Z)"),
+        (SnapshotSortMode.NameDescending, FontAwesomeIcon.SortAlphaUpAlt, "Name (Z to A)"),
+        (SnapshotSortMode.DateNewestFirst, FontAwesomeIcon.SortAmountDown, "Date (newest first)"),
+        (SnapshotSortMode.DateOldestFirst, FontAwesomeIcon.SortAmountUpAlt, "Date (oldest first)")
+    ];
+
+    private void DrawSnapshotSortButton()
+    {
+        var currentMode = _snappy.Configuration.SnapshotSortMode;
+        var current = Array.Find(SnapshotSortModes, m => m.Mode == currentMode);
+        if (current.Label == null)
+            current = SnapshotSortModes[0];
+
+        if (UiHelpers.IconButton(current.Icon, $"Sort snapshots\nCurrent: {current.Label}"))
+            ImGui.OpenPopup("SnapshotSortPopup");
+
+        using var popup = ImRaii.Popup("SnapshotSortPopup");
+        if (!popup)
+            return;
+
+        foreach (var (mode, icon, label) in SnapshotSortModes)
+        {
+            ImEx.Icon.Draw(icon.Icon());
+            ImGui.SameLine();
+            if (ImGui.Selectable(label, mode == currentMode))
+                SetSnapshotSortMode(mode);
         }
     }
 
