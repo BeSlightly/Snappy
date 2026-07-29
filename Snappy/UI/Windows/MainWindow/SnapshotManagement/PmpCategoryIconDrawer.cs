@@ -87,9 +87,9 @@ internal sealed class PmpCategoryIconDrawer : IDisposable
                 armouryIcons.LoadTexturePart("ui/uld/ArmouryBoard_hr1.tex", 10));
             Add(ChangedItemIconFlag.Finger,
                 armouryIcons.LoadTexturePart("ui/uld/ArmouryBoard_hr1.tex", 11));
-            AddGameTexture(ChangedItemIconFlag.Monster, "ui/icon/062000/062044_hr1.tex");
-            AddGameTexture(ChangedItemIconFlag.Demihuman, "ui/icon/062000/062043_hr1.tex");
-            AddGameTexture(ChangedItemIconFlag.Customization, "ui/icon/062000/062045_hr1.tex");
+            AddGameTexture(ChangedItemIconFlag.Monster, "ui/icon/062000/062047_hr1.tex");
+            AddGameTexture(ChangedItemIconFlag.Demihuman, "ui/icon/062000/062044_hr1.tex");
+            AddGameTexture(ChangedItemIconFlag.Customization, "ui/icon/062000/062046_hr1.tex");
             AddGameTexture(ChangedItemIconFlag.Action, "ui/icon/062000/062001_hr1.tex");
             Add(ChangedItemIconFlag.Emote, LoadEmoteTexture());
             Add(ChangedItemIconFlag.Unknown, LoadUnknownTexture());
