@@ -22,10 +22,10 @@ public partial class MainWindow
 
     private static readonly (HistorySortMode Mode, FontAwesomeIcon Icon, string Label)[] HistorySortModes =
     [
-        (HistorySortMode.DateNewestFirst, FontAwesomeIcon.SortAmountDown, "Newest first"),
-        (HistorySortMode.DateOldestFirst, FontAwesomeIcon.SortAmountUpAlt, "Oldest first"),
         (HistorySortMode.NameAscending, FontAwesomeIcon.SortAlphaDown, "Name (A to Z)"),
-        (HistorySortMode.NameDescending, FontAwesomeIcon.SortAlphaUpAlt, "Name (Z to A)")
+        (HistorySortMode.NameDescending, FontAwesomeIcon.SortAlphaUpAlt, "Name (Z to A)"),
+        (HistorySortMode.DateNewestFirst, FontAwesomeIcon.SortAmountDown, "Date (newest first)"),
+        (HistorySortMode.DateOldestFirst, FontAwesomeIcon.SortAmountUpAlt, "Date (oldest first)")
     ];
 
     private readonly List<int> _historyOrder = new();

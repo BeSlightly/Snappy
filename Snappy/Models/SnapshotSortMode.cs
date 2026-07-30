@@ -5,5 +5,7 @@ public enum SnapshotSortMode
     NameAscending,
     NameDescending,
     DateNewestFirst,
-    DateOldestFirst
+    DateOldestFirst,
+    ModifiedNewestFirst,
+    ModifiedOldestFirst
 }

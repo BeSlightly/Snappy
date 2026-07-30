@@ -91,8 +91,10 @@ public partial class MainWindow
     [
         (SnapshotSortMode.NameAscending, FontAwesomeIcon.SortAlphaDown, "Name (A to Z)"),
         (SnapshotSortMode.NameDescending, FontAwesomeIcon.SortAlphaUpAlt, "Name (Z to A)"),
-        (SnapshotSortMode.DateNewestFirst, FontAwesomeIcon.SortAmountDown, "Date (newest first)"),
-        (SnapshotSortMode.DateOldestFirst, FontAwesomeIcon.SortAmountUpAlt, "Date (oldest first)")
+        (SnapshotSortMode.DateNewestFirst, FontAwesomeIcon.SortAmountDown, "Created (newest first)"),
+        (SnapshotSortMode.DateOldestFirst, FontAwesomeIcon.SortAmountUpAlt, "Created (oldest first)"),
+        (SnapshotSortMode.ModifiedNewestFirst, FontAwesomeIcon.SortNumericDown, "Modified (newest first)"),
+        (SnapshotSortMode.ModifiedOldestFirst, FontAwesomeIcon.SortNumericUpAlt, "Modified (oldest first)")
     ];
 
     private void DrawSnapshotSortButton()

@@ -58,7 +58,11 @@ public partial class MainWindow
         {
             return Directory.EnumerateDirectories(directory)
                 .Where(path => File.Exists(Path.Combine(path, Constants.SnapshotFileName)))
-                .Select(path => new Snapshot(path) { CreatedUtc = GetCreationTimeUtc(path) })
+                .Select(path => new Snapshot(path)
+                {
+                    CreatedUtc = GetCreationTimeUtc(path),
+                    ModifiedUtc = GetModifiedTimeUtc(path)
+                })
                 .ToArray();
         }
         catch (Exception ex)
@@ -79,6 +83,30 @@ public partial class MainWindow
             PluginLog.Warning($"Failed to read the creation time of '{snapshotPath}': {ex.Message}");
             return DateTime.MinValue;
         }
+    }
+
+    private static DateTime GetModifiedTimeUtc(string snapshotPath)
+    {
+        var paths = SnapshotPaths.From(snapshotPath);
+        var modified = DateTime.MinValue;
+        foreach (var file in new[] { paths.SnapshotFile, paths.GlamourerHistoryFile, paths.CustomizeHistoryFile })
+        {
+            try
+            {
+                if (!File.Exists(file))
+                    continue;
+
+                var writeTime = File.GetLastWriteTimeUtc(file);
+                if (writeTime > modified)
+                    modified = writeTime;
+            }
+            catch (Exception ex)
+            {
+                PluginLog.Warning($"Failed to read the write time of '{file}': {ex.Message}");
+            }
+        }
+
+        return modified;
     }
 
     private void LoadSnapshots(IReadOnlyList<Snapshot> snapshots)
@@ -111,6 +139,14 @@ public partial class MainWindow
                 .ToArray(),
             SnapshotSortMode.DateOldestFirst => snapshots
                 .OrderBy(s => s.Value.CreatedUtc)
+                .ThenBy(s => s.Value.Name, StringComparer.OrdinalIgnoreCase)
+                .ToArray(),
+            SnapshotSortMode.ModifiedNewestFirst => snapshots
+                .OrderByDescending(s => s.Value.ModifiedUtc)
+                .ThenBy(s => s.Value.Name, StringComparer.OrdinalIgnoreCase)
+                .ToArray(),
+            SnapshotSortMode.ModifiedOldestFirst => snapshots
+                .OrderBy(s => s.Value.ModifiedUtc)
                 .ThenBy(s => s.Value.Name, StringComparer.OrdinalIgnoreCase)
                 .ToArray(),
             _ => snapshots
