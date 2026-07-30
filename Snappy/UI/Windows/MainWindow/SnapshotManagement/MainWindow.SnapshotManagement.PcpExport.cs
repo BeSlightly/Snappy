@@ -56,31 +56,9 @@ public partial class MainWindow
                 ImGui.AlignTextToFramePadding();
                 Im.Text("Glamourer"u8);
                 ImGui.Spacing();
-                ImGui.SetNextItemWidth(-1);
 
-                var glamourerPreview = _pcpSelectedGlamourerEntry != null
-                    ? HistoryEntryUtil.FormatEntryPreview(_pcpSelectedGlamourerEntry)
-                    : "Use latest entry";
-                using (var combo = ImRaii.Combo("##PcpGlamourerEntry", glamourerPreview))
-                {
-                    if (combo)
-                    {
-                        var useLatestSelected = _pcpSelectedGlamourerEntry == null;
-                        if (ImGui.Selectable("Use latest entry", useLatestSelected))
-                            _pcpSelectedGlamourerEntry = null;
-                        if (useLatestSelected) ImGui.SetItemDefaultFocus();
-
-                        for (var i = _glamourerHistory.Entries.Count - 1; i >= 0; i--)
-                        {
-                            var entry = _glamourerHistory.Entries[i];
-                            var label = HistoryEntryUtil.FormatEntryPreview(entry);
-                            var isSelected = ReferenceEquals(_pcpSelectedGlamourerEntry, entry);
-                            if (ImGui.Selectable(label, isSelected))
-                                _pcpSelectedGlamourerEntry = entry;
-                            if (isSelected) ImGui.SetItemDefaultFocus();
-                        }
-                    }
-                }
+                _pcpGlamourerCombo.Draw("##PcpGlamourerEntry", _pcpGlamourerCombo.PreviewLabel,
+                    ImGui.GetContentRegionAvail().X);
 
                 Im.Tooltip.OnHover(
                     "Pick a specific Glamourer design to include in the export. If not selected, the latest design will be used.");
@@ -89,31 +67,9 @@ public partial class MainWindow
                 ImGui.AlignTextToFramePadding();
                 Im.Text("Customize+"u8);
                 ImGui.Spacing();
-                ImGui.SetNextItemWidth(-1);
 
-                var customizePreview = _pcpSelectedCustomizeEntry != null
-                    ? HistoryEntryUtil.FormatEntryPreview(_pcpSelectedCustomizeEntry)
-                    : "Use latest entry";
-                using (var combo = ImRaii.Combo("##PcpCustomizeEntry", customizePreview))
-                {
-                    if (combo)
-                    {
-                        var useLatestSelected = _pcpSelectedCustomizeEntry == null;
-                        if (ImGui.Selectable("Use latest entry", useLatestSelected))
-                            _pcpSelectedCustomizeEntry = null;
-                        if (useLatestSelected) ImGui.SetItemDefaultFocus();
-
-                        for (var i = _customizeHistory.Entries.Count - 1; i >= 0; i--)
-                        {
-                            var entry = _customizeHistory.Entries[i];
-                            var label = HistoryEntryUtil.FormatEntryPreview(entry);
-                            var isSelected = ReferenceEquals(_pcpSelectedCustomizeEntry, entry);
-                            if (ImGui.Selectable(label, isSelected))
-                                _pcpSelectedCustomizeEntry = entry;
-                            if (isSelected) ImGui.SetItemDefaultFocus();
-                        }
-                    }
-                }
+                _pcpCustomizeCombo.Draw("##PcpCustomizeEntry", _pcpCustomizeCombo.PreviewLabel,
+                    ImGui.GetContentRegionAvail().X);
 
                 Im.Tooltip.OnHover(
                     "Pick a specific Customize+ profile/template to include in the export. If not selected, the latest entry will be used.");
@@ -210,8 +166,8 @@ public partial class MainWindow
                     return;
 
                 Notify.Info($"Starting PCP export for '{snapshotName}'...");
-                var glam = _pcpSelectedGlamourerEntry;
-                var cust = _pcpSelectedCustomizeEntry;
+                var glam = PcpSelectedGlamourerEntry;
+                var cust = PcpSelectedCustomizeEntry;
                 var nameOverride = _pcpPlayerNameOverride;
                 var worldOverride = _pcpSelectedWorldIdOverride;
                 _snappy.ExecuteBackgroundTask(() =>
@@ -240,8 +196,8 @@ public partial class MainWindow
                     return;
 
                 Notify.Info($"Starting MCDF export for '{snapshotName}'...");
-                var glam = _pcpSelectedGlamourerEntry;
-                var cust = _pcpSelectedCustomizeEntry;
+                var glam = PcpSelectedGlamourerEntry;
+                var cust = PcpSelectedCustomizeEntry;
                 _snappy.ExecuteBackgroundTask(() => _mcdfManager.ExportMcdf(snapshotPath, path, glam, cust));
             },
             _snappy.Configuration.WorkingDirectory

@@ -5,88 +5,37 @@ namespace Snappy.UI.Windows;
 
 public partial class MainWindow
 {
-    private readonly record struct PmpHistoryOption(int Index, string Label, string? FileMapId, string? GlamourerBase64);
-
     private void DrawPmpHistorySelector()
     {
-        var options = BuildPmpHistoryOptions();
-        EnsurePmpHistorySelection(options);
+        EnsurePmpHistorySelection();
 
         ImGui.AlignTextToFramePadding();
         Im.Text("Source"u8);
         ImGui.SameLine();
 
-        ImGui.SetNextItemWidth(-1);
-        var preview = _pmpSelectedHistoryLabel ?? "Select a Glamourer entry";
-        using (var combo = ImRaii.Combo("##PmpHistoryEntry", preview))
-        {
-            if (combo)
-            {
-                foreach (var option in options)
-                {
-                    var isSelected = _pmpSelectedHistoryIndex.HasValue && option.Index == _pmpSelectedHistoryIndex.Value;
-                    if (ImGui.Selectable(option.Label, isSelected))
-                    {
-                        _pmpSelectedHistoryIndex = option.Index;
-                        _pmpSelectedHistoryLabel = option.Label;
-                        _pmpSelectedFileMapId = option.FileMapId;
-                        _pmpSelectedGlamourerBase64 = option.GlamourerBase64;
-                        _pmpNeedsRebuild = true;
-                    }
-
-                    if (isSelected)
-                        ImGui.SetItemDefaultFocus();
-                }
-            }
-        }
+        var preview = _pmpHistoryCombo.Selection != null
+            ? _pmpHistoryCombo.PreviewLabel
+            : "Select a Glamourer entry";
+        _pmpHistoryCombo.Draw("##PmpHistoryEntry", preview, ImGui.GetContentRegionAvail().X);
 
         Im.Tooltip.OnHover("Glamourer history entry used to build the export list and filter equipped items."u8);
     }
 
-    private IReadOnlyList<PmpHistoryOption> BuildPmpHistoryOptions()
+    private void EnsurePmpHistorySelection()
     {
-        var options = new List<PmpHistoryOption>();
-        for (var i = _glamourerHistory.Entries.Count - 1; i >= 0; i--)
+        var entries = _glamourerHistory.Entries;
+        if (entries.Count == 0)
         {
-            var entry = _glamourerHistory.Entries[i];
-            var label = $"Glamourer: {HistoryEntryUtil.FormatEntryPreview(entry)}";
-            options.Add(new PmpHistoryOption(i, label, entry.FileMapId, entry.GlamourerString));
-        }
-
-        return options;
-    }
-
-    private void EnsurePmpHistorySelection(IReadOnlyList<PmpHistoryOption> options)
-    {
-        if (options.Count == 0)
-        {
-            _pmpSelectedHistoryLabel = null;
-            _pmpSelectedHistoryIndex = null;
-            _pmpSelectedFileMapId = null;
-            _pmpSelectedGlamourerBase64 = null;
+            _pmpHistoryCombo.SetSelection(null);
             return;
         }
 
-        var stillValid = _pmpSelectedHistoryIndex.HasValue
-                         && options.Any(o => o.Index == _pmpSelectedHistoryIndex.Value);
-        if (stillValid)
-        {
-            var match = options.First(o => o.Index == _pmpSelectedHistoryIndex);
-            _pmpSelectedHistoryLabel = match.Label;
-            _pmpSelectedGlamourerBase64 = match.GlamourerBase64;
-            _pmpSelectedFileMapId = match.FileMapId;
+        var current = _pmpHistoryCombo.Selection;
+        if (current != null && entries.Any(e => ReferenceEquals(e, current)))
             return;
-        }
 
-        var defaultOption = options.FirstOrDefault(o => !string.IsNullOrWhiteSpace(o.GlamourerBase64));
-        if (string.IsNullOrEmpty(defaultOption.Label))
-            defaultOption = options[0];
-
-        _pmpSelectedHistoryIndex = defaultOption.Index;
-        _pmpSelectedHistoryLabel = defaultOption.Label;
-        _pmpSelectedFileMapId = defaultOption.FileMapId;
-        _pmpSelectedGlamourerBase64 = defaultOption.GlamourerBase64;
-        _pmpNeedsRebuild = true;
+        var fallback = entries.LastOrDefault(e => !string.IsNullOrWhiteSpace(e.GlamourerString)) ?? entries[^1];
+        _pmpHistoryCombo.SetSelection(fallback);
     }
 
     private void RequestPmpChangedItemsBuild()
@@ -94,7 +43,8 @@ public partial class MainWindow
         if (_selectedSnapshotInfo == null)
             return;
 
-        var fileMapId = _pmpSelectedFileMapId ?? _selectedSnapshotInfo.CurrentFileMapId;
+        var fileMapId = PmpSelectedFileMapId ?? _selectedSnapshotInfo.CurrentFileMapId;
+        var glamourerBase64 = PmpSelectedGlamourerBase64;
         var resolvedFileMap = FileMapUtil.ResolveFileMap(_selectedSnapshotInfo, fileMapId);
         var resolvedFileSwaps = FileMapUtil.ResolveFileSwaps(_selectedSnapshotInfo, fileMapId);
 
@@ -116,9 +66,9 @@ public partial class MainWindow
             {
                 var result = await _snapshotChangedItemService.BuildChangedItemsAsync(gamePaths, manipulations,
                     resolvedFileMap, filesDirectory);
-                var allowedKeys = await _snapshotChangedItemService.GetEquippedItemKeysAsync(_pmpSelectedGlamourerBase64);
+                var allowedKeys = await _snapshotChangedItemService.GetEquippedItemKeysAsync(glamourerBase64);
                 var customizationFilter =
-                    await _snapshotChangedItemService.GetCustomizationFilterAsync(_pmpSelectedGlamourerBase64);
+                    await _snapshotChangedItemService.GetCustomizationFilterAsync(glamourerBase64);
                 var customizationOverrides =
                     await _snapshotChangedItemService.GetCustomizationKeysFromManipulationsAsync(
                         manipulations,

@@ -22,7 +22,7 @@ public partial class MainWindow
         {
             var snapshotPath = _selectedSnapshot.FullName;
             var snapshotName = _selectedSnapshot.Name;
-            var fileMapId = _pmpSelectedFileMapId ?? _selectedSnapshotInfo.CurrentFileMapId;
+            var fileMapId = PmpSelectedFileMapId ?? _selectedSnapshotInfo.CurrentFileMapId;
             var resolvedFileMap = FileMapUtil.ResolveFileMap(_selectedSnapshotInfo, fileMapId);
             var resolvedFileSwaps = FileMapUtil.ResolveFileSwaps(_selectedSnapshotInfo, fileMapId);
 

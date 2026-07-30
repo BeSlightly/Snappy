@@ -28,7 +28,7 @@
     "DownloadLinkTesting": "https://github.com/BeSlightly/Snappy/releases/download/v0.5.2.6/latest.zip",
     "IconUrl": "https://raw.githubusercontent.com/BeSlightly/Snappy/refs/heads/master/snappy.png",
     "LastUpdate": 1785315667,
-    "Changelog": "Experimental support for Laci Synchroni",
+    "Changelog": "Added sorting options to snapshot selector and glamourer/customize+ entries",
     "DownloadCount": 9400,
     "TestingAssemblyVersion": "0.5.2.6"
   }

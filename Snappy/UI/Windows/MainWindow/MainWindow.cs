@@ -32,16 +32,26 @@ public partial class MainWindow : Window, IDisposable
 
     private HistoryEntryBase? _historyEntryToRename;
 
-    private GlamourerHistoryEntry? _pcpSelectedGlamourerEntry;
-    private CustomizeHistoryEntry? _pcpSelectedCustomizeEntry;
+    private readonly HistoryEntryCombo<GlamourerHistoryEntry> _pcpGlamourerCombo;
+    private readonly HistoryEntryCombo<CustomizeHistoryEntry> _pcpCustomizeCombo;
+    private readonly HistoryEntryCombo<GlamourerHistoryEntry> _pmpHistoryCombo;
+
+    private GlamourerHistoryEntry? PcpSelectedGlamourerEntry
+        => _pcpGlamourerCombo.Selection;
+
+    private CustomizeHistoryEntry? PcpSelectedCustomizeEntry
+        => _pcpCustomizeCombo.Selection;
+
+    private string? PmpSelectedFileMapId
+        => _pmpHistoryCombo.Selection?.FileMapId;
+
+    private string? PmpSelectedGlamourerBase64
+        => _pmpHistoryCombo.Selection?.GlamourerString;
+
     private string _pcpPlayerNameOverride = string.Empty;
     private int? _pcpSelectedWorldIdOverride;
     private SnapshotChangedItemSet? _pmpChangedItems;
     private readonly Dictionary<string, bool> _pmpItemSelection = new(StringComparer.OrdinalIgnoreCase);
-    private string? _pmpSelectedFileMapId;
-    private string? _pmpSelectedHistoryLabel;
-    private int? _pmpSelectedHistoryIndex;
-    private string? _pmpSelectedGlamourerBase64;
     private bool _pmpIsBuilding;
     private int _pmpBuildToken;
     private int _historyLoadVersion;
@@ -94,6 +104,14 @@ public partial class MainWindow : Window, IDisposable
         _ipcManager = ipcManager;
         _snapshotCombo = new SnapshotCombo(() => _snapshotList);
         _snapshotCombo.SelectionChanged += OnSnapshotSelectionChanged;
+
+        _pcpGlamourerCombo = new HistoryEntryCombo<GlamourerHistoryEntry>(
+            () => _glamourerHistory.Entries, "Use latest entry");
+        _pcpCustomizeCombo = new HistoryEntryCombo<CustomizeHistoryEntry>(
+            () => _customizeHistory.Entries, "Use latest entry");
+
+        _pmpHistoryCombo = new HistoryEntryCombo<GlamourerHistoryEntry>(() => _glamourerHistory.Entries);
+        _pmpHistoryCombo.SelectionChanged += _ => _pmpNeedsRebuild = true;
 
         _pcpWorldSelector.EmptyName = "Use snapshot's world";
         _pcpWorldSelector.DisplayCurrent = false;
