@@ -19,7 +19,6 @@ public sealed class PenumbraIpc : IpcSubscriber
     private readonly GetMetaManipulations _getMeta;
     private readonly GetGameObjectResourcePaths _getResourcePaths;
     private readonly RedrawObject _redraw;
-    private readonly Dictionary<int, Guid> _tempCollectionGuids = new();
     private DateTime _collectionCacheStamp = DateTime.MinValue;
     private HashSet<Guid> _persistentCollectionIds = [];
 
@@ -131,25 +130,18 @@ public sealed class PenumbraIpc : IpcSubscriber
         }
     }
 
-    public bool RemoveTemporaryCollection(int objIdx)
+    public bool RemoveTemporaryCollection(Guid collection)
     {
         if (!IsReady()) return false;
 
-        if (!_tempCollectionGuids.TryGetValue(objIdx, out var guid))
+        PluginLog.Information($"[Penumbra] Deleting temporary collection {collection}");
+        if (!TryDeleteCollection(collection, out var ret))
         {
-            PluginLog.Debug($"[Penumbra] No temporary collection GUID found for object index '{objIdx}' to remove.");
-            return true;
-        }
-
-        PluginLog.Information($"[Penumbra] Deleting temporary collection for object index {objIdx} (Guid: {guid})");
-        if (!TryDeleteCollection(guid, out var ret))
-        {
-            PluginLog.Warning($"[Penumbra] Failed to delete temporary collection {guid}: {ret}");
+            PluginLog.Warning($"[Penumbra] Failed to delete temporary collection {collection}: {ret}");
             return false;
         }
 
         PluginLog.Debug("[Penumbra] DeleteTemporaryCollection returned: " + ret);
-        _tempCollectionGuids.Remove(objIdx);
         return true;
     }
 
@@ -163,8 +155,10 @@ public sealed class PenumbraIpc : IpcSubscriber
         return IsReady() ? _getMeta.Invoke(objIdx) : string.Empty;
     }
 
-    public bool SetTemporaryMods(ICharacter character, int? idx, Dictionary<string, string> mods, string manips)
+    public bool SetTemporaryMods(ICharacter character, int? idx, Dictionary<string, string> mods, string manips,
+        out Guid collectionId)
     {
+        collectionId = Guid.Empty;
         if (!IsReady() || idx == null) return false;
 
         var collection = Guid.Empty;
@@ -201,11 +195,7 @@ public sealed class PenumbraIpc : IpcSubscriber
                 return false;
             }
 
-            if (_tempCollectionGuids.TryGetValue(idx.Value, out var oldCollection) && oldCollection != collection
-                && !TryDeleteCollection(oldCollection, out var deleteResult))
-                PluginLog.Warning($"[Penumbra] Failed to delete replaced collection {oldCollection}: {deleteResult}");
-
-            _tempCollectionGuids[idx.Value] = collection;
+            collectionId = collection;
             return true;
         }
         catch (Exception ex)
@@ -249,8 +239,7 @@ public sealed class PenumbraIpc : IpcSubscriber
     {
         if (!isAvailable && wasAvailable)
         {
-            PluginLog.Information("[Penumbra] Plugin unloaded, clearing temporary collections");
-            _tempCollectionGuids.Clear();
+            PluginLog.Information("[Penumbra] Plugin unloaded, clearing collection cache");
             _persistentCollectionIds.Clear();
             _collectionCacheStamp = DateTime.MinValue;
         }

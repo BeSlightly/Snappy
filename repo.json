@@ -28,7 +28,7 @@
     "DownloadLinkTesting": "https://github.com/BeSlightly/Snappy/releases/download/v0.5.2.6/latest.zip",
     "IconUrl": "https://raw.githubusercontent.com/BeSlightly/Snappy/refs/heads/master/snappy.png",
     "LastUpdate": 1785400892,
-    "Changelog": "Added sorting options to snapshot selector and glamourer/customize+ entries",
+    "Changelog": "Fixed a bug where temp collections would not be cleaned up properly.",
     "DownloadCount": 10011,
     "TestingAssemblyVersion": "0.5.2.6"
   }

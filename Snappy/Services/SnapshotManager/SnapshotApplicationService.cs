@@ -68,23 +68,24 @@ public class SnapshotApplicationService : ISnapshotApplicationService
 
     private bool ApplyLoadPlan(ICharacter characterApplyTo, int objIdx, bool isOnLocalPlayer, SnapshotLoadPlan plan)
     {
-        var appliedPenumbraCollection = false;
+        var existingSnapshot = _activeSnapshotManager.GetSnapshotForCharacter(characterApplyTo);
+        var penumbraCollectionId = existingSnapshot?.PenumbraCollectionId;
         if (plan.ApplyFiles)
         {
+            if (penumbraCollectionId.HasValue &&
+                !_ipcManager.PenumbraRemoveTemporaryCollection(penumbraCollectionId.Value))
+                return false;
+
+            penumbraCollectionId = null;
             if (plan.ModdedPaths.Any() || !string.IsNullOrEmpty(plan.ResolvedManipulations))
             {
-                appliedPenumbraCollection = _ipcManager.PenumbraSetTempMods(characterApplyTo, objIdx,
-                    plan.ModdedPaths, plan.ResolvedManipulations);
-                if (!appliedPenumbraCollection)
+                if (!_ipcManager.PenumbraSetTempMods(characterApplyTo, objIdx,
+                        plan.ModdedPaths, plan.ResolvedManipulations, out var collectionId))
                     return false;
-            }
-            else if (!_ipcManager.PenumbraRemoveTemporaryCollection(characterApplyTo.ObjectIndex))
-            {
-                return false;
+                penumbraCollectionId = collectionId;
             }
         }
 
-        var existingSnapshot = _activeSnapshotManager.GetSnapshotForCharacter(characterApplyTo);
         _activeSnapshotManager.RemoveAllSnapshotsForCharacter(characterApplyTo);
         Guid? cplusProfileId = null;
         if (plan.CustomizePlusAvailable)
@@ -128,9 +129,6 @@ public class SnapshotApplicationService : ISnapshotApplicationService
         if (shouldRedraw)
             _ipcManager.PenumbraRedraw(objIdx);
 
-        var hasPenumbraCollection = plan.ApplyFiles
-            ? appliedPenumbraCollection
-            : existingSnapshot?.HasPenumbraCollection == true;
         var hasGlamourerState = appliedGlamourerState || existingSnapshot?.HasGlamourerState == true;
         var isGlamourerLocked = appliedGlamourerState
             ? true
@@ -142,7 +140,7 @@ public class SnapshotApplicationService : ISnapshotApplicationService
         var appliedGlamourer = plan.AppliedGlamourerTimestamp != null;
         var appliedCustomizeTracked = plan.CustomizePlusAvailable && plan.AppliedCustomizeTimestamp != null;
         _activeSnapshotManager.AddSnapshot(new ActiveSnapshot(characterApplyTo.ObjectIndex, finalCplusProfileId,
-            isOnLocalPlayer, characterApplyTo.Name.TextValue, isGlamourerLocked, hasPenumbraCollection,
+            isOnLocalPlayer, characterApplyTo.Name.TextValue, isGlamourerLocked, penumbraCollectionId,
             hasGlamourerState)
         {
             GlamourerSnapshotPath = appliedGlamourer

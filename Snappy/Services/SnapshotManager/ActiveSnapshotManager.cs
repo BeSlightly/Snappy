@@ -43,7 +43,9 @@ public class ActiveSnapshotManager : IActiveSnapshotManager
 
         if (revertedCount > 0)
             Notify.Success($"Reverted {revertedCount} active snapshot(s).");
-        else
+        if (HasActiveSnapshots)
+            Notify.Error("Some snapshots could not be reverted. Please try again.");
+        else if (revertedCount == 0)
             Notify.Info("No active snapshots to revert.");
     }
 
@@ -65,12 +67,12 @@ public class ActiveSnapshotManager : IActiveSnapshotManager
 
         foreach (var snapshot in snapshotsToRevert)
         {
-            var redrawIndex = RevertSnapshot(snapshot, localPlayer, logOnRetarget: false);
+            if (!RevertSnapshot(snapshot, localPlayer, logOnRetarget: false, out var redrawIndex))
+                continue;
+            _activeSnapshots.Remove(snapshot);
             if (redrawIndex.HasValue)
                 indicesToRedraw.Add(redrawIndex.Value);
         }
-
-        _activeSnapshots.RemoveAll(s => snapshotsToRevert.Contains(s));
 
         foreach (var index in indicesToRedraw)
             if (Svc.Objects[index] != null)
@@ -79,7 +81,10 @@ public class ActiveSnapshotManager : IActiveSnapshotManager
                 _ipcManager.PenumbraRedraw(index);
             }
 
-        Notify.Success($"Reverted snapshot for {character.Name.TextValue}.");
+        if (snapshotsToRevert.Any(s => _activeSnapshots.Contains(s)))
+            Notify.Error($"Could not fully revert snapshot for {character.Name.TextValue}. Please try again.");
+        else
+            Notify.Success($"Reverted snapshot for {character.Name.TextValue}.");
     }
 
     public bool IsActorLockedBySnappy(ICharacter character)
@@ -237,10 +242,16 @@ public class ActiveSnapshotManager : IActiveSnapshotManager
 
         var indicesToRedraw = new HashSet<int>();
         var localPlayer = Player.Object;
+        var revertedCount = 0;
 
         foreach (var snapshot in snapshotsToRevert)
         {
-            var redrawIndex = RevertSnapshot(snapshot, localPlayer, logOnRetarget: true);
+            if (!RevertSnapshot(snapshot, localPlayer, logOnRetarget: true, out var redrawIndex))
+            {
+                snapshotsToKeep.Add(snapshot);
+                continue;
+            }
+            revertedCount++;
             if (redrawIndex.HasValue)
                 indicesToRedraw.Add(redrawIndex.Value);
         }
@@ -255,20 +266,26 @@ public class ActiveSnapshotManager : IActiveSnapshotManager
                 _ipcManager.PenumbraRedraw(index);
             }
 
-        return snapshotsToRevert.Count;
+        return revertedCount;
     }
 
-    private int? RevertSnapshot(ActiveSnapshot snapshot, IGameObject? localPlayer, bool logOnRetarget)
+    private bool RevertSnapshot(ActiveSnapshot snapshot, IGameObject? localPlayer, bool logOnRetarget,
+        out int? redrawIndex)
     {
+        redrawIndex = null;
+        if (snapshot.PenumbraCollectionId.HasValue &&
+            !_ipcManager.PenumbraRemoveTemporaryCollection(snapshot.PenumbraCollectionId.Value))
+        {
+            PluginLog.Warning($"Could not delete snapshot collection {snapshot.PenumbraCollectionId}. Keeping it tracked for retry.");
+            return false;
+        }
+
         var target = ResolveSnapshotTarget(snapshot, localPlayer, logOnRetarget);
 
         if (target != null)
         {
             PluginLog.Information(
                 $"Reverting state for actor '{target.Name}' at index {target.ObjectIndex} (original index: {snapshot.ObjectIndex}).");
-
-            if (snapshot.HasPenumbraCollection)
-                _ipcManager.PenumbraRemoveTemporaryCollection(target.ObjectIndex);
 
             if (snapshot.CustomizePlusProfileId.HasValue)
                 _ipcManager.RevertCustomizePlusScale(snapshot.CustomizePlusProfileId.Value);
@@ -279,18 +296,16 @@ public class ActiveSnapshotManager : IActiveSnapshotManager
                 _ipcManager.RevertGlamourerToAutomation(target);
             }
 
-            return target.ObjectIndex;
+            redrawIndex = target.ObjectIndex;
+            return true;
         }
 
         PluginLog.Warning(
             $"Could not find a live actor at index {snapshot.ObjectIndex} to revert. Attempting to clear resources regardless.");
-        if (snapshot.HasPenumbraCollection)
-            _ipcManager.PenumbraRemoveTemporaryCollection(snapshot.ObjectIndex);
-
         if (snapshot.CustomizePlusProfileId.HasValue)
             _ipcManager.RevertCustomizePlusScale(snapshot.CustomizePlusProfileId.Value);
 
-        return null;
+        return true;
     }
 
     private static IGameObject? ResolveSnapshotTarget(ActiveSnapshot snapshot, IGameObject? localPlayer,
@@ -323,7 +338,7 @@ public record ActiveSnapshot(
     bool IsOnLocalPlayer,
     string CharacterName,
     bool IsGlamourerLocked,
-    bool HasPenumbraCollection,
+    Guid? PenumbraCollectionId,
     bool HasGlamourerState
 )
 {
