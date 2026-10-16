@@ -51,6 +51,14 @@ https://github.com/BeSlightly/Snappy/raw/refs/heads/master/repo.json
 
 Loading is tested primarily with actors spawned by [Brio](https://github.com/AsgardXIV/Brio). Other actor types may behave differently.
 
+## Known issues
+
+### Glamourer automation and associated mods
+
+There is an issue with Penumbra 1.7.2.1 where Glamourer automation can enable your installed mods in Snappy's temporary collections. This can cause wrong textures or missing models when switching snapshots outside GPose.
+
+If this happens, turn off **Always Apply Associated Mods** in Glamourer's settings, then disable and reenable Penumbra. You can leave automation enabled, but Glamourer will no longer apply associated mods to any collection.
+
 ## Responsible use
 
 The following is a message from the previous developer, which remains relevant to this fork:
