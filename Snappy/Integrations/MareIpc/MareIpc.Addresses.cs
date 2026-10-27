@@ -177,13 +177,21 @@ public sealed partial class MareIpc
 
         try
         {
-            return subscriber.InvokeFunc().Where(addr => addr != nint.Zero).ToHashSet();
+            return InvokeHandledAddresses(subscriber).Where(addr => addr != nint.Zero).ToHashSet();
         }
         catch (Exception ex)
         {
             PluginLog.Debug($"Failed to get {pluginName} handled addresses: {ex.Message}");
             return null;
         }
+    }
+
+    private static List<nint> InvokeHandledAddresses(ICallGateSubscriber<List<nint>> subscriber)
+    {
+        if (Svc.Framework.IsInFrameworkUpdateThread)
+            return subscriber.InvokeFunc();
+
+        return Svc.Framework.RunOnFrameworkThread(() => subscriber.InvokeFunc()).GetAwaiter().GetResult();
     }
 
     private HashSet<nint>? GetVisiblePairedAddressesViaPairs(MarePluginInfo pluginInfo)

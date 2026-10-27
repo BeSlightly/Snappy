@@ -33,13 +33,7 @@ public sealed partial class MareIpc
             var pairObject = GetMarePairFromPlugin(character, marePlugin);
             if (pairObject == null) continue;
 
-            var characterData = pairObject.GetFoP("LastReceivedCharacterData");
-            if (characterData == null)
-            {
-                var handler = pairObject.GetFoP("Handler");
-                if (handler != null)
-                    characterData = handler.GetFoP("LastReceivedCharacterData");
-            }
+            var characterData = GetPairCharacterData(pairObject);
             if (characterData != null)
             {
                 PluginLog.Debug(
@@ -103,6 +97,42 @@ public sealed partial class MareIpc
         }
 
         return null;
+    }
+
+    private static object? GetPairCharacterData(object pairObject)
+    {
+        var characterData = pairObject.GetFoP("LastReceivedCharacterData");
+        if (characterData != null)
+            return characterData;
+
+        characterData = InvokeParameterlessMethod(pairObject, "GetCopyOfPairCharacterData");
+        if (characterData != null)
+            return characterData;
+
+        var handler = pairObject.GetFoP("Handler");
+        if (handler == null || ReferenceEquals(handler, pairObject))
+            return null;
+
+        return handler.GetFoP("LastReceivedCharacterData")
+               ?? InvokeParameterlessMethod(handler, "GetCopyOfPairCharacterData");
+    }
+
+    private static object? InvokeParameterlessMethod(object target, string methodName)
+    {
+        try
+        {
+            var method = target.GetType().GetMethod(methodName,
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+                null,
+                Type.EmptyTypes,
+                null);
+            return method?.Invoke(target, null);
+        }
+        catch (Exception e)
+        {
+            PluginLog.Debug($"[Mare IPC] Failed to invoke {methodName} on {target.GetType().Name}: {e.Message}");
+            return null;
+        }
     }
 
     private static bool IsMatchingPairObject(object pairObject, ICharacter character)

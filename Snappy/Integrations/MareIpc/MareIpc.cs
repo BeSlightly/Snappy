@@ -36,7 +36,7 @@ public sealed partial class MareIpc : IpcSubscriber
         public object? Plugin { get; set; }
         public object? PairManager { get; set; }
         public object? FileCacheManager { get; set; }
-        public MethodInfo? GetFileCacheByHashMethod { get; set; }
+        public MethodInfo? FileCacheLookupMethod { get; set; }
 
         public MarePluginInfo(string pluginName, string namespacePrefix)
         {
@@ -133,18 +133,11 @@ public sealed partial class MareIpc : IpcSubscriber
                     pluginInfo.FileCacheManager = serviceProvider.GetService(fileCacheManagerType);
                     if (pluginInfo.FileCacheManager != null)
                     {
-                        pluginInfo.GetFileCacheByHashMethod = fileCacheManagerType.GetMethod("GetFileCacheByHash",
-                            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
-                            null, [typeof(string), typeof(bool)], null);
+                        pluginInfo.FileCacheLookupMethod = FindFileCacheLookupMethod(fileCacheManagerType);
 
-                        if (pluginInfo.GetFileCacheByHashMethod == null)
-                            pluginInfo.GetFileCacheByHashMethod = fileCacheManagerType.GetMethod("GetFileCacheByHash",
-                                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
-                                null, [typeof(string)], null);
-
-                        if (pluginInfo.GetFileCacheByHashMethod == null)
+                        if (pluginInfo.FileCacheLookupMethod == null)
                             PluginLog.Warning(
-                                $"[Mare IPC] Could not find method GetFileCacheByHash in FileCacheManager for {pluginName}.");
+                                $"[Mare IPC] Could not find a usable file cache lookup method in FileCacheManager for {pluginName}.");
                     }
                 }
 
@@ -198,7 +191,7 @@ public sealed partial class MareIpc : IpcSubscriber
         pluginInfo.Plugin = null;
         pluginInfo.PairManager = null;
         pluginInfo.FileCacheManager = null;
-        pluginInfo.GetFileCacheByHashMethod = null;
+        pluginInfo.FileCacheLookupMethod = null;
     }
 
     private void RefreshPluginAvailability()
