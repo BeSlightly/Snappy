@@ -23,13 +23,13 @@
     "Punchline": "Plugin to save current appearance and applied mods of a character",
     "AcceptsFeedback": false,
     "IsTestingExclusive": "False",
-    "DownloadLinkInstall": "https://github.com/BeSlightly/Snappy/releases/download/v0.5.2.11/latest.zip",
-    "DownloadLinkUpdate": "https://github.com/BeSlightly/Snappy/releases/download/v0.5.2.11/latest.zip",
+    "DownloadLinkInstall": "https://github.com/BeSlightly/Snappy/releases/download/v0.5.2.12/latest.zip",
+    "DownloadLinkUpdate": "https://github.com/BeSlightly/Snappy/releases/download/v0.5.2.12/latest.zip",
     "DownloadLinkTesting": "https://github.com/BeSlightly/Snappy/releases/download/v0.5.2.6/latest.zip",
     "IconUrl": "https://raw.githubusercontent.com/BeSlightly/Snappy/refs/heads/master/snappy.png",
-    "LastUpdate": 1793120407,
+    "LastUpdate": 1793120595,
     "Changelog": "Fix PlayerSync capture",
-    "DownloadCount": 13334,
+    "DownloadCount": 12192,
     "TestingAssemblyVersion": "0.5.2.6"
   }
 ]
