@@ -25,11 +25,11 @@
     "IsTestingExclusive": "False",
     "DownloadLinkInstall": "https://github.com/BeSlightly/Snappy/releases/download/v0.5.2.12/latest.zip",
     "DownloadLinkUpdate": "https://github.com/BeSlightly/Snappy/releases/download/v0.5.2.12/latest.zip",
-    "DownloadLinkTesting": "https://github.com/BeSlightly/Snappy/releases/download/v0.5.2.6/latest.zip",
+    "DownloadLinkTesting": "https://github.com/BeSlightly/Snappy/releases/download/v0.5.2.12/latest.zip",
     "IconUrl": "https://raw.githubusercontent.com/BeSlightly/Snappy/refs/heads/master/snappy.png",
-    "LastUpdate": 1793120595,
+    "LastUpdate": 1795731598,
     "Changelog": "Fix PlayerSync capture",
-    "DownloadCount": 12192,
-    "TestingAssemblyVersion": "0.5.2.6"
+    "DownloadCount": 13810,
+    "TestingAssemblyVersion": "0.5.2.13"
   }
 ]
