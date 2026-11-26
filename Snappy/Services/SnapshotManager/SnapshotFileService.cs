@@ -69,6 +69,7 @@ public class SnapshotFileService : ISnapshotFileService
                            BuildDefaultSnapshotPath(_configuration.WorkingDirectory, charaName, resolvedWorldId,
                                resolvedWorldName);
         var useLiveData = _configuration.UseLiveSnapshotData || isLocalPlayer;
+        var useResourcePaths = _configuration.UseLiveSnapshotData && _configuration.UsePenumbraIpcResourcePaths;
 
         SnapshotLiveState? liveState = null;
         SnapshotData? mareData = null;
@@ -82,18 +83,19 @@ public class SnapshotFileService : ISnapshotFileService
             mareData = _mareSnapshotDataBuilder.BuildFromMare(character);
         }
 
-        var penumbraPaths = CapturePenumbraPaths(objectIndex, useLiveData);
+        var penumbraPaths = CapturePenumbraPaths(objectIndex, useLiveData, useResourcePaths);
 
         return new SnapshotCapture(charaName, objectIndex, resolvedWorldId, resolvedWorldName, snapshotPath,
-            useLiveData, !_configuration.UseLiveSnapshotData && !isLocalPlayer, liveState, mareData, penumbraPaths);
+            useLiveData, useResourcePaths, !_configuration.UseLiveSnapshotData && !isLocalPlayer, liveState, mareData,
+            penumbraPaths);
     }
 
-    private PenumbraPathState CapturePenumbraPaths(int objectIndex, bool useLiveData)
+    private PenumbraPathState CapturePenumbraPaths(int objectIndex, bool useLiveData, bool useResourcePaths)
     {
         var resourcePaths = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
         var collectionFiles = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
-        if (useLiveData && _configuration.UsePenumbraIpcResourcePaths)
+        if (useLiveData && useResourcePaths)
         {
             resourcePaths = _ipcManager.PenumbraGetGameObjectResourcePaths(objectIndex);
         }
@@ -147,7 +149,9 @@ public class SnapshotFileService : ISnapshotFileService
         var resolvedCurrentFileSwaps =
             FileMapUtil.ResolveFileSwaps(snapshotInfo, snapshotInfo.CurrentFileMapId);
 
-        var includeRemovals = !capture.UseLiveData || !_configuration.UsePenumbraIpcResourcePaths;
+        var includeRemovals = !capture.UseLiveData
+                              || !capture.UseResourcePaths
+                              || capture.PenumbraPaths.ResourcePaths.Count > 0;
 
         // Mare users often pause sounds/animations/emotes; those hashes stay in character data
         // but are absent from the local cache. Skip them instead of aborting the whole capture.
@@ -183,7 +187,7 @@ public class SnapshotFileService : ISnapshotFileService
                 $"[Snappy] Skipped {skippedMissingFiles.Count} missing file(s) while capturing '{capture.CharacterName}'.");
         }
 
-        var mapChanged = UpdateFileMaps(snapshotInfo, snapshotData, resolvedCurrentMap, resolvedCurrentFileSwaps,
+        UpdateFileMaps(snapshotInfo, snapshotData, resolvedCurrentMap, resolvedCurrentFileSwaps,
             includeRemovals, now);
 
         snapshotInfo.ManipulationString = snapshotData.Manipulation;
@@ -210,19 +214,19 @@ public class SnapshotFileService : ISnapshotFileService
             PluginLog.Debug("New Glamourer version detected. Appending to history.");
             addedGlamourerEntry = true;
         }
-        if (mapChanged && !addedGlamourerEntry &&
+        if (!addedGlamourerEntry &&
             !string.Equals(lastGlamourerEntry?.FileMapId, snapshotInfo.CurrentFileMapId, StringComparison.OrdinalIgnoreCase))
         {
             var glamourerString = hasGlamourerData
                 ? snapshotData.Glamourer
                 : lastGlamourerEntry?.GlamourerString ?? string.Empty;
-            // Glamourer string unchanged but files changed; record a new entry so users can pick the correct file map.
+            // Glamourer string unchanged but the active file map differs; record a new entry so users get the current file map.
             var entryStamp = DateTime.UtcNow;
             var newEntry = GlamourerHistoryEntry.Create(glamourerString,
                 $"Files Update - {entryStamp:yyyy-MM-dd HH:mm:ss} UTC", snapshotInfo.CurrentFileMapId,
                 b64Customize);
             glamourerHistory.Entries.Add(newEntry);
-            PluginLog.Debug("File map changed without Glamourer change. Added history entry to capture file map.");
+            PluginLog.Debug("Active file map differs without Glamourer change. Added history entry to capture file map.");
             addedGlamourerEntry = true;
         }
 
@@ -280,7 +284,7 @@ public class SnapshotFileService : ISnapshotFileService
                 return null;
 
             // Penumbra maps and actor state are frozen together; file enumeration and hashing remain on the worker.
-            return _configuration.UsePenumbraIpcResourcePaths
+            return capture.UseResourcePaths
                 ? _liveSnapshotDataBuilder.Build(capture.LiveState, capture.PenumbraPaths.ResourcePaths)
                 : _collectionSnapshotDataBuilder.Build(capture.LiveState, capture.PenumbraPaths.CollectionFiles);
         }
@@ -599,20 +603,22 @@ public class SnapshotFileService : ISnapshotFileService
         var updatedSnapshotInfo = snapshotInfo;
         var cleanupPlanned = false;
         string? cleanupSkippedReason = null;
-        if (deleteUniqueGlamourerFiles && deletedGlamourerEntry != null)
+        if (deletedGlamourerEntry != null)
         {
             cleanupPlanned = TryBuildHistoryDeletionPlan(snapshotInfo, deletedGlamourerEntry, glamourerHistory,
-                out updatedSnapshotInfo, out cleanupSkippedReason);
+                out updatedSnapshotInfo, out var planError);
             if (!cleanupPlanned)
             {
                 updatedSnapshotInfo = snapshotInfo;
+                if (deleteUniqueGlamourerFiles)
+                    cleanupSkippedReason = planError;
             }
         }
 
         if (!SaveSnapshotToDiskCore(snapshotPath, updatedSnapshotInfo, glamourerHistory, customizeHistory))
             return new HistoryEntryDeletionResult(false, ErrorMessage: "Could not save the updated snapshot state.");
 
-        if (!cleanupPlanned)
+        if (!deleteUniqueGlamourerFiles || !cleanupPlanned)
             return new HistoryEntryDeletionResult(true, CleanupSkippedReason: cleanupSkippedReason);
 
         // Re-read the committed state and prove each candidate is still unreferenced before touching the file store.
@@ -852,6 +858,7 @@ public class SnapshotFileService : ISnapshotFileService
         string? WorldName,
         string SnapshotPath,
         bool UseLiveData,
+        bool UseResourcePaths,
         bool UseMareFileCache,
         SnapshotLiveState? LiveState,
         SnapshotData? MareData,
